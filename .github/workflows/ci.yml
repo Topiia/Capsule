@@ -1,0 +1,145 @@
+name: VlogSphere CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+# Cancel in-progress runs on new pushes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------
+  # BACKEND INTEGRITY CHECKS
+  # ------------------------------------------------------------------
+  backend:
+    name: Backend API (Node.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      # MongoDB Service
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd mongosh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Redis Service (Required for P2 Features)
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: './backend/package.json'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Security Audit (Dependencies)
+        run: npm audit --audit-level=high
+
+      - name: Lint Code
+        run: npm run lint
+
+      - name: Run Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/vlogsphere_test
+          JWT_SECRET: test_jwt_secret_key_12345
+          JWT_REFRESH_SECRET: test_jwt_refresh_secret_key_12345
+          JWT_EXPIRE: 1h
+          JWT_REFRESH_EXPIRE: 1d
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          ENABLE_CACHING: true
+          # Mock external services for CI
+          CLOUDINARY_CLOUD_NAME: mock_cloud
+          CLOUDINARY_API_KEY: mock_key
+          CLOUDINARY_API_SECRET: mock_secret
+          EMAIL_HOST: localhost
+          EMAIL_PORT: 1025
+          EMAIL_USER: mock_user
+          EMAIL_PASS: mock_pass
+
+  # ------------------------------------------------------------------
+  # FRONTEND INTEGRITY CHECKS
+  # ------------------------------------------------------------------
+  frontend:
+    name: Frontend App (React/Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: './frontend/package.json'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint Code
+        run: npm run lint
+
+      - name: Run Unit Tests
+        run: npm test -- run # Vitest runs in watch mode by default, -- run forces single pass
+
+      - name: Verify Build
+        run: npm run build
+
+  # ------------------------------------------------------------------
+  # SECRET SCANNING (TruffleHog)
+  # ------------------------------------------------------------------
+  secrets:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for secret scanning
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --debug --only-verified
