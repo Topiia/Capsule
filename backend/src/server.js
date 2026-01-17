@@ -84,15 +84,46 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api/', limiter);
 }
 
-// Stricter rate limiting for auth endpoints (disabled in test mode)
-const authLimiter = process.env.NODE_ENV !== 'test' ? rateLimit({
+// SECURITY: Separate rate limiters for different auth endpoint types
+// 1. Login/Register limiter - Strict (prevent brute force)
+const loginLimiter = process.env.NODE_ENV !== 'test' ? rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
+  max: 5, // 5 login attempts per window
   message: {
     success: false,
-    error: 'Too many authentication attempts, please try again later.',
+    errorType: 'ratelimit',
+    error: 'Too many login attempts. Please try again in 15 minutes.',
   },
-  skipSuccessfulRequests: true,
+  skipSuccessfulRequests: true, // Don't count successful logins
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      errorType: 'ratelimit',
+      error: 'Too many login attempts. Please try again in 15 minutes.',
+      retryAfterSeconds: Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000),
+    });
+  },
+}) : (req, res, next) => next();
+
+// 2. Session check limiter - Lenient (allow normal app usage)
+const sessionLimiter = process.env.NODE_ENV !== 'test' ? rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // 30 session checks per window (page refreshes, etc.)
+  message: {
+    success: false,
+    errorType: 'ratelimit',
+    error: 'Too many requests. Please wait a moment.',
+  },
+  standardHeaders: true,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      errorType: 'ratelimit',
+      error: 'Too many requests. Please wait a moment.',
+      retryAfterSeconds: Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000),
+    });
+  },
 }) : (req, res, next) => next();
 
 // Body parser middleware
@@ -137,8 +168,10 @@ app.get('/health/db', (req, res) => {
   }
 });
 
-// API routes
-app.use('/api/auth', authLimiter, authRoutes);
+// API routes with appropriate rate limiting
+// Pass limiters to auth routes
+authRoutes.setLimiters(loginLimiter, sessionLimiter);
+app.use('/api/auth', authRoutes);
 app.use('/api/vlogs', vlogRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', userRoutes);

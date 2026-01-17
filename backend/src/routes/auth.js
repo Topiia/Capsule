@@ -19,19 +19,34 @@ const {
   updatePasswordValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
-  validate,
 } = require('../middleware/validation');
 
-// Routes
-router.post('/register', registerValidation, register);
-router.post('/login', loginValidation, login);
-router.get('/me', protect, getMe);
+// Import rate limiters (defined in server.js, exported via app.locals)
+// We'll pass them from server.js instead
+let loginLimiter;
+let sessionLimiter;
+
+// Export function to set limiters from server.js
+router.setLimiters = (loginLim, sessionLim) => {
+  loginLimiter = loginLim;
+  sessionLimiter = sessionLim;
+};
+
+// Routes with appropriate rate limiting
+// Strict limiting (prevent brute force)
+router.post('/register', loginLimiter, registerValidation, register);
+router.post('/login', loginLimiter, loginValidation, login);
+router.post('/forgotpassword', loginLimiter, forgotPasswordValidation, forgotPassword);
+
+// Lenient limiting (allow normal usage)
+router.get('/me', sessionLimiter, protect, getMe);
+router.post('/refresh', sessionLimiter, refreshToken);
+
+// No rate limiting (protected by auth middleware)
 router.put('/updatedetails', protect, updateProfileValidation, updateDetails);
 router.put('/updatepassword', protect, updatePasswordValidation, updatePassword);
-router.post('/forgotpassword', forgotPasswordValidation, forgotPassword);
 router.put('/resetpassword/:resettoken', resetPasswordValidation, resetPassword);
 router.get('/verify/:token', verifyEmail);
-router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 
 module.exports = router;

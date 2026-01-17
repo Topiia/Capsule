@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  // Deduplication guard: Prevent multiple parallel session init requests
+  const isInitializing = useRef(false)
+  const hasInitialized = useRef(false)
 
   // Logout: Call API to clear cookies, then clear state
   const logout = useCallback(async () => {
@@ -77,10 +81,13 @@ export const AuthProvider = ({ children }) => {
             message = serverMessage || 'Please provide valid email and password.'
             errorType = 'validation'
             break
-          case 429:
-            message = 'Too many login attempts. Please try again in a few minutes.'
+          case 429: {
+            const retryAfter = error.response.data?.retryAfterSeconds || 900 // 15 min default
+            const minutes = Math.ceil(retryAfter / 60)
+            message = `Too many login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`
             errorType = 'ratelimit'
             break
+          }
           case 500:
           case 502:
           case 503:
@@ -182,6 +189,13 @@ export const AuthProvider = ({ children }) => {
   // Cookies sent automatically by browser with withCredentials: true
   useEffect(() => {
     const initAuth = async () => {
+      // Prevent duplicate requests (React 18 StrictMode calls effects twice in dev)
+      if (isInitializing.current || hasInitialized.current) {
+        return
+      }
+
+      isInitializing.current = true
+
       try {
         // Try to get current user (cookie sent automatically)
         const response = await authAPI.getMe()
@@ -202,16 +216,37 @@ export const AuthProvider = ({ children }) => {
 
             console.log('Session restored via refresh token')
           } catch (refreshError) {
-            // Refresh failed, user not logged in
-            console.log('Session restoration failed, user not logged in')
+            // Check if it's a rate limit error
+            if (refreshError.response?.status === 429) {
+              const retryAfter = refreshError.response.data?.retryAfterSeconds || 60
+              console.warn(`Rate limited. Retry after ${retryAfter} seconds`)
+              toast.error(
+                `Too many requests. Please wait ${retryAfter} seconds and refresh.`,
+                { duration: retryAfter * 1000 }
+              )
+            } else {
+              // Refresh failed, user not logged in
+              console.log('Session restoration failed, user not logged in')
+            }
             setIsAuthenticated(false)
           }
+        } else if (error.response?.status === 429) {
+          // Rate limit on initial /me call
+          const retryAfter = error.response.data?.retryAfterSeconds || 60
+          console.warn(`Rate limited on /me. Retry after ${retryAfter} seconds`)
+          toast.error(
+            `Too many requests. Please wait ${retryAfter} seconds.`,
+            { duration: retryAfter * 1000 }
+          )
+          setIsAuthenticated(false)
         } else {
           // Other error, assume not logged in
           setIsAuthenticated(false)
         }
       } finally {
         setLoading(false)
+        isInitializing.current = false
+        hasInitialized.current = true
       }
     }
 
