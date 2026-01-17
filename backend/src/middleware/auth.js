@@ -10,10 +10,9 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
   // Check for token in Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  // Check for token in cookies
-  else if (req.cookies.token) {
+    [, token] = req.headers.authorization.split(' ');
+  } else if (req.cookies.token) {
+    // Check for token in cookies
     token = req.cookies.token;
   }
 
@@ -38,7 +37,11 @@ exports.protect = asyncHandler(async (req, res, next) => {
       // Auto-activate for easier development
       if (typeof user.isActive === 'undefined' || user.isActive === false) {
         user.isActive = true;
-        try { await User.findByIdAndUpdate(user._id, { isActive: true }); } catch (err) { /* ignore */ }
+        try {
+          await User.findByIdAndUpdate(user._id, { isActive: true });
+        } catch (err) {
+          // Ignore activation errors in development
+        }
       }
     } else if (!user.isActive) {
       // Production: reject inactive users
@@ -66,10 +69,9 @@ exports.optionalAuth = asyncHandler(async (req, res, next) => {
 
   // Check for token in Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  // Check for token in cookies
-  else if (req.cookies.token) {
+    [, token] = req.headers.authorization.split(' ');
+  } else if (req.cookies.token) {
+    // Check for token in cookies
     token = req.cookies.token;
   }
 
@@ -218,7 +220,7 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 });
 
 // SECURITY: Logout middleware - revokes all active sessions
-exports.logout = asyncHandler(async (req, res, next) => {
+exports.logout = asyncHandler(async (req, res, _next) => {
   if (req.user) {
     // SECURITY: Revoke all sessions for this user
     // This prevents any existing refresh tokens from being used
@@ -229,9 +231,18 @@ exports.logout = asyncHandler(async (req, res, next) => {
     console.log(`[AUTH] User logged out - Sessions revoked: ${user.username}`);
   }
 
-  // Clear cookies
-  res.cookie('token', '', { maxAge: 0 });
-  res.cookie('refreshToken', '', { maxAge: 0 });
+  // PRODUCTION FIX: Clear cookies with matching attributes
+  // Cookies must be cleared with same sameSite/secure settings or they won't delete
+  const isProduction = process.env.NODE_ENV === 'production';
+  const clearOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 0, // Expire immediately
+  };
+
+  res.cookie('token', '', clearOptions);
+  res.cookie('refreshToken', '', clearOptions);
 
   res.status(200).json({
     success: true,

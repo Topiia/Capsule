@@ -24,6 +24,22 @@ const generateRefreshToken = (id, tokenFamily, tokenVersion) => jwt.sign(
   },
 );
 
+// PRODUCTION FIX: Cookie options for cross-site authentication
+// Required for Vercel (frontend) + Render (backend) deployment
+const getCookieOptions = (maxAge) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true, // Prevents XSS attacks (JS cannot access)
+    secure: isProduction, // HTTPS only in production (required for SameSite=None)
+    sameSite: isProduction ? 'none' : 'lax', // Cross-site in prod, same-site in dev
+    maxAge, // Expiry time in milliseconds
+    // Note: No 'domain' attribute - browser automatically uses backend's domain
+    // (vlogsphere-backend.onrender.com). Setting domain='.vercel.app' would fail
+    // because backend doesn't own that domain.
+  };
+};
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
@@ -116,19 +132,11 @@ The VlogSphere Team`,
     }
   }
 
-  // Set cookies (consistent with login)
-  if (process.env.NODE_ENV === 'production' || req.body.rememberMe) {
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
-  }
+  // PRODUCTION FIX: Set cookies with cross-site support
+  // Always set cookies (both dev and prod) for consistent behavior
+  // Cross-site attributes (SameSite=None; Secure) enable Vercel → Render auth
+  res.cookie('token', token, getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
+  res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000)); // 30 days
 
   res.status(201).json({
     success: true,
@@ -245,19 +253,11 @@ The VlogSphere Team`,
     }
   }
 
-  // Set cookies (optional)
-  if (req.body.rememberMe) {
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
-  }
+  // PRODUCTION FIX: Set cookies with cross-site support
+  // Always set cookies (both dev and prod) for consistent behavior
+  // Cross-site attributes (SameSite=None; Secure) enable Vercel → Render auth
+  res.cookie('token', token, getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
+  res.cookie('refreshToken', refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000)); // 30 days
 
   res.status(200).json({
     success: true,

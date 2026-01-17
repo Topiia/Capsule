@@ -44,6 +44,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // PRODUCTION FIX: Enable credentials (cookies) for cross-origin requests
+  // Required for Vercel (frontend) → Render (backend) authentication
+  // Browser will include cookies in requests and accept Set-Cookie headers
+  withCredentials: true,
 })
 
 // Auth API methods
