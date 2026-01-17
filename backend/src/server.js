@@ -157,7 +157,7 @@ const loginLimiter = process.env.NODE_ENV !== 'test' ? rateLimit({
 // 2. Session check limiter - Lenient (allow normal app usage)
 const sessionLimiter = process.env.NODE_ENV !== 'test' ? rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // 30 session checks per window (page refreshes, etc.)
+  max: 100, // 100 session checks per window (allows active browsing)
   message: {
     success: false,
     errorType: 'ratelimit',
