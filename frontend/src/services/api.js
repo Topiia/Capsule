@@ -51,16 +51,9 @@ const api = axios.create({
 })
 
 // Auth API methods
+// COOKIE-ONLY AUTH: No Authorization header management needed
+// Cookies are sent automatically by browser with withCredentials: true
 export const authAPI = {
-  // Set auth header
-  setAuthHeader: (token) => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    } else {
-      delete api.defaults.headers.common['Authorization']
-    }
-  },
-
   // Auth endpoints
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
@@ -70,7 +63,8 @@ export const authAPI = {
   updatePassword: (passwordData) => api.put('/auth/updatepassword', passwordData),
   forgotPassword: (email) => api.post('/auth/forgotpassword', { email }),
   resetPassword: (token, password) => api.put(`/auth/resetpassword/${token}`, { password }),
-  refreshToken: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
+  // COOKIE-ONLY AUTH: No body needed, refreshToken cookie sent automatically
+  refreshToken: () => api.post('/auth/refresh'),
   verifyEmail: (token) => api.get(`/auth/verify/${token}`),
 }
 
@@ -185,10 +179,7 @@ api.interceptors.response.use(
       case 401: {
         error.message = data.error?.message || data.message || 'Your session has expired. Please log in again.'
 
-        // Clear auth data on 401
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-
+        // COOKIE-ONLY AUTH: No localStorage to clear (cookies cleared by server)
         // Store current location for redirect after login
         const currentPath = window.location.pathname
         if (currentPath !== '/login' && currentPath !== '/register') {

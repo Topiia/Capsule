@@ -14,57 +14,35 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }) => {
+  // COOKIE-ONLY AUTH: No token state needed, cookies handled by browser
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem('token'))
-  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken'))
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // Memoize logout first as others might depend on it (and it's used in effects)
+  // Logout: Call API to clear cookies, then clear state
   const logout = useCallback(async () => {
     try {
-      if (token) {
-        await authAPI.logout()
-      }
+      await authAPI.logout()
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Clear all data
+      // Clear user state
       setUser(null)
-      setToken(null)
-      setRefreshToken(null)
       setIsAuthenticated(false)
-
-      // Clear storage from BOTH storages (cleanup any legacy tokens)
-      localStorage.removeItem('token')
-      localStorage.removeItem('refreshToken')
-      sessionStorage.removeItem('token')
-      sessionStorage.removeItem('refreshToken')
-
-      // Clear auth header
-      authAPI.setAuthHeader(null)
 
       toast.success('Logged out successfully')
     }
-  }, [token]) // token is used in `if (token)`
+  }, [])
 
+  // Login: No localStorage needed, cookies set by server automatically
   const login = useCallback(async (email, password, rememberMe = false) => {
     try {
       const response = await authAPI.login({ email, password, rememberMe })
-      const { token: newToken, refreshToken: newRefreshToken, user: userData } = response.data
+      const { user: userData } = response.data
 
-      setToken(newToken)
-      setRefreshToken(newRefreshToken)
+      // Update state (cookies set automatically by server)
       setUser(userData)
       setIsAuthenticated(true)
-
-      // Store tokens in localStorage for cross-tab persistence
-      // Always use localStorage to ensure auth works across tabs and page refresh
-      localStorage.setItem('token', newToken)
-      localStorage.setItem('refreshToken', newRefreshToken)
-
-      // Set auth header
-      authAPI.setAuthHeader(newToken)
 
       toast.success('Welcome back!')
       return { success: true }
@@ -85,9 +63,8 @@ export const AuthProvider = ({ children }) => {
           message = 'Connection failed. Please check if the server is running.'
           errorType = 'connection'
         }
-      }
-      // HTTP errors with response
-      else if (error.response) {
+      } else if (error.response) {
+        // HTTP errors with response
         const status = error.response.status
         const serverMessage = error.response.data?.error?.message || error.response.data?.message
 
@@ -116,7 +93,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // Log error for debugging (helps identify issues)
+      // Log error for debugging
       console.error('Login error:', { errorType, status: error.response?.status, message })
 
       toast.error(message, { duration: 5000 })
@@ -124,27 +101,20 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
+  // Register: Same as login, cookies set automatically
   const register = useCallback(async (userData) => {
     try {
       const response = await authAPI.register(userData)
-      const { token: newToken, refreshToken: newRefreshToken, user: userInfo } = response.data
+      const { user: userInfo } = response.data
 
-      setToken(newToken)
-      setRefreshToken(newRefreshToken)
+      // Update state (cookies set automatically by server)
       setUser(userInfo)
       setIsAuthenticated(true)
-
-      // Store tokens
-      localStorage.setItem('token', newToken)
-      localStorage.setItem('refreshToken', newRefreshToken)
-
-      // Set auth header
-      authAPI.setAuthHeader(newToken)
 
       toast.success('Account created successfully!')
       return { success: true }
     } catch (error) {
-      // Enhanced error handling for all failure types
+      // Enhanced error handling
       let message = 'Registration failed. Please try again.'
 
       // Network errors
@@ -154,9 +124,8 @@ export const AuthProvider = ({ children }) => {
         } else {
           message = 'Connection failed. Please check if the server is running.'
         }
-      }
-      // HTTP errors with response
-      else if (error.response) {
+      } else if (error.response) {
+        // HTTP errors with response
         const status = error.response.status
         const serverMessage = error.response.data?.error?.message || error.response.data?.message
 
@@ -182,7 +151,7 @@ export const AuthProvider = ({ children }) => {
       toast.error(message, { duration: 5000 })
       return { success: false, error: message }
     }
-  }, []) // No external dependencies from component state
+  }, [])
 
   const updateUser = useCallback(async (userData) => {
     try {
@@ -195,7 +164,7 @@ export const AuthProvider = ({ children }) => {
       toast.error(message)
       return { success: false, error: message }
     }
-  }, []) // No external dependencies from component state
+  }, [])
 
   const updatePassword = useCallback(async (currentPassword, newPassword) => {
     try {
@@ -207,111 +176,57 @@ export const AuthProvider = ({ children }) => {
       toast.error(message)
       return { success: false, error: message }
     }
-  }, []) // No external dependencies from component state
+  }, [])
 
-  // Check if user is authenticated on mount
+  // COOKIE-ONLY AUTH: Session restoration via /me endpoint
+  // Cookies sent automatically by browser with withCredentials: true
   useEffect(() => {
     const initAuth = async () => {
-      // Try to recover session if we have tokens
-      // Check localStorage first (primary), fallback to sessionStorage (legacy)
-      const storedToken = localStorage.getItem('token') || sessionStorage.getItem('token')
-      const storedRefreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken')
+      try {
+        // Try to get current user (cookie sent automatically)
+        const response = await authAPI.getMe()
+        setUser(response.data.user)
+        setIsAuthenticated(true)
+      } catch (error) {
+        // If 401, try to refresh token
+        if (error.response?.status === 401) {
+          try {
+            console.log('Access token expired, attempting refresh...')
+            // No body needed - refreshToken cookie sent automatically
+            await authAPI.refreshToken()
 
-      if (storedToken || storedRefreshToken) {
-        try {
-          // 1. Try with current access token if available
-          if (storedToken) {
-            authAPI.setAuthHeader(storedToken)
-            const response = await authAPI.getMe()
-            setUser(response.data.user)
-            setToken(storedToken) // Ensure state is updated if token came from storage
+            // After refresh, fetch user again
+            const userResponse = await authAPI.getMe()
+            setUser(userResponse.data.user)
             setIsAuthenticated(true)
-          } else {
-            // No access token, force refresh flow
-            throw new Error('No access token')
-          }
-        } catch (error) {
-          // 2. If access token failed (401) or missing, try refresh token
-          if (storedRefreshToken) {
-            try {
-              console.log('Access token expired or missing, attempting refresh...')
-              const response = await authAPI.refreshToken(storedRefreshToken)
-              const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data
 
-              // Update state
-              setToken(accessToken)
-              setRefreshToken(newRefreshToken)
-              setUser(userData)
-              setIsAuthenticated(true)
-              authAPI.setAuthHeader(accessToken)
-
-              // Update storage (respecting where it was found, default to localStorage if both missing)
-              if (sessionStorage.getItem('refreshToken')) {
-                sessionStorage.setItem('token', accessToken)
-                sessionStorage.setItem('refreshToken', newRefreshToken)
-              } else {
-                localStorage.setItem('token', accessToken)
-                localStorage.setItem('refreshToken', newRefreshToken)
-              }
-            } catch (refreshError) {
-              console.error('Session recovery failed:', refreshError)
-              logout()
-            }
-          } else {
-            // No refresh token to fallback on
-            logout()
+            console.log('Session restored via refresh token')
+          } catch (refreshError) {
+            // Refresh failed, user not logged in
+            console.log('Session restoration failed, user not logged in')
+            setIsAuthenticated(false)
           }
+        } else {
+          // Other error, assume not logged in
+          setIsAuthenticated(false)
         }
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     initAuth()
-  }, [logout]) // Depend on logout as it's called within initAuth
-
-  // Auto refresh token before expiration
-  useEffect(() => {
-    if (refreshToken) {
-      const refreshInterval = setInterval(async () => {
-        try {
-          const response = await authAPI.refreshToken(refreshToken)
-          const { accessToken, refreshToken: newRefreshToken } = response.data
-
-          setToken(accessToken)
-          setRefreshToken(newRefreshToken)
-          localStorage.setItem('token', accessToken)
-          localStorage.setItem('refreshToken', newRefreshToken)
-          authAPI.setAuthHeader(accessToken)
-        } catch (error) {
-          console.error('Token refresh failed:', error)
-
-          // SECURITY: Check if session was revoked due to security violation
-          const errorMessage = error.response?.data?.error?.message || ''
-          if (errorMessage.includes('revoked') || errorMessage.includes('reuse')) {
-            toast.error('Your session was revoked for security reasons. Please log in again.', {
-              duration: 6000
-            })
-          }
-
-          logout()
-        }
-      }, 25 * 60 * 1000) // Refresh every 25 minutes
-
-      return () => clearInterval(refreshInterval)
-    }
-  }, [refreshToken, logout])
+  }, []) // No dependencies, run once on mount
 
   const value = {
     user,
-    token,
-    refreshToken,
     loading,
     isAuthenticated,
     login,
     register,
     logout,
     updateUser,
-    updatePassword
+    updatePassword,
   }
 
   return (
