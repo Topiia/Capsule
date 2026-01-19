@@ -98,17 +98,35 @@ app.use(helmet({
 const corsOptions = {
   origin(origin, callback) {
     const allowedOrigins = process.env.CORS_ORIGINS
-      ? process.env.CORS_ORIGINS.split(',')
+      ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
       : ['http://localhost:3000'];
 
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
+    // Check if origin is in explicit allowlist
     if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+
+    // PRODUCTION: Support Vercel preview deployments safely
+    // Only allow preview URLs for the vlogspherefrontend project
+    // Pattern: https://vlogspherefrontend-*.vercel.app
+    try {
+      const { hostname, protocol } = new URL(origin);
+      const isValidVercelPreview = protocol === 'https:'
+        && hostname.endsWith('.vercel.app')
+        && (hostname === 'vlogspherefrontend.vercel.app'
+          || hostname.startsWith('vlogspherefrontend-'));
+
+      if (isValidVercelPreview) {
+        return callback(null, true);
+      }
+    } catch (err) {
+      // Invalid URL, fall through to rejection
+    }
+
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,
