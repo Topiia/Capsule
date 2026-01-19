@@ -12,90 +12,110 @@ const logger = require('../config/logger');
  * - Monitoring through Bull Board (optional)
  */
 
-// Create email queue
-const emailQueue = new Queue('email', {
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
-  },
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 2000, // Start with 2s, then 4s, then 8s
+// Create email queue (graceful fallback if Redis unavailable)
+let emailQueue = null;
+let isQueueAvailable = false;
+
+try {
+  emailQueue = new Queue('email', {
+    redis: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      password: process.env.REDIS_PASSWORD || undefined,
     },
-    removeOnComplete: true, // Clean up completed jobs
-    removeOnFail: false, // Keep failed jobs for debugging
-  },
-});
-
-// Process email jobs
-emailQueue.process(async (job) => {
-  const {
-    to, subject, text, html, from,
-  } = job.data;
-
-  logger.info('Processing email job', {
-    jobId: job.id,
-    to,
-    subject,
-    attempt: job.attemptsMade + 1,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000, // Start with 2s, then 4s, then 8s
+      },
+      removeOnComplete: true, // Clean up completed jobs
+      removeOnFail: false, // Keep failed jobs for debugging
+    },
   });
 
-  try {
-    await sendEmail({
-      to,
-      subject,
-      text,
-      html,
-      from,
-    });
+  isQueueAvailable = true;
+  logger.info('Bull email queue initialized successfully');
+  console.log('[INFO] Bull email queue ready');
+} catch (error) {
+  isQueueAvailable = false;
+  emailQueue = null;
+  logger.warn('Bull queue unavailable - emails will be sent synchronously', {
+    error: error.message,
+  });
+  console.warn('[WARN] Bull email queue unavailable - emails will be sent synchronously');
+}
 
-    logger.info('Email sent successfully', {
+// Process email jobs (only if queue is available)
+if (isQueueAvailable && emailQueue) {
+  emailQueue.process(async (job) => {
+    const {
+      to, subject, text, html, from,
+    } = job.data;
+
+    logger.info('Processing email job', {
       jobId: job.id,
       to,
       subject,
-    });
-
-    return { success: true, to, subject };
-  } catch (error) {
-    logger.error('Email send failed', {
-      jobId: job.id,
-      to,
-      subject,
-      error: error.message,
       attempt: job.attemptsMade + 1,
     });
 
-    throw error; // Re-throw to trigger retry
-  }
-});
+    try {
+      await sendEmail({
+        to,
+        subject,
+        text,
+        html,
+        from,
+      });
 
-// Queue event handlers
-emailQueue.on('completed', (job, result) => {
-  logger.debug('Email job completed', {
-    jobId: job.id,
-    result,
-  });
-});
+      logger.info('Email sent successfully', {
+        jobId: job.id,
+        to,
+        subject,
+      });
 
-emailQueue.on('failed', (job, err) => {
-  logger.error('Email job failed (all retries exhausted)', {
-    jobId: job.id,
-    to: job.data.to,
-    subject: job.data.subject,
-    error: err.message,
-    attempts: job.attemptsMade,
-  });
-});
+      return { success: true, to, subject };
+    } catch (error) {
+      logger.error('Email send failed', {
+        jobId: job.id,
+        to,
+        subject,
+        error: error.message,
+        attempt: job.attemptsMade + 1,
+      });
 
-emailQueue.on('stalled', (job) => {
-  logger.warn('Email job stalled', {
-    jobId: job.id,
-    to: job.data.to,
+      throw error; // Re-throw to trigger retry
+    }
   });
-});
+}
+
+// Queue event handlers (only attach if queue is available)
+if (isQueueAvailable && emailQueue) {
+  emailQueue.on('completed', (job, result) => {
+    logger.debug('Email job completed', {
+      jobId: job.id,
+      result,
+    });
+  });
+
+  emailQueue.on('failed', (job, err) => {
+    logger.error('Email job failed (all retries exhausted)', {
+      jobId: job.id,
+      to: job.data.to,
+      subject: job.data.subject,
+      error: err.message,
+      attempts: job.attemptsMade,
+    });
+  });
+
+  emailQueue.on('stalled', (job) => {
+    logger.warn('Email job stalled', {
+      jobId: job.id,
+      to: job.data.to,
+    });
+  });
+}
 
 /**
  * Queue an email for async processing
@@ -110,6 +130,37 @@ emailQueue.on('stalled', (job) => {
  * @returns {Promise<object>} - Job object
  */
 exports.queueEmail = async (emailData, priority = 5) => {
+  // Fallback to direct send if queue unavailable
+  if (!isQueueAvailable || !emailQueue) {
+    logger.info('Sending email directly (queue unavailable)', {
+      to: emailData.to,
+      subject: emailData.subject,
+    });
+
+    try {
+      await sendEmail({
+        to: emailData.to,
+        subject: emailData.subject,
+        text: emailData.text,
+        html: emailData.html,
+        from: emailData.from,
+      });
+      logger.info('Email sent directly (no queue)', {
+        to: emailData.to,
+        subject: emailData.subject,
+      });
+      return { success: true, direct: true };
+    } catch (error) {
+      logger.error('Direct email send failed', {
+        to: emailData.to,
+        subject: emailData.subject,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  // Queue email normally
   try {
     const job = await emailQueue.add(emailData, {
       priority,
@@ -190,6 +241,18 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail({
  * Get queue statistics
  */
 exports.getQueueStats = async () => {
+  if (!isQueueAvailable || !emailQueue) {
+    return {
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
+      total: 0,
+      available: false,
+    };
+  }
+
   const [waiting, active, completed, failed, delayed] = await Promise.all([
     emailQueue.getWaitingCount(),
     emailQueue.getActiveCount(),
@@ -205,6 +268,7 @@ exports.getQueueStats = async () => {
     failed,
     delayed,
     total: waiting + active + completed + failed + delayed,
+    available: true,
   };
 };
 
@@ -212,6 +276,11 @@ exports.getQueueStats = async () => {
  * Clean old jobs (run periodically)
  */
 exports.cleanOldJobs = async () => {
+  if (!isQueueAvailable || !emailQueue) {
+    logger.debug('Queue cleanup skipped - queue unavailable');
+    return;
+  }
+
   await emailQueue.clean(24 * 60 * 60 * 1000, 'completed'); // Remove completed jobs older than 1 day
   await emailQueue.clean(7 * 24 * 60 * 60 * 1000, 'failed'); // Remove failed jobs older than 7 days
   logger.info('Email queue cleaned');
@@ -219,8 +288,10 @@ exports.cleanOldJobs = async () => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  await emailQueue.close();
-  logger.info('Email queue closed on SIGTERM');
+  if (isQueueAvailable && emailQueue) {
+    await emailQueue.close();
+    logger.info('Email queue closed on SIGTERM');
+  }
 });
 
 module.exports = exports;

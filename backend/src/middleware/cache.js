@@ -30,7 +30,10 @@ const generateCacheKey = (req) => {
  * @param {function} keyGenerator - Custom key generator function
  * @returns {function} - Express middleware
  */
-exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async (req, res, next) => {
+exports.cacheMiddleware = (
+  ttl = 300,
+  keyGenerator = generateCacheKey,
+) => async (req, res, next) => {
   // Only cache GET requests
   if (req.method !== 'GET') {
     return next();
@@ -38,6 +41,14 @@ exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async 
 
   // Skip if caching is disabled
   if (process.env.ENABLE_CACHING === 'false') {
+    return next();
+  }
+
+  // Skip if Redis is unavailable
+  if (!redis.isAvailable()) {
+    logger.debug('Cache bypassed - Redis unavailable', {
+      correlationId: req.correlationId,
+    });
     return next();
   }
 
@@ -68,7 +79,7 @@ exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async 
 
     // Override res.json to cache response
     const originalJson = res.json.bind(res);
-    res.json = function (data) {
+    res.json = function jsonOverride(data) {
       // Only cache successful responses
       if (res.statusCode === 200 && data) {
         redis.setJSON(cacheKey, data, ttl).catch((err) => {
@@ -99,6 +110,12 @@ exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async 
  * @param {string} pattern - Cache key pattern (e.g., 'cache:/api/vlogs:*')
  */
 exports.invalidateCache = async (pattern) => {
+  // Skip if Redis unavailable
+  if (!redis.isAvailable()) {
+    logger.debug('Cache invalidation skipped - Redis unavailable', { pattern });
+    return 0;
+  }
+
   try {
     const deleted = await redis.delPattern(pattern);
     logger.info('Cache invalidated', {
