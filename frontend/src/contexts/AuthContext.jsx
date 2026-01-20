@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { authAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -350,7 +350,9 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated, logout])
 
-  const value = {
+  // PERFORMANCE: Memoize context value to prevent unnecessary rerenders
+  // Only recreate when dependencies actually change
+  const value = useMemo(() => ({
     user,
     loading,
     isAuthenticated,
@@ -359,7 +361,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     updatePassword,
-  }
+  }), [user, loading, isAuthenticated, login, register, logout, updateUser, updatePassword])
 
   return (
     <AuthContext.Provider value={value}>
