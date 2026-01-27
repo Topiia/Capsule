@@ -87,3 +87,10 @@ temp_*
 # Redis
 *.rdb
 dump.rdb
+
+# Test artifacts
+test-artifacts/
+test_output_*.json
+test_output_*.txt
+test_full_output*.txt
+debug_*.log
