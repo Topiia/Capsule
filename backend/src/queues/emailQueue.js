@@ -1,28 +1,27 @@
 const Queue = require('bull');
-const sendEmail = require('../utils/sendEmail');
 const logger = require('../config/logger');
+const emailConfig = require('../config/email');
+const { sendEmailSync } = require('../utils/sendEmailSync');
 
 /**
- * PERFORMANCE: Email Job Queue
+ * PERFORMANCE: Email Job Queue (Producer Only)
  *
- * Async email processing using Bull queue:
+ * This file initializes the queue producer for the API server.
+ * The worker process (src/workers/emailWorker.js) handles job consumption.
+ *
  * - Prevents email sending from blocking HTTP requests
- * - Automatic retry with exponential backoff
+ * - Automatic retry with exponential backoff (handled by worker)
  * - Job persistence (survives server restarts)
- * - Monitoring through Bull Board (optional)
+ * - FALLBACK: Sends synchronously if Redis unavailable
  */
 
-// Create email queue (graceful fallback if Redis unavailable)
 let emailQueue = null;
-let isQueueAvailable = false;
+let queueReady = false;
 
+// Initialize queue
 try {
   emailQueue = new Queue('email', {
-    redis: {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-      password: process.env.REDIS_PASSWORD || undefined,
-    },
+    redis: emailConfig.redis,
     defaultJobOptions: {
       attempts: 3,
       backoff: {
@@ -34,93 +33,32 @@ try {
     },
   });
 
-  isQueueAvailable = true;
-  logger.info('Bull email queue initialized successfully');
-  console.log('[INFO] Bull email queue ready');
-} catch (error) {
-  isQueueAvailable = false;
-  emailQueue = null;
-  logger.warn('Bull queue unavailable - emails will be sent synchronously', {
-    error: error.message,
-  });
-  console.warn(
-    '[WARN] Bull email queue unavailable - emails will be sent synchronously',
-  );
-}
-
-// Process email jobs (only if queue is available)
-if (isQueueAvailable && emailQueue) {
-  emailQueue.process(async (job) => {
-    const {
-      to, subject, text, html, from,
-    } = job.data;
-
-    logger.info('Processing email job', {
-      jobId: job.id,
-      to,
-      subject,
-      attempt: job.attemptsMade + 1,
+  // Verify connectivity on init (async)
+  emailQueue.isReady().then(() => {
+    queueReady = true;
+    logger.info('Email queue ready (async mode enabled)', {
+      redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
     });
-
-    try {
-      await sendEmail({
-        to,
-        subject,
-        text,
-        html,
-        from,
-      });
-
-      logger.info('Email sent successfully', {
-        jobId: job.id,
-        to,
-        subject,
-      });
-
-      return { success: true, to, subject };
-    } catch (error) {
-      logger.error('Email send failed', {
-        jobId: job.id,
-        to,
-        subject,
-        error: error.message,
-        attempt: job.attemptsMade + 1,
-      });
-
-      throw error; // Re-throw to trigger retry
-    }
-  });
-}
-
-// Queue event handlers (only attach if queue is available)
-if (isQueueAvailable && emailQueue) {
-  emailQueue.on('completed', (job, result) => {
-    logger.debug('Email job completed', {
-      jobId: job.id,
-      result,
-    });
-  });
-
-  emailQueue.on('failed', (job, err) => {
-    logger.error('Email job failed (all retries exhausted)', {
-      jobId: job.id,
-      to: job.data.to,
-      subject: job.data.subject,
+  }).catch((err) => {
+    queueReady = false;
+    logger.warn('Email queue unavailable - using synchronous fallback', {
       error: err.message,
-      attempts: job.attemptsMade,
+      impact: 'Emails will be sent synchronously (blocking)',
     });
   });
-
-  emailQueue.on('stalled', (job) => {
-    logger.warn('Email job stalled', {
-      jobId: job.id,
-      to: job.data.to,
-    });
+} catch (error) {
+  queueReady = false;
+  logger.warn('Bull queue initialization failed - using synchronous fallback', {
+    error: error.message,
+    impact: 'Emails will be sent synchronously (blocking)',
   });
 }
 
+// NOTE: Worker process registration removed
+// Email jobs are processed by separate worker: src/workers/emailWorker.js
 /**
  * Queue an email for async processing
+ * FALLBACK: If Redis unavailable, sends email synchronously
  *
  * @param {object} emailData - Email data
  * @param {string} emailData.to - Recipient email
@@ -129,61 +67,45 @@ if (isQueueAvailable && emailQueue) {
  * @param {string} emailData.html - HTML content
  * @param {string} emailData.from - Sender (optional)
  * @param {number} priority - Job priority (1-10, higher = more important)
- * @returns {Promise<object>} - Job object
+ * @returns {Promise<object>} - Job object or fallback result
  */
 exports.queueEmail = async (emailData, priority = 5) => {
-  // Fallback to direct send if queue unavailable
-  if (!isQueueAvailable || !emailQueue) {
-    logger.info('Sending email directly (queue unavailable)', {
+  // GRACEFUL DEGRADATION: Use sync fallback if Redis unavailable
+  if (!queueReady || !emailQueue) {
+    logger.warn('Redis unavailable - sending email synchronously (FALLBACK)', {
       to: emailData.to,
       subject: emailData.subject,
     });
 
-    try {
-      await sendEmail({
-        to: emailData.to,
-        subject: emailData.subject,
-        text: emailData.text,
-        html: emailData.html,
-        from: emailData.from,
-      });
-      logger.info('Email sent directly (no queue)', {
-        to: emailData.to,
-        subject: emailData.subject,
-      });
-      return { success: true, direct: true };
-    } catch (error) {
-      logger.error('Direct email send failed', {
-        to: emailData.to,
-        subject: emailData.subject,
-        error: error.message,
-      });
-      throw error;
-    }
+    // Send synchronously as fallback
+    const result = await sendEmailSync(emailData);
+    return { emailId: result.id, fallback: true };
   }
 
-  // Queue email normally
+  // Queue email normally (preferred path)
   try {
     const job = await emailQueue.add(emailData, {
       priority,
       attempts: emailData.critical ? 5 : 3, // More retries for critical emails
     });
 
-    logger.info('Email queued', {
+    logger.info('Email queued (async)', {
       jobId: job.id,
       to: emailData.to,
       subject: emailData.subject,
       priority,
     });
-
-    return job;
+    return { jobId: job.id, queued: true };
   } catch (error) {
-    logger.error('Failed to queue email', {
+    logger.error('Failed to queue email - attempting synchronous fallback', {
       to: emailData.to,
       subject: emailData.subject,
       error: error.message,
     });
-    throw error;
+
+    // Fallback to synchronous send if queue fails
+    const result = await sendEmailSync(emailData);
+    return { emailId: result.id, fallback: true };
   }
 };
 
@@ -249,10 +171,15 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
 );
 
 /**
+ * Check if queue is available
+ */
+exports.isQueueAvailable = () => queueReady;
+
+/**
  * Get queue statistics
  */
 exports.getQueueStats = async () => {
-  if (!isQueueAvailable || !emailQueue) {
+  if (!queueReady || !emailQueue) {
     return {
       waiting: 0,
       active: 0,
@@ -287,7 +214,7 @@ exports.getQueueStats = async () => {
  * Clean old jobs (run periodically)
  */
 exports.cleanOldJobs = async () => {
-  if (!isQueueAvailable || !emailQueue) {
+  if (!queueReady || !emailQueue) {
     logger.debug('Queue cleanup skipped - queue unavailable');
     return;
   }
@@ -299,7 +226,7 @@ exports.cleanOldJobs = async () => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  if (isQueueAvailable && emailQueue) {
+  if (queueReady && emailQueue) {
     await emailQueue.close();
     logger.info('Email queue closed on SIGTERM');
   }
