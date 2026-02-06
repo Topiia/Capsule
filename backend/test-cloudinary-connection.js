@@ -7,11 +7,11 @@
  * Run with: node test-cloudinary-connection.js
  */
 
-const cloudinary = require("./src/config/cloudinary");
-const dotenv = require("dotenv");
-
+const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
+
+const cloudinary = require('./src/config/cloudinary');
 
 console.log("\n🔍 Testing Cloudinary Configuration...\n");
 
