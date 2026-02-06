@@ -12,14 +12,14 @@ describe("DeleteConfirmModal", () => {
         isOpen={true}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
-        message="Are you sure you want to delete this vlog?"
+        title="Delete Capsule"
+        message="Are you sure you want to delete this capsule?"
       />,
     );
 
-    expect(screen.getByText("Delete Vlog")).toBeInTheDocument();
+    expect(screen.getByText("Delete Capsule")).toBeInTheDocument();
     expect(
-      screen.getByText("Are you sure you want to delete this vlog?"),
+      screen.getByText("Are you sure you want to delete this capsule?"),
     ).toBeInTheDocument();
     expect(screen.getByText("Delete")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe("DeleteConfirmModal", () => {
         isOpen={true}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
+        title="Delete Capsule"
         message="Are you sure?"
       />,
     );
@@ -88,7 +88,7 @@ describe("DeleteConfirmModal", () => {
         isOpen={true}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
+        title="Delete Capsule"
         message="Are you sure?"
       />,
     );
@@ -106,7 +106,7 @@ describe("DeleteConfirmModal", () => {
         isOpen={true}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
+        title="Delete Capsule"
         message="Are you sure?"
         isLoading={true}
       />,
@@ -125,7 +125,7 @@ describe("DeleteConfirmModal", () => {
         isOpen={true}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
+        title="Delete Capsule"
         message="Are you sure?"
         confirmText="Yes, Delete"
         cancelText="No, Keep It"
@@ -145,7 +145,7 @@ describe("DeleteConfirmModal", () => {
         isOpen={false}
         onClose={onClose}
         onConfirm={onConfirm}
-        title="Delete Vlog"
+        title="Delete Capsule"
         message="Are you sure?"
       />,
     );

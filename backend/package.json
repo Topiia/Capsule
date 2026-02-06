@@ -1,7 +1,7 @@
 {
-  "name": "vlogsphere-backend",
+  "name": "capsule-backend",
   "version": "1.0.0",
-  "description": "Production-ready backend for VLOGSPHERE vlogging platform",
+  "description": "Production-ready backend for Capsule vlogging platform",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -60,6 +60,6 @@
     "nodejs",
     "mongodb"
   ],
-  "author": "VLOGSPHERE Team",
+  "author": "Capsule Team",
   "license": "MIT"
 }

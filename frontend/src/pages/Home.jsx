@@ -2,8 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { vlogAPI } from "../services/api";
-import VlogCard from "../components/Vlog/VlogCard";
-import LoadingSpinner from "../components/UI/LoadingSpinner";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import Button from "../components/UI/Button";
 import HeroSection from "../components/Home/HeroSection";
 import FeatureShowcase from "../components/Home/FeatureShowcase";
@@ -43,7 +42,7 @@ const Home = () => {
               Featured Content
             </h2>
             <p className="text-xl text-[var(--theme-text-secondary)] max-w-2xl mx-auto">
-              Discover the most popular and trending vlogs from our community of
+              Discover the most popular and trending capsules from our community of
               creators
             </p>
           </motion.div>
@@ -71,7 +70,7 @@ const Home = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <VlogCard vlog={vlog} featured />
+                  <CapsuleCard vlog={vlog} featured />
                 </motion.div>
               ))}
             </div>
@@ -101,7 +100,7 @@ const Home = () => {
             className="text-center mb-12"
           >
             <h2 className="text-4xl md:text-5xl font-bold gradient-text mb-4">
-              Latest Vlogs
+              Latest Capsules
             </h2>
             <p className="text-xl text-[var(--theme-text-secondary)] max-w-2xl mx-auto">
               Stay up to date with the newest content from our vibrant community
@@ -131,7 +130,7 @@ const Home = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.05 }}
                 >
-                  <VlogCard vlog={vlog} compact />
+                  <CapsuleCard vlog={vlog} compact />
                 </motion.div>
               ))}
             </div>
@@ -157,7 +156,7 @@ const Home = () => {
             </h2>
             <p className="text-xl text-[var(--theme-text-secondary)] mb-8 max-w-2xl mx-auto">
               Join thousands of creators who are already sharing their passion
-              with the world. Start your vlogging journey today with our
+              with the world. Start your capsule journey today with our
               AI-powered platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -168,7 +167,7 @@ const Home = () => {
               </Link>
               <Link to="/create">
                 <Button size="lg" variant="outline">
-                  Create Your First Vlog
+                  Create Your First Capsule
                 </Button>
               </Link>
             </div>

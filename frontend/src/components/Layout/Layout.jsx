@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import Header from "./Header";
 import Footer from "./Footer";
@@ -9,6 +9,7 @@ import { useState } from "react";
 
 const Layout = () => {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -22,31 +23,41 @@ const Layout = () => {
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
         {/* Content Area with Sidebar */}
-        <div className="flex items-start pt-16">
-          {/* Sidebar - Only shown when authenticated */}
-          {isAuthenticated && (
-            <Sidebar
-              isOpen={sidebarOpen}
-              onClose={() => setSidebarOpen(false)}
-            />
-          )}
+        {isAuthenticated && (
+          <Sidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
+        )}
 
-          {/* Main Content - Flexible width, proper spacing */}
-          <main className="flex-1 min-h-screen w-full">
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* content wrapper - includes footer so it respects sidebar offset */}
+        <div className={`flex flex-col min-h-screen pt-16 ${isAuthenticated ? "lg:pl-64" : ""}`}>
+          {/* Main Content */}
+          <main className="flex-1 w-full">
+            {location.pathname === "/" ? (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               >
                 <Outlet />
               </motion.div>
-            </div>
+            ) : (
+              <div className="container mx-auto px-4 py-8 max-w-7xl">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Outlet />
+                </motion.div>
+              </div>
+            )}
           </main>
-        </div>
 
-        {/* Footer */}
-        <Footer />
+          {/* Footer - Now inside the wrapper */}
+          <Footer />
+        </div>
       </div>
     </div>
   );

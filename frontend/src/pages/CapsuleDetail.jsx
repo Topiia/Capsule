@@ -32,7 +32,7 @@ import {
   HandThumbDownIcon as HandThumbDownIconSolid,
 } from "@heroicons/react/24/solid";
 
-const VlogDetail = () => {
+const CapsuleDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -158,10 +158,10 @@ const VlogDetail = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-[var(--theme-text)] mb-4">
-            Vlog Not Found
+            Capsule Not Found
           </h1>
           <p className="text-[var(--theme-text-secondary)]">
-            The vlog you&apos;re looking for doesn&apos;t exist
+            The capsule you&apos;re looking for doesn&apos;t exist
           </p>
         </div>
       </div>
@@ -230,7 +230,7 @@ const VlogDetail = () => {
                             <PencilIcon className="w-4 h-4 text-white" />
                           </div>
                           <span className="text-[var(--theme-text)] font-medium">
-                            Edit Vlog
+                            Edit Capsule
                           </span>
                         </button>
                         <button
@@ -244,7 +244,7 @@ const VlogDetail = () => {
                             <TrashIcon className="w-4 h-4 text-white" />
                           </div>
                           <span className="text-red-400 font-medium">
-                            Delete Vlog
+                            Delete Capsule
                           </span>
                         </button>
                       </motion.div>
@@ -384,7 +384,7 @@ const VlogDetail = () => {
                     <div key={index} className="relative">
                       <img
                         src={image.url}
-                        alt={image.caption || `Vlog image ${index + 1}`}
+                        alt={image.caption || `Capsule image ${index + 1}`}
                         className="w-full h-auto rounded-xl"
                       />
                       {image.caption && (
@@ -660,7 +660,7 @@ const VlogDetail = () => {
               ) : (
                 <div className="mb-6 glass-card p-4 rounded-xl text-center">
                   <p className="text-[var(--theme-text-secondary)] mb-3">
-                    Please log in to comment on this vlog
+                    Please log in to comment on this capsule
                   </p>
                   <Button
                     size="sm"
@@ -805,8 +805,8 @@ const VlogDetail = () => {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
-        title="Delete Vlog?"
-        message="Are you sure you want to delete this vlog? This action cannot be undone and all images will be permanently removed."
+        title="Delete Capsule?"
+        message="Are you sure you want to delete this capsule? This action cannot be undone and all images will be permanently removed."
         confirmText="Delete"
         isLoading={deleteMutation.isPending}
       />
@@ -814,4 +814,4 @@ const VlogDetail = () => {
   );
 };
 
-export default VlogDetail;
+export default CapsuleDetail;

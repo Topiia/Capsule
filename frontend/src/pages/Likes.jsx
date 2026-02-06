@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import LoadingSpinner from "../components/UI/LoadingSpinner";
 import Button from "../components/UI/Button";
 import {
@@ -76,7 +76,7 @@ const Likes = () => {
       toast.error("Failed to unlike vlog");
     },
     onSuccess: () => {
-      toast.success("Vlog unliked");
+      toast.success("Capsule unliked");
     },
     onSettled: () => {
       // Invalidate and refetch
@@ -123,11 +123,11 @@ const Likes = () => {
         <div className="flex items-center space-x-3 mb-2">
           <HeartIcon className="w-8 h-8 text-[var(--theme-accent)]" />
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">
-            Liked Vlogs
+            Liked Capsules
           </h1>
         </div>
         <p className="text-[var(--theme-text-secondary)]">
-          Vlogs you've shown some love
+          Capsules you&apos;ve shown some love
         </p>
       </motion.div>
 
@@ -147,7 +147,7 @@ const Likes = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search liked vlogs..."
+                placeholder="Search liked capsules..."
                 className="w-full pl-10 pr-4 py-3 bg-[var(--glass-white)] border border-white/10 rounded-lg text-[var(--theme-text)] placeholder-[var(--theme-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] transition-all"
               />
             </div>
@@ -208,12 +208,12 @@ const Likes = () => {
                 <HeartIcon className="w-12 h-12 text-[var(--theme-text-secondary)]" />
               </div>
               <h2 className="text-2xl font-bold text-[var(--theme-text)] mb-3">
-                {searchQuery ? "No liked vlogs found" : "No liked vlogs yet"}
+                {searchQuery ? "No liked capsules found" : "No liked capsules yet"}
               </h2>
               <p className="text-[var(--theme-text-secondary)] mb-6 max-w-md mx-auto">
                 {searchQuery
                   ? "Try adjusting your search or filters"
-                  : "Start liking vlogs to build your collection of favorites"}
+                  : "Start liking capsules to build your collection of favorites"}
               </p>
               {!searchQuery && (
                 <Link to="/trending">
@@ -236,12 +236,12 @@ const Likes = () => {
                 <button
                   onClick={() => handleUnlike(vlog._id)}
                   className="absolute top-2 right-2 z-10 p-2 bg-red-500/80 hover:bg-red-500 text-white rounded-full backdrop-blur-sm transition-all duration-200"
-                  title="Unlike vlog"
+                  title="Unlike capsule"
                 >
                   <HeartIcon className="w-4 h-4" />
                 </button>
 
-                <VlogCard vlog={vlog} compact />
+                <CapsuleCard vlog={vlog} compact />
               </motion.div>
             ))}
           </div>
@@ -256,7 +256,7 @@ const Likes = () => {
           transition={{ delay: 0.4 }}
           className="mt-8 text-center text-[var(--theme-text-secondary)]"
         >
-          Showing {filteredLikes.length} liked vlog
+          Showing {filteredLikes.length} liked capsule
           {filteredLikes.length !== 1 ? "s" : ""}
         </motion.div>
       )}

@@ -6,7 +6,7 @@ print("Starting MongoDB initialization...");
 
 // Create database and user
 
-db = db.getSiblingDB("vlogsphere");
+db = db.getSiblingDB("capsule");
 
 // Create application user
 db.createUser({
@@ -15,7 +15,7 @@ db.createUser({
   roles: [
     {
       role: "readWrite",
-      db: "vlogsphere",
+      db: "capsule",
     },
   ],
 });

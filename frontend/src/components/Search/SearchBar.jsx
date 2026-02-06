@@ -36,7 +36,7 @@ const SearchBar = () => {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Search vlogs..."
+          placeholder="Search capsules..."
           className={`block w-full pl-10 pr-3 py-2 glass-input transition-all duration-200 ${
             isFocused ? "ring-2 ring-[var(--theme-accent)]" : ""
           }`}
@@ -54,7 +54,7 @@ const SearchBar = () => {
                 type="submit"
                 className="w-full text-left px-3 py-2 rounded hover:bg-[var(--glass-white)] text-[var(--theme-text)]"
               >
-                Search for "{query}"
+                Search for &quot;{query}&quot;
               </button>
             </div>
           </motion.div>

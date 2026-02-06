@@ -32,7 +32,7 @@ const getInitials = (name = "") => {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 };
 
-const VlogCard = ({ vlog, featured = false, compact = false }) => {
+const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
   const { isAuthenticated, user } = useAuth();
   const {
     toggleLike,
@@ -583,4 +583,4 @@ const VlogCard = ({ vlog, featured = false, compact = false }) => {
   );
 };
 
-export default VlogCard;
+export default CapsuleCard;

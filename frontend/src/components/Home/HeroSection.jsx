@@ -1,10 +1,9 @@
-import React from "react";
+
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import Button from "../UI/Button";
 import {
-  PlayIcon,
   SparklesIcon,
   RocketLaunchIcon,
   CameraIcon,
@@ -58,7 +57,7 @@ const HeroSection = () => {
         >
           <SparklesIcon className="w-4 h-4 text-[var(--theme-accent)]" />
           <span className="text-xs md:text-sm font-medium text-[var(--theme-text)]">
-            AI-Powered Vlogging Platform
+            AI-Powered Capsule Platform
           </span>
         </motion.div>
 
@@ -83,7 +82,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6 }}
           className="text-base sm:text-lg md:text-xl text-[var(--theme-text-secondary)] mb-8 leading-relaxed px-2"
         >
-          Create, share, and explore stunning AI-enhanced vlogs — where
+          Create, share, and explore stunning AI-enhanced Capsules — where
           creativity meets futuristic design.
         </motion.p>
 
@@ -111,7 +110,7 @@ const HeroSection = () => {
             <>
               <Link to="/create">
                 <Button size="lg" variant="primary">
-                  Create Vlog
+                  Create Capsule
                 </Button>
               </Link>
               <Link to="/explore">
@@ -137,10 +136,10 @@ const HeroSection = () => {
         </div>
 
         {/* Stats */}
-        <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-lg sm:max-w-3xl mx-auto">
+        <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-lg sm:max-w-4xl lg:max-w-6xl mx-auto">
           {[
             { number: "10K+", label: "Creators" },
-            { number: "50K+", label: "Vlogs" },
+            { number: "50K+", label: "Capsules" },
             { number: "1M+", label: "Views" },
             { number: "99.9%", label: "Uptime" },
           ].map((st, i) => (

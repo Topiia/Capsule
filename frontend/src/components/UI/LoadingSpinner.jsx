@@ -166,7 +166,7 @@ export const SkeletonLoader = ({ className = "", count = 1 }) => {
 export const PageLoader = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <LoadingSpinner size="xl" text="Loading VLOGSPHERE..." />
+      <LoadingSpinner size="xl" text="Loading CAPSULE..." />
     </div>
   );
 };

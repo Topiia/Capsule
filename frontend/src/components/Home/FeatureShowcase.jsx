@@ -88,10 +88,10 @@ const FeatureShowcase = () => {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold gradient-text mb-6">
-            Why Choose VLOGSPHERE?
+            Why Choose CAPSULE?
           </h2>
           <p className="text-xl text-[var(--theme-text-secondary)] max-w-3xl mx-auto">
-            Experience the next generation of vlogging with cutting-edge
+            Experience the next generation of capsule creation with cutting-edge
             technology, stunning design, and powerful features that empower
             creators.
           </p>

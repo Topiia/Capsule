@@ -23,7 +23,7 @@ const sendEmail = async (options) => {
 
     // Send email via Resend API
     const data = await resend.emails.send({
-      from: `${process.env.FROM_NAME || 'VlogSphere'} <${fromEmail}>`,
+      from: `${process.env.FROM_NAME || 'Capsule'} <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html || options.text.replace(/\n/g, '<br>'),

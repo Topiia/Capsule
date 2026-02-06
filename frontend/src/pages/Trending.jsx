@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { vlogAPI } from "../services/api";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 
 import {
   FireIcon,
@@ -103,7 +103,7 @@ const Trending = () => {
                     <span>#{index + 1}</span>
                   </div>
                 </div>
-                <VlogCard vlog={vlog} featured />
+                <CapsuleCard vlog={vlog} featured />
               </motion.div>
             ))}
           </div>
@@ -139,7 +139,7 @@ const Trending = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.5 + index * 0.05 }}
               >
-                <VlogCard vlog={vlog} compact />
+                <CapsuleCard vlog={vlog} compact />
               </motion.div>
             ))}
           </div>
@@ -160,7 +160,7 @@ const Trending = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
             { label: "Total Views Today", value: "2.4M", icon: FireIcon },
-            { label: "New Vlogs", value: "1.2K", icon: ArrowTrendingUpIcon },
+            { label: "New Capsules", value: "1.2K", icon: ArrowTrendingUpIcon },
             { label: "Active Creators", value: "8.5K", icon: UserIcon },
             { label: "Engagement Rate", value: "94%", icon: TrophyIcon },
           ].map((stat, index) => (

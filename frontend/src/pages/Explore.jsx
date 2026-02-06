@@ -2,8 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { vlogAPI } from "../services/api";
-import VlogCard from "../components/Vlog/VlogCard";
-import LoadingSpinner from "../components/UI/LoadingSpinner";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import Button from "../components/UI/Button";
 
 const Explore = () => {
@@ -80,7 +79,7 @@ const Explore = () => {
           Explore Content
         </h1>
         <p className="text-xl text-[var(--theme-text-secondary)] max-w-2xl">
-          Discover amazing vlogs from creators around the world
+          Discover amazing capsules from creators around the world
         </p>
       </motion.div>
 
@@ -95,7 +94,7 @@ const Explore = () => {
         <div className="mb-6">
           <input
             type="text"
-            placeholder="Search vlogs..."
+            placeholder="Search capsules..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full glass-input"
@@ -155,7 +154,7 @@ const Explore = () => {
         className="mb-6"
       >
         <p className="text-[var(--theme-text-secondary)]">
-          Showing {allVlogs.length} vlogs
+          Showing {allVlogs.length} capsules
           {selectedCategory !== "all" && ` in ${selectedCategory}`}
           {searchQuery && ` for "${searchQuery}"`}
         </p>
@@ -181,7 +180,7 @@ const Explore = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + index * 0.05 }}
             >
-              <VlogCard vlog={vlog} compact />
+              <CapsuleCard vlog={vlog} compact />
             </motion.div>
           ))}
         </div>
@@ -208,7 +207,7 @@ const Explore = () => {
             </svg>
           </div>
           <h3 className="text-xl font-semibold text-[var(--theme-text)] mb-2">
-            No vlogs found
+            No capsules found
           </h3>
           <p className="text-[var(--theme-text-secondary)] mb-6">
             Try adjusting your search or filters to find more content
@@ -235,7 +234,7 @@ const Explore = () => {
             disabled={isFetchingNextPage}
             loading={isFetchingNextPage}
           >
-            Load More Vlogs
+            Load More Capsules
           </Button>
         </div>
       )}

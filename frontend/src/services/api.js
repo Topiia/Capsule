@@ -12,7 +12,7 @@ const getApiBaseURL = () => {
       "❌ CRITICAL: VITE_API_URL is not configured for production build!";
     console.error(errorMsg);
     console.error("Set VITE_API_URL in Vercel environment variables");
-    console.error("Expected: https://vlogsphere-backend.onrender.com/api");
+    console.error("Expected: https://capsule-backend.onrender.com/api");
     throw new Error("API URL not configured for production");
   }
 

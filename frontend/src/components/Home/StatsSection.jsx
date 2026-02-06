@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 const StatsSection = () => {
   const [stats, setStats] = useState({
     users: 0,
-    vlogs: 0,
+    capsules: 0,
     views: 0,
     uptime: 0,
   });
@@ -17,7 +17,7 @@ const StatsSection = () => {
 
     const targetStats = {
       users: 12500,
-      vlogs: 48500,
+      capsules: 48500,
       views: 2400000,
       uptime: 99.9,
     };
@@ -29,7 +29,7 @@ const StatsSection = () => {
 
       setStats({
         users: Math.floor(targetStats.users * progress),
-        vlogs: Math.floor(targetStats.vlogs * progress),
+        capsules: Math.floor(targetStats.capsules * progress),
         views: Math.floor(targetStats.views * progress),
         uptime: Math.min(targetStats.uptime, 99.9 * progress),
       });
@@ -50,8 +50,8 @@ const StatsSection = () => {
       color: "from-blue-500 to-purple-500",
     },
     {
-      label: "Vlogs Created",
-      value: stats.vlogs.toLocaleString(),
+      label: "Capsules Created",
+      value: stats.capsules.toLocaleString(),
       icon: "📹",
       color: "from-green-500 to-blue-500",
     },
@@ -107,7 +107,7 @@ const StatsSection = () => {
             Platform Statistics
           </h2>
           <p className="text-xl text-[var(--theme-text-secondary)] max-w-2xl mx-auto">
-            Join thousands of creators who trust VLOGSPHERE for their visual
+            Join thousands of creators who trust CAPSULE for their visual
             storytelling
           </p>
         </motion.div>

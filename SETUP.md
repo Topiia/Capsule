@@ -1,8 +1,8 @@
-# VLOGSPHERE Setup Guide
+# CAPSULE Setup Guide
 
 ## 🚀 Quick Start
 
-This guide will help you set up and run the VLOGSPHERE platform on your local machine or production server.
+This guide will help you set up and run the CAPSULE platform on your local machine or production server.
 
 ## 📋 Prerequisites
 
@@ -24,7 +24,7 @@ Before you begin, ensure you have the following installed:
 
 ```bash
 git clone <repository-url>
-cd vlogsphere
+cd capsule
 ```
 
 ### 2. Backend Setup
@@ -82,7 +82,7 @@ sudo systemctl start mongod
 
 # Create database (optional)
 mongosh
-use vlogsphere
+use capsule
 exit
 ```
 
@@ -170,13 +170,13 @@ npm run preview  # or serve the dist folder with a web server
 ```bash
 # Build and run backend
 cd backend
-docker build -t vlogsphere-backend .
-docker run -p 5000:5000 --env-file .env vlogsphere-backend
+docker build -t capsule-backend .
+docker run -p 5000:5000 --env-file .env capsule-backend
 
 # Build and run frontend
 cd ../frontend
-docker build -t vlogsphere-frontend .
-docker run -p 3000:80 vlogsphere-frontend
+docker build -t capsule-frontend .
+docker run -p 3000:80 capsule-frontend
 ```
 
 ## 🌐 Production Deployment
@@ -212,7 +212,7 @@ chmod +x deploy.sh
    ```bash
    # Clone repository
    git clone <your-repository-url>
-   cd vlogsphere
+   cd capsule
 
    # Setup backend
    cd backend
@@ -220,7 +220,7 @@ chmod +x deploy.sh
    npm run build
 
    # Start with PM2
-   pm2 start src/server.js --name vlogsphere-backend
+   pm2 start src/server.js --name capsule-backend
    pm2 startup
    pm2 save
 
@@ -237,7 +237,7 @@ chmod +x deploy.sh
    sudo apt install nginx
 
    # Configure NGINX
-   sudo nano /etc/nginx/sites-available/vlogsphere
+   sudo nano /etc/nginx/sites-available/capsule
    ```
 
    **NGINX Configuration:**
@@ -248,7 +248,7 @@ chmod +x deploy.sh
        server_name your-domain.com;
 
        location / {
-           root /path/to/vlogsphere/frontend/dist;
+           root /path/to/capsule/frontend/dist;
            try_files $uri $uri/ /index.html;
        }
 
@@ -294,10 +294,10 @@ chmod +x deploy.sh
 
 ```bash
 # Backend logs
-pm2 logs vlogsphere-backend
+pm2 logs capsule-backend
 
 # System logs
-sudo journalctl -u vlogsphere-backend
+sudo journalctl -u capsule-backend
 ```
 
 ### Performance Monitoring
@@ -374,7 +374,7 @@ sudo apt update && sudo apt upgrade
 
 ## 🎉 Success!
 
-You should now have a fully functional VLOGSPHERE platform running. Visit your application URL to start creating and sharing amazing visual content!
+You should now have a fully functional CAPSULE platform running. Visit your application URL to start creating and sharing amazing visual content!
 
 ## 📞 Support
 

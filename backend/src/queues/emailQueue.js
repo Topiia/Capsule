@@ -115,14 +115,14 @@ exports.queueEmail = async (emailData, priority = 5) => {
 exports.queueVerificationEmail = async (email, verificationUrl) => exports.queueEmail(
   {
     to: email,
-    subject: 'Email Verification - VlogSphere',
+    subject: 'Email Verification - Capsule',
     html: `
-      <h2>Welcome to VlogSphere!</h2>
+      <h2>Welcome to Capsule!</h2>
       <p>Please verify your email address by clicking the link below:</p>
       <a href="${verificationUrl}">${verificationUrl}</a>
       <p>This link will expire in 24 hours.</p>
     `,
-    text: `Welcome to VlogSphere! Please verify your email: ${verificationUrl}`,
+    text: `Welcome to Capsule! Please verify your email: ${verificationUrl}`,
     critical: true,
   },
   10,
@@ -134,7 +134,7 @@ exports.queueVerificationEmail = async (email, verificationUrl) => exports.queue
 exports.queuePasswordResetEmail = async (email, resetUrl) => exports.queueEmail(
   {
     to: email,
-    subject: 'Password Reset - VlogSphere',
+    subject: 'Password Reset - Capsule',
     html: `
       <h2>Password Reset Request</h2>
       <p>You requested a password reset. Click the link below to reset your password:</p>
@@ -154,10 +154,10 @@ exports.queuePasswordResetEmail = async (email, resetUrl) => exports.queueEmail(
 exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
   {
     to: email,
-    subject: 'Welcome to VlogSphere!',
+    subject: 'Welcome to Capsule!',
     html: `
       <h2>Welcome ${username}!</h2>
-      <p>Thank you for joining VlogSphere. Start creating and sharing your vlogs today!</p>
+      <p>Thank you for joining Capsule. Start creating and sharing your vlogs today!</p>
       <p>Get started by:</p>
       <ul>
         <li>Completing your profile</li>
@@ -165,7 +165,7 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
         <li>Following other creators</li>
       </ul>
     `,
-    text: `Welcome ${username}! Thank you for joining VlogSphere.`,
+    text: `Welcome ${username}! Thank you for joining Capsule.`,
   },
   5,
 );

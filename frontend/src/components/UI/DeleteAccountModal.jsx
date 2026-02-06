@@ -126,7 +126,7 @@ function DeleteAccountModal({ isOpen, onClose, onSuccess }) {
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>
-                    <span>All vlogs you&apos;ve created</span>
+                    <span>All capsules you&apos;ve created</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">•</span>

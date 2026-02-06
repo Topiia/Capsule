@@ -129,7 +129,9 @@ const corsOptions = {
       const isValidVercelPreview = protocol === 'https:'
         && hostname.endsWith('.vercel.app')
         && (hostname === 'vlogspherefrontend.vercel.app'
-          || hostname.startsWith('vlogspherefrontend-'));
+          || hostname.startsWith('vlogspherefrontend-')
+          || hostname === 'capsule-frontend.vercel.app'
+          || hostname.startsWith('capsule-frontend-'));
 
       if (isValidVercelPreview) {
         return callback(null, true);
@@ -152,7 +154,7 @@ app.use(cors(corsOptions));
 
 app.use(
   statusMonitor({
-    title: 'VlogSphere Status',
+    title: 'Capsule Status',
     path: '/status',
     spans: [
       {
@@ -278,7 +280,7 @@ app.get('/health', (req, res) => {
 
   res.status(200).json({
     status: 'ok',
-    service: 'vlogsphere-backend',
+    service: 'capsule-backend',
     env,
     isProduction,
     timestamp: new Date().toISOString(),
@@ -317,7 +319,7 @@ app.use('/api/users', userRoutes);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Welcome to VLOGSPHERE API',
+    message: 'Welcome to Capsule API',
     version: '1.0.0',
     documentation: '/api/docs',
   });
@@ -327,7 +329,7 @@ app.get('/', (req, res) => {
 app.get('/api/docs', (req, res) => {
   res.json({
     success: true,
-    message: 'VLOGSPHERE API Documentation',
+    message: 'Capsule API Documentation',
     endpoints: {
       authentication: {
         'POST /api/auth/register': 'Register a new user',

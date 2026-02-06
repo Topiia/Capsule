@@ -29,20 +29,20 @@ const Footer = () => {
   const socialLinks = [
     {
       name: "Twitter",
-      href: "https://twitter.com/vlogsphere",
+      href: "https://twitter.com/capsule",
       icon: "twitter",
     },
     {
       name: "Instagram",
-      href: "https://instagram.com/vlogsphere",
+      href: "https://instagram.com/capsule",
       icon: "instagram",
     },
     {
       name: "YouTube",
-      href: "https://youtube.com/vlogsphere",
+      href: "https://youtube.com/capsule",
       icon: "youtube",
     },
-    { name: "GitHub", href: "https://github.com/vlogsphere", icon: "github" },
+    { name: "GitHub", href: "https://github.com/capsule", icon: "github" },
   ];
 
   return (
@@ -61,10 +61,10 @@ const Footer = () => {
               <Logo size="md" />
               <div>
                 <h3 className="text-xl font-bold text-[var(--theme-text)]">
-                  VLOGSPHERE
+                  CAPSULE
                 </h3>
                 <p className="text-sm text-[var(--theme-text-secondary)]">
-                  AI-Ready Visual Vlogging Platform
+                  AI-Ready Visual Capsule Platform
                 </p>
               </div>
             </div>
@@ -136,7 +136,7 @@ const Footer = () => {
             <div className="flex items-center space-x-4">
               <Logo size="sm" />
               <p className="text-[var(--theme-text-secondary)] text-sm">
-                © {currentYear} VLOGSPHERE. All rights reserved.
+                © {currentYear} CAPSULE. All rights reserved.
               </p>
             </div>
 

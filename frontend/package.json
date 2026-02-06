@@ -1,5 +1,5 @@
 {
-  "name": "vlogsphere-frontend",
+  "name": "capsule-frontend",
   "version": "1.0.0",
   "description": "Futuristic vlogging platform frontend",
   "private": true,
@@ -57,6 +57,6 @@
     "futuristic",
     "ui"
   ],
-  "author": "VLOGSPHERE Team",
+  "author": "Capsule Team",
   "license": "MIT"
 }

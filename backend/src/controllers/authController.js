@@ -35,7 +35,7 @@ const getCookieOptions = (maxAge) => {
     sameSite: isProduction ? 'none' : 'lax', // Cross-site in prod, same-site in dev
     maxAge, // Expiry time in milliseconds
     // Note: No 'domain' attribute - browser automatically uses backend's domain
-    // (vlogsphere-backend.onrender.com). Setting domain='.vercel.app' would fail
+    // (capsule-backend.onrender.com). Setting domain='.vercel.app' would fail
     // because backend doesn't own that domain.
   };
 };
@@ -109,10 +109,10 @@ exports.register = asyncHandler(async (req, res, next) => {
 
       await sendEmail({
         to: user.email,
-        subject: 'Welcome to VlogSphere - Verify Your Email',
+        subject: 'Welcome to Capsule - Verify Your Email',
         text: `Hi ${user.username},
 
-Welcome to VlogSphere! We're excited to have you join our community of content creators.
+Welcome to Capsule! We're excited to have you join our community of content creators.
 
 To complete your registration and activate your account, please click the link below:
 
@@ -120,12 +120,12 @@ ${verificationUrl}
 
 This verification link will expire in 24 hours.
 
-If you didn't create an account with VlogSphere, please ignore this email.
+If you didn't create an account with Capsule, please ignore this email.
 
 Best regards,
-The VlogSphere Team`,
+The Capsule Team`,
         html: `
-          <h2>Welcome to VlogSphere!</h2>
+          <h2>Welcome to Capsule!</h2>
           <p>Hi ${user.username},</p>
           <p>We're excited to have you join our community of content creators.</p>
           <p>To complete your registration and activate your account, please click the button below:</p>
@@ -137,9 +137,9 @@ The VlogSphere Team`,
           <p>Or copy and paste this link into your browser:</p>
           <p><a href="${verificationUrl}">${verificationUrl}</a></p>
           <p><small>This verification link will expire in 24 hours.</small></p>
-          <p>If you didn't create an account with VlogSphere, please ignore this email.</p>
+          <p>If you didn't create an account with Capsule, please ignore this email.</p>
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-          <p style="color: #666; font-size: 12px;">Best regards,<br>The VlogSphere Team</p>
+          <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
         `,
       });
     } catch (error) {
@@ -225,10 +225,10 @@ exports.login = asyncHandler(async (req, res, next) => {
     try {
       await sendEmail({
         to: user.email,
-        subject: 'Welcome to VlogSphere! 🎉',
+        subject: 'Welcome to Capsule! 🎉',
         text: `Hi ${user.username},
 
-Welcome to VlogSphere! Your account is now active and ready to use.
+Welcome to Capsule! Your account is now active and ready to use.
 
 We're thrilled to have you join our community of content creators. Here are some things you can do to get started:
 
@@ -243,12 +243,12 @@ If you have any questions or need help getting started, check out our help cente
 Happy vlogging!
 
 Best regards,
-The VlogSphere Team`,
+The Capsule Team`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #4F46E5;">Welcome to VlogSphere! 🎉</h1>
+            <h1 style="color: #4F46E5;">Welcome to Capsule! 🎉</h1>
             <p>Hi ${user.username},</p>
-            <p>Welcome to VlogSphere! Your account is now active and ready to use.</p>
+            <p>Welcome to Capsule! Your account is now active and ready to use.</p>
             <p>We're thrilled to have you join our community of content creators. Here are some things you can do to get started:</p>
             <ul style="line-height: 2;">
               <li>✨ Create your first vlog</li>
@@ -260,7 +260,7 @@ The VlogSphere Team`,
             <p>If you have any questions or need help getting started, check out our help center or reach out to our support team.</p>
             <p style="margin-top: 30px;"><strong>Happy vlogging!</strong></p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 12px;">Best regards,<br>The VlogSphere Team</p>
+            <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
           </div>
         `,
       });
@@ -402,10 +402,10 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   try {
     await sendEmail({
       to: user.email,
-      subject: 'VlogSphere Password Reset Request',
+      subject: 'Capsule Password Reset Request',
       text: `Hi ${user.username},
 
-You are receiving this email because you (or someone else) has requested a password reset for your VlogSphere account.
+You are receiving this email because you (or someone else) has requested a password reset for your Capsule account.
 
 Please click the link below to reset your password:
 
@@ -416,11 +416,11 @@ This link will expire in 15 minutes.
 If you did not request this password reset, please ignore this email and your password will remain unchanged.
 
 Best regards,
-The VlogSphere Team`,
+The Capsule Team`,
       html: `
         <h2>Password Reset Request</h2>
         <p>Hi ${user.username},</p>
-        <p>You are receiving this email because you (or someone else) has requested a password reset for your VlogSphere account.</p>
+        <p>You are receiving this email because you (or someone else) has requested a password reset for your Capsule account.</p>
         <p>Please click the button below to reset your password:</p>
         <p style="text-align: center; margin: 30px 0;">
           <a href="${resetUrl}" style="background-color: #DC2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
@@ -432,7 +432,7 @@ The VlogSphere Team`,
         <p><strong style="color: #DC2626;">⏰ This link will expire in 15 minutes.</strong></p>
         <p>If you did not request this password reset, please ignore this email and your password will remain unchanged.</p>
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-        <p style="color: #666; font-size: 12px;">Best regards,<br>The VlogSphere Team</p>
+        <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
       `,
     });
 

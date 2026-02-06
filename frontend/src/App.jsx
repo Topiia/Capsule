@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Suspense, lazy } from "react";
 
 // Layout Components
@@ -15,9 +15,9 @@ const ForgotPassword = lazy(() => import("./pages/Auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/Auth/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Profile = lazy(() => import("./pages/Profile"));
-const CreateVlog = lazy(() => import("./pages/CreateVlog"));
-const EditVlog = lazy(() => import("./pages/EditVlog"));
-const VlogDetail = lazy(() => import("./pages/VlogDetail"));
+const CreateCapsule = lazy(() => import("./pages/CreateCapsule"));
+const EditCapsule = lazy(() => import("./pages/EditCapsule"));
+const CapsuleDetail = lazy(() => import("./pages/CapsuleDetail"));
 const Explore = lazy(() => import("./pages/Explore"));
 const Trending = lazy(() => import("./pages/Trending"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -41,12 +41,12 @@ function App() {
             <Route index element={<Home />} />
             <Route path="explore" element={<Explore />} />
             <Route path="trending" element={<Trending />} />
-            <Route path="vlog/:id" element={<VlogDetail />} />
+            <Route path="vlog/:id" element={<CapsuleDetail />} />
             <Route
               path="vlog/:id/edit"
               element={
                 <ProtectedRoute>
-                  <EditVlog />
+                  <EditCapsule />
                 </ProtectedRoute>
               }
             />
@@ -72,7 +72,7 @@ function App() {
               path="create"
               element={
                 <ProtectedRoute>
-                  <CreateVlog />
+                  <CreateCapsule />
                 </ProtectedRoute>
               }
             />
@@ -81,7 +81,7 @@ function App() {
               path="edit/:id"
               element={
                 <ProtectedRoute>
-                  <CreateVlog editMode={true} />
+                  <CreateCapsule editMode={true} />
                 </ProtectedRoute>
               }
             />

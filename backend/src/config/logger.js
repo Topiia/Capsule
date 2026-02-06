@@ -78,7 +78,7 @@ const logger = winston.createLogger({
     || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   format: logFormat,
   defaultMeta: {
-    service: 'vlogsphere-api',
+    service: 'capsule-api',
     environment: process.env.NODE_ENV || 'development',
   },
   transports: [errorTransport, combinedTransport],

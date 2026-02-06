@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { vlogAPI } from "../services/api";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import Button from "../components/UI/Button";
-import LoadingSpinner from "../components/UI/LoadingSpinner";
 import {
   PlusIcon,
   ChartBarIcon,
@@ -96,7 +95,7 @@ const Dashboard = () => {
               Welcome back, {user?.username}!
             </h1>
             <p className="text-[var(--theme-text-secondary)]">
-              Here's what's happening with your content today
+              Here&apos;s what&apos;s happening with your content today
             </p>
           </div>
 
@@ -106,7 +105,7 @@ const Dashboard = () => {
                 variant="primary"
                 leftIcon={<PlusIcon className="w-5 h-5" />}
               >
-                Create Vlog
+                Create Capsule
               </Button>
             </Link>
           </div>
@@ -181,7 +180,7 @@ const Dashboard = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 + index * 0.1 }}
               >
-                <VlogCard vlog={vlog} compact />
+                <CapsuleCard vlog={vlog} compact />
               </motion.div>
             ))}
           </div>

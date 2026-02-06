@@ -1,8 +1,8 @@
-# VLOGSPHERE - AI-Ready Visual Vlogging Platform
+# CAPSULE - AI-Ready Visual Vlogging Platform
 
 ## 🚀 Overview
 
-VLOGSPHERE is a cutting-edge, production-ready vlogging platform that combines futuristic design with powerful functionality. Built with modern web technologies, it offers users a premium experience for creating, sharing, and discovering visual content.
+CAPSULE is a cutting-edge, production-ready vlogging platform that combines futuristic design with powerful functionality. Built with modern web technologies, it offers users a premium experience for creating, sharing, and discovering visual content.
 
 ## ✨ Key Features
 
@@ -63,7 +63,7 @@ VLOGSPHERE is a cutting-edge, production-ready vlogging platform that combines f
 ## 📁 Project Structure
 
 ```
-vlogsphere/
+capsule/
 ├── frontend/                 # React frontend application
 │   ├── src/
 │   │   ├── components/      # Reusable UI components
@@ -134,7 +134,7 @@ vlogsphere/
 
    ```bash
    git clone <repository-url>
-   cd vlogsphere
+   cd capsule
    ```
 
 2. **Install backend dependencies**
@@ -163,9 +163,9 @@ vlogsphere/
 
    ```env
    # Database
-   MONGODB_URI=mongodb://localhost:27017/vlogsphere
+   MONGODB_URI=mongodb://localhost:27017/capsule
    # OR for MongoDB Atlas:
-   # MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/vlogsphere
+   # MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/capsule
 
    # JWT Secrets (generate strong random strings)
    JWT_SECRET=your-super-secret-jwt-key-here
@@ -174,7 +174,7 @@ vlogsphere/
    # Resend Email API
    RESEND_API_KEY=re_your_resend_api_key
    FROM_EMAIL=onboarding@resend.dev
-   FROM_NAME=VlogSphere
+   FROM_NAME=Capsule
 
    # Cloudinary
    CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
@@ -320,4 +320,4 @@ For support, please open an issue in the GitHub repository or contact the develo
 
 ---
 
-Built with ❤️ by the VLOGSPHERE team
+Built with ❤️ by the CAPSULE team

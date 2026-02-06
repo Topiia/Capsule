@@ -4,16 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { userAPI, vlogAPI } from "../services/api";
 import { formatNumber, getInitials } from "../utils/helpers";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import Button from "../components/UI/Button";
 import FollowButton from "../components/UI/FollowButton";
 import LoadingSpinner from "../components/UI/LoadingSpinner";
 import {
   UserIcon,
   CalendarIcon,
-  EyeIcon,
-  HeartIcon,
-  ChatBubbleLeftIcon,
   ShareIcon,
   MapPinIcon,
   LinkIcon,
@@ -60,10 +57,10 @@ const Profile = () => {
             User Not Found
           </h1>
           <p className="text-[var(--theme-text-secondary)]">
-            The profile you're looking for doesn't exist
+            The profile you&apos;re looking for doesn&apos;t exist
           </p>
           <Link to="/explore" className="mt-4 inline-block">
-            <Button variant="primary">Explore Vlogs</Button>
+            <Button variant="primary">Explore Capsules</Button>
           </Link>
         </div>
       </div>
@@ -71,7 +68,7 @@ const Profile = () => {
   }
 
   const stats = [
-    { label: "Vlogs", value: userVlogs?.total || 0 },
+    { label: "Capsules", value: userVlogs?.total || 0 },
     { label: "Followers", value: profileUser.followerCount || 0 },
     { label: "Following", value: profileUser.followingCount || 0 },
     {
@@ -205,7 +202,7 @@ const Profile = () => {
         <div className="border-b border-white/10">
           <nav className="-mb-px flex space-x-8">
             {[
-              { label: "Vlogs", value: "vlogs" },
+              { label: "Capsules", value: "vlogs" },
               { label: "About", value: "about" },
               { label: "Following", value: "following" },
               { label: "Followers", value: "followers" },
@@ -250,7 +247,7 @@ const Profile = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + index * 0.1 }}
               >
-                <VlogCard vlog={vlog} />
+                <CapsuleCard vlog={vlog} />
               </motion.div>
             ))}
           </div>
@@ -272,12 +269,12 @@ const Profile = () => {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-[var(--theme-text)] mb-2">
-              No vlogs yet
+              No capsules yet
             </h3>
             <p className="text-[var(--theme-text-secondary)] mb-6">
               {isOwnProfile
                 ? "Start creating content to share your story with the world"
-                : `${profileUser.username} hasn't created any vlogs yet`}
+                : `${profileUser.username} hasn't created any capsules yet`}
             </p>
             {isOwnProfile && (
               <Link to="/create">
@@ -299,7 +296,7 @@ const Profile = () => {
                     </svg>
                   }
                 >
-                  Create Your First Vlog
+                  Create Your First Capsule
                 </Button>
               </Link>
             )}

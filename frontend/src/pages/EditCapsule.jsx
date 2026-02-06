@@ -17,7 +17,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
-const EditVlog = () => {
+const EditCapsule = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -251,7 +251,7 @@ const EditVlog = () => {
             Vlog Not Found
           </h1>
           <p className="text-[var(--theme-text-secondary)]">
-            The vlog you're trying to edit doesn't exist
+            The vlog you&apos;re trying to edit doesn&apos;t exist
           </p>
         </div>
       </div>
@@ -270,7 +270,7 @@ const EditVlog = () => {
             Edit Vlog
           </h1>
           <p className="text-lg sm:text-xl text-[var(--theme-text-secondary)]">
-            Update your vlog content and settings
+            Update your capsule content and settings
           </p>
         </div>
 
@@ -294,7 +294,7 @@ const EditVlog = () => {
                   htmlFor="title"
                   className="block text-sm font-medium text-[var(--theme-text)] mb-2"
                 >
-                  Vlog Title *
+                  Capsule Title *
                 </label>
                 <input
                   {...register("title", {
@@ -311,7 +311,7 @@ const EditVlog = () => {
                   type="text"
                   id="title"
                   className="glass-input"
-                  placeholder="Enter a catchy title for your vlog"
+                  placeholder="Enter a catchy title for your capsule"
                   disabled={updateMutation.isLoading}
                 />
                 {errors.title && (
@@ -377,7 +377,7 @@ const EditVlog = () => {
                   id="description"
                   rows={4}
                   className="glass-input resize-none"
-                  placeholder="Describe your vlog content..."
+                  placeholder="Describe your capsule content..."
                   disabled={updateMutation.isLoading}
                 />
                 {errors.description && (
@@ -598,7 +598,7 @@ const EditVlog = () => {
                     Visibility
                   </h3>
                   <p className="text-xs text-[var(--theme-text-secondary)]">
-                    Choose who can see your vlog
+                    Choose who can see your capsule
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -655,7 +655,7 @@ const EditVlog = () => {
               loading={updateMutation.isLoading || uploadingImages}
               className="w-full sm:w-auto px-12 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
             >
-              Update Vlog
+              Update Capsule
             </Button>
           </motion.div>
         </form>
@@ -664,4 +664,4 @@ const EditVlog = () => {
   );
 };
 
-export default EditVlog;
+export default EditCapsule;

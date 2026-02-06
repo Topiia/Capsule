@@ -26,7 +26,7 @@ const UserMenu = ({ user }) => {
       action: () => navigate(`/profile/${user?.username}`),
     },
     {
-      label: "Create Vlog",
+      label: "Create Capsule",
       href: "/create",
       icon: PlusIcon,
       action: () => navigate("/create"),
@@ -38,7 +38,7 @@ const UserMenu = ({ user }) => {
       action: () => navigate("/bookmarks"),
     },
     {
-      label: "Liked Vlogs",
+      label: "Liked Capsules",
       href: "/liked",
       icon: HeartIcon,
       action: () => navigate("/liked"),

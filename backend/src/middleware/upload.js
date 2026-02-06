@@ -22,7 +22,7 @@ const fileFilter = (req, file, cb) => {
 const cloudStorage = new CloudinaryStorage({
   cloudinary,
   params: async (_req, file) => ({
-    folder: 'vlogsphere',
+    folder: 'capsule',
     allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'],
     transformation: [
       { fetch_format: 'auto' },

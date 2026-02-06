@@ -1,6 +1,6 @@
 {
-  "name": "VlogSphere",
-  "short_name": "VlogSphere",
+  "name": "Capsule",
+  "short_name": "Capsule",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

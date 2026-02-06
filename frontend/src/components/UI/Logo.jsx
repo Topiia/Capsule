@@ -44,9 +44,13 @@ const Logo = ({ size = "md", className = "" }) => {
           filter="url(#glow)"
         />
 
-        {/* Inner Play Button Shape */}
-        <path
-          d="M35 25 L35 75 L75 50 Z"
+        {/* Inner Capsule Shape */}
+        <rect
+          x="35"
+          y="25"
+          width="30"
+          height="50"
+          rx="15"
           fill="url(#logoGradient)"
           opacity="0.8"
         />

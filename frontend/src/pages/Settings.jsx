@@ -423,7 +423,7 @@ const AccountSettings = () => {
           </p>
           <ul className="list-disc list-inside text-gray-400 mb-6 space-y-1">
             <li>Your profile and account data</li>
-            <li>All vlogs you&apos;ve created</li>
+            <li>All capsules you&apos;ve created</li>
             <li>All comments and likes</li>
             <li>All uploaded images</li>
           </ul>
@@ -756,7 +756,7 @@ const NotificationsSettings = () => {
                     New Comment
                   </div>
                   <div className="text-sm text-[var(--theme-text-secondary)]">
-                    Get notified when someone comments on your vlog
+                    Get notified when someone comments on your capsule
                   </div>
                 </div>
                 <ToggleSwitch
@@ -771,7 +771,7 @@ const NotificationsSettings = () => {
                     New Like
                   </div>
                   <div className="text-sm text-[var(--theme-text-secondary)]">
-                    Get notified when someone likes your vlog
+                    Get notified when someone likes your capsule
                   </div>
                 </div>
                 <ToggleSwitch

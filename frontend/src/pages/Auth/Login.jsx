@@ -87,7 +87,7 @@ const Login = () => {
             Welcome Back
           </h2>
           <p className="text-[var(--theme-text-secondary)]">
-            Sign in to your VLOGSPHERE account
+            Sign in to your CAPSULE account
           </p>
         </div>
 

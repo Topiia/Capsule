@@ -22,7 +22,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: "Home", href: "/", icon: HomeIcon },
     { name: "Explore", href: "/explore", icon: MapIcon },
     { name: "Trending", href: "/trending", icon: FireIcon },
-    { name: "Create Vlog", href: "/create", icon: PlusIcon },
+    { name: "Create Capsule", href: "/create", icon: PlusIcon },
     { name: "My Profile", href: `/profile/${user?.username}`, icon: UserIcon },
     { name: "Bookmarks", href: "/bookmarks", icon: BookmarkIcon },
     { name: "Liked", href: "/liked", icon: HeartIcon },
@@ -45,21 +45,21 @@ const Sidebar = ({ isOpen, onClose }) => {
       {/* Sidebar - Mobile: Fixed with animation, Desktop: Sticky */}
       <aside
         className={`
-          fixed lg:sticky top-0 left-0 h-screen lg:h-auto lg:min-h-screen w-64 
+          fixed lg:fixed top-0 left-0 h-screen w-64 
           glass-card border-r border-white/10 z-40 lg:z-10
           transition-transform duration-300 ease-in-out
           overflow-y-auto overflow-x-hidden lg:self-start
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        <div className="flex flex-col h-full lg:h-auto lg:min-h-[calc(100vh-4rem)] pt-16 lg:pt-0">
+        <div className="flex flex-col h-full pt-16">
           {/* Header - Hidden on desktop to avoid duplication */}
-          <div className="p-6 border-b border-white/10 lg:mt-16">
+          <div className="p-6 border-b border-white/10 lg:hidden">
             <div className="flex items-center space-x-3">
               <Logo size="md" />
               <div>
                 <h2 className="text-lg font-bold text-[var(--theme-text)]">
-                  VLOGSPHERE
+                  CAPSULE
                 </h2>
                 <p className="text-sm text-[var(--theme-text-secondary)]">
                   Create & Share

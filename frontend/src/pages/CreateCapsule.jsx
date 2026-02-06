@@ -1,21 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
-import { useAuth } from "../contexts/AuthContext";
+
 import { vlogAPI, uploadAPI } from "../services/api";
 import Button from "../components/UI/Button";
-import LoadingSpinner from "../components/UI/LoadingSpinner";
 import toast from "react-hot-toast";
 import {
   PhotoIcon,
   TagIcon,
-  // CategoryIcon,
-  EyeIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
-const CreateVlog = ({ editMode = false }) => {
-  const { user } = useAuth();
+import { useParams } from "react-router-dom";
+
+const CreateCapsule = ({ editMode = false }) => {
+  const { id } = useParams();
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
@@ -45,7 +44,6 @@ const CreateVlog = ({ editMode = false }) => {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -102,14 +100,14 @@ const CreateVlog = ({ editMode = false }) => {
       if (response.data.success) {
         toast.success(
           editMode
-            ? "Vlog updated successfully!"
-            : "Vlog created successfully!",
+            ? "Capsule updated successfully!"
+            : "Capsule created successfully!",
         );
         // Redirect to the new vlog
         window.location.href = `/vlog/${response.data.data._id}`;
       }
     } catch (error) {
-      toast.error(editMode ? "Failed to update vlog" : "Failed to create vlog");
+      toast.error(editMode ? "Failed to update capsule" : "Failed to create capsule");
     } finally {
       setLoading(false);
     }
@@ -124,7 +122,7 @@ const CreateVlog = ({ editMode = false }) => {
       >
         <div className="mb-8">
           <h1 className="text-4xl md:text-5xl font-bold gradient-text mb-4">
-            {editMode ? "Edit Vlog" : "Create New Vlog"}
+            {editMode ? "Edit Capsule" : "Create New Capsule"}
           </h1>
           <p className="text-xl text-[var(--theme-text-secondary)]">
             Share your story with the world through visual content
@@ -151,7 +149,7 @@ const CreateVlog = ({ editMode = false }) => {
                   htmlFor="title"
                   className="block text-sm font-medium text-[var(--theme-text)] mb-2"
                 >
-                  Vlog Title *
+                  Capsule Title *
                 </label>
                 <input
                   {...register("title", {
@@ -168,7 +166,7 @@ const CreateVlog = ({ editMode = false }) => {
                   type="text"
                   id="title"
                   className="glass-input"
-                  placeholder="Enter a catchy title for your vlog"
+                  placeholder="Enter a catchy title for your capsule"
                   disabled={loading}
                 />
                 {errors.title && (
@@ -231,7 +229,7 @@ const CreateVlog = ({ editMode = false }) => {
                   id="description"
                   rows={4}
                   className="glass-input resize-none"
-                  placeholder="Describe your vlog content..."
+                  placeholder="Describe your capsule content..."
                   disabled={loading}
                 />
                 {errors.description && (
@@ -392,7 +390,7 @@ const CreateVlog = ({ editMode = false }) => {
                     Visibility
                   </h3>
                   <p className="text-xs text-[var(--theme-text-secondary)]">
-                    Choose who can see your vlog
+                    Choose who can see your capsule
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -439,7 +437,7 @@ const CreateVlog = ({ editMode = false }) => {
               loading={loading || uploadingImages}
               className="px-12"
             >
-              {editMode ? "Update Vlog" : "Publish Vlog"}
+              {editMode ? "Update Capsule" : "Publish Capsule"}
             </Button>
           </motion.div>
         </form>
@@ -448,4 +446,4 @@ const CreateVlog = ({ editMode = false }) => {
   );
 };
 
-export default CreateVlog;
+export default CreateCapsule;

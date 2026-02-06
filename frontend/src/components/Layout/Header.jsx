@@ -82,7 +82,7 @@ const Header = ({ onToggleSidebar }) => {
               >
                 <Logo size="sm" />
                 <span className="hidden sm:block text-xl font-bold gradient-text whitespace-nowrap">
-                  VLOGSPHERE
+                  CAPSULE
                 </span>
               </Link>
             </div>
@@ -134,7 +134,7 @@ const Header = ({ onToggleSidebar }) => {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => navigate("/create")}
                   className="hidden md:flex items-center space-x-2 px-3 lg:px-4 py-2 bg-[var(--theme-accent)] text-white rounded-lg hover:shadow-lg transition-all duration-200"
-                  aria-label="Create new vlog"
+                  aria-label="Create new capsule"
                 >
                   <PlusIcon className="w-5 h-5" />
                   <span className="hidden lg:inline">Create</span>

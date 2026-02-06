@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import LoadingSpinner from "../components/UI/LoadingSpinner";
 import Button from "../components/UI/Button";
 import {
@@ -54,7 +54,7 @@ const Bookmarks = () => {
           </h1>
         </div>
         <p className="text-[var(--theme-text-secondary)]">
-          Your saved vlogs for later viewing
+          Your saved capsules for later viewing
         </p>
       </motion.div>
 
@@ -83,10 +83,10 @@ const Bookmarks = () => {
                 No bookmarks yet
               </h2>
               <p className="text-[var(--theme-text-secondary)] mb-6 max-w-md mx-auto">
-                Start bookmarking vlogs to save them for later viewing
+                Start bookmarking capsules to save them for later viewing
               </p>
               <Link to="/explore">
-                <Button variant="primary">Explore Vlogs</Button>
+                <Button variant="primary">Explore Capsules</Button>
               </Link>
             </motion.div>
           </div>
@@ -100,7 +100,7 @@ const Bookmarks = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.2 + index * 0.05 }}
                 >
-                  <VlogCard vlog={{ ...vlog, isBookmarked: true }} compact />
+                  <CapsuleCard vlog={{ ...vlog, isBookmarked: true }} compact />
                 </motion.div>
               ))}
             </div>
