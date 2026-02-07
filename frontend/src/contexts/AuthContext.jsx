@@ -21,11 +21,7 @@ export const useAuth = () => {
   return context;
 };
 
-// CRITICAL FIX: Global singleton guard to prevent duplicate auth initialization
-// Using module-level variable instead of useRef to persist across ALL instances
-// This prevents multiple /me requests even with multiple AuthProvider instances or re-renders
-let globalAuthInitialized = false;
-let globalAuthInitializing = false;
+
 
 /*
   ============================================================
@@ -239,18 +235,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // COOKIE-ONLY AUTH: Session restoration via /me endpoint
-  // CRITICAL: Global singleton guard prevents duplicate requests
+  // CRITICAL: Prevent duplicate initialization
+  const isAuthInitialized = useRef(false);
+
   useEffect(() => {
     const initAuth = async () => {
-      // PRODUCTION FIX: Check global flag first (prevents duplicate requests)
-      if (globalAuthInitializing || globalAuthInitialized) {
-        console.log("[AuthContext] Skipping duplicate auth initialization");
-        // Still need to set loading to false for this instance
-        setLoading(false);
+      // Prevent double initialization (React Strict Mode or multiple mounts)
+      if (isAuthInitialized.current) {
         return;
       }
+      isAuthInitialized.current = true;
 
-      globalAuthInitializing = true;
       console.log("[AuthContext] Initializing authentication...");
 
       try {
@@ -263,7 +258,7 @@ export const AuthProvider = ({ children }) => {
         // If 401, try to refresh token
         if (error.response?.status === 401) {
           try {
-            console.log("Access token expired, attempting refresh...");
+            console.log("[AuthContext] Access token expired, attempting refresh...");
             // No body needed - refreshToken cookie sent automatically
             await authAPI.refreshToken();
 
@@ -272,59 +267,30 @@ export const AuthProvider = ({ children }) => {
             setUser(userResponse.data.user);
             setIsAuthenticated(true);
 
-            console.log("Session restored via refresh token");
+            console.log("[AuthContext] Session restored via refresh token");
           } catch (refreshError) {
-            // Check if it's a rate limit error
-            if (refreshError.response?.status === 429) {
-              const retryAfter =
-                refreshError.response.data?.retryAfterSeconds || 60;
-              console.warn(`Rate limited. Retry after ${retryAfter} seconds`);
-
-              // UX FIX: Only show toast if NOT initial load (user took explicit action)
-              if (!isInitialLoadRef.current) {
-                toast.error(
-                  `Too many requests. Please wait ${retryAfter} seconds and refresh.`,
-                  { duration: retryAfter * 1000 },
-                );
-              } else {
-                console.log(
-                  "[AuthContext] Rate limit during initial load - toast suppressed",
-                );
-              }
-            } else {
-              // Refresh failed, user not logged in
-              console.log("Session restoration failed, user not logged in");
-            }
+            // Refresh failed, user not logged in
+            console.warn("[AuthContext] Session restoration failed:", refreshError.message);
             setIsAuthenticated(false);
+            setUser(null);
           }
         } else if (error.response?.status === 429) {
           // Rate limit on initial /me call
           const retryAfter = error.response.data?.retryAfterSeconds || 60;
           console.warn(
-            `Rate limited on /me. Retry after ${retryAfter} seconds`,
+            `[AuthContext] Rate limited on /me. Retry after ${retryAfter} seconds`
           );
-
-          // UX FIX: Only show toast if NOT initial load (user took explicit action)
-          if (!isInitialLoadRef.current) {
-            toast.error(`Too many requests. Please wait ${retryAfter} seconds.`, {
-              duration: retryAfter * 1000,
-            });
-          } else {
-            console.log(
-              "[AuthContext] Rate limit during initial load - toast suppressed",
-            );
-          }
           setIsAuthenticated(false);
+          setUser(null);
         } else {
           // Other error, assume not logged in
           console.log("[AuthContext] No active session");
           setIsAuthenticated(false);
+          setUser(null);
         }
       } finally {
         setLoading(false);
-        globalAuthInitializing = false;
-        globalAuthInitialized = true;
-        isInitialLoadRef.current = false; // UX FIX: Mark initial load complete
+        isInitialLoadRef.current = false;
         console.log("[AuthContext] Authentication initialization complete");
       }
     };
