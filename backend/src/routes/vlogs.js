@@ -143,8 +143,7 @@ const commentValidation = [
   body('text')
     .isLength({ min: 1, max: 500 })
     .withMessage('Comment must be between 1 and 500 characters')
-    .trim()
-    .escape(),
+    .trim(),
 ];
 
 // Routes
