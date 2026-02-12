@@ -52,18 +52,18 @@ exports.getBookmarks = asyncHandler(async (req, res, next) => {
    ADD BOOKMARK
 ---------------------------------------------------------- */
 exports.addBookmark = asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.user.id);
+  // Check if vlog exists
   const vlog = await Vlog.findById(req.params.vlogId);
-
   if (!vlog) {
     return next(new ErrorResponse('Vlog not found', 404));
   }
 
-  // Check if already bookmarked
-  if (!user.bookmarks.includes(req.params.vlogId)) {
-    user.bookmarks.push(req.params.vlogId);
-    await user.save();
-  }
+  // FIXED Bug #10: Use atomic $addToSet instead of includes() check
+  // This prevents race conditions and is more efficient
+  await User.findByIdAndUpdate(
+    req.user.id,
+    { $addToSet: { bookmarks: req.params.vlogId } },
+  );
 
   res.status(200).json({
     success: true,

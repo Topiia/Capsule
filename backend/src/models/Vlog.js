@@ -122,17 +122,20 @@ const vlogSchema = new mongoose.Schema(
 );
 
 // Virtual for engagement score
-vlogSchema.virtual('engagementScore').get(function () {
+vlogSchema.virtual('engagementScore').get(function getEngagementScore() {
   const likes = this.likeCount || 0;
   const comments = this.commentCount || 0;
   const shares = this.shares || 0;
-  const views = this.views || 1; // Avoid division by zero
+  const views = this.views || 0;
+
+  // FIXED Bug #11: Return 0 for vlogs with no views (instead of calculating with views=1)
+  if (views === 0) return '0.00';
 
   return (((likes + comments + shares) / views) * 100).toFixed(2);
 });
 
 // Pre-save middleware to calculate reading time
-vlogSchema.pre('save', function (next) {
+vlogSchema.pre('save', function calculateReadingTime(next) {
   if (this.isModified('content') || this.isModified('description')) {
     const totalText = `${this.content || ''} ${this.description || ''}`;
     const wordsPerMinute = 200;

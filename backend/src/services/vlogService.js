@@ -71,6 +71,12 @@ class VlogService {
    */
   /* eslint-disable class-methods-use-this */
   async toggleLike(vlogId, userId) {
+    // FIXED Bug #9: Check if vlog exists first
+    const vlog = await Vlog.findById(vlogId);
+    if (!vlog) {
+      throw new ErrorResponse('Vlog not found', 404);
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -94,6 +100,7 @@ class VlogService {
         await Like.deleteOne({ _id: existingLike._id }).session(session);
         await Vlog.findByIdAndUpdate(vlogId, {
           $inc: { likeCount: -1 },
+          $max: { likeCount: 0 },
         }).session(session);
       } else {
         // Like: First remove dislike if it exists (CRITICAL: prevent duplicate key error)
@@ -101,6 +108,7 @@ class VlogService {
           await Like.deleteOne({ _id: existingDislike._id }).session(session);
           await Vlog.findByIdAndUpdate(vlogId, {
             $inc: { dislikeCount: -1 },
+            $max: { dislikeCount: 0 },
           }).session(session);
         }
 
@@ -117,10 +125,10 @@ class VlogService {
       await session.commitTransaction();
 
       // Return new state
-      const vlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
+      const updatedVlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
       return {
-        likeCount: vlog.likeCount,
-        dislikeCount: vlog.dislikeCount,
+        likeCount: updatedVlog.likeCount,
+        dislikeCount: updatedVlog.dislikeCount,
         isLiked,
         isDisliked,
       };
@@ -136,6 +144,12 @@ class VlogService {
    * Toggle Dislike status
    */
   async toggleDislike(vlogId, userId) {
+    // FIXED Bug #9: Check if vlog exists first
+    const vlog = await Vlog.findById(vlogId);
+    if (!vlog) {
+      throw new ErrorResponse('Vlog not found', 404);
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -159,22 +173,19 @@ class VlogService {
         await Like.deleteOne({ _id: existingDislike._id }).session(session);
         await Vlog.findByIdAndUpdate(vlogId, {
           $inc: { dislikeCount: -1 },
+          $max: { dislikeCount: 0 },
         }).session(session);
 
-        // Restore like state if it was there? No, typical behavior is just remove dislike.
-        // Wait, if I am undisliking, does that mean I am liking? No, back to neutral.
-        // But we need to correctly return isLiked status if it somehow exists
-        // (which it shouldn't if mutually exclusive).
-        // Actually, logic above ensures mutual exclusion.
-        // So if I undislike, I am neutral.
-        // existingLike should definitely be null here if we enforce mutual exclusion.
-        isLiked = !!existingLike;
+        // FIXED Bug #12: Explicit state - after undislike, user is neutral
+        isLiked = false;
+        isDisliked = false;
       } else {
         // Dislike: First remove like if it exists (CRITICAL: prevent duplicate key error)
         if (existingLike) {
           await Like.deleteOne({ _id: existingLike._id }).session(session);
           await Vlog.findByIdAndUpdate(vlogId, {
             $inc: { likeCount: -1 },
+            $max: { likeCount: 0 },
           }).session(session);
         }
 
@@ -190,10 +201,10 @@ class VlogService {
 
       await session.commitTransaction();
 
-      const vlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
+      const updatedVlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
       return {
-        likeCount: vlog.likeCount,
-        dislikeCount: vlog.dislikeCount,
+        likeCount: updatedVlog.likeCount,
+        dislikeCount: updatedVlog.dislikeCount,
         isLiked,
         isDisliked,
       };
@@ -248,7 +259,11 @@ class VlogService {
     }
 
     await Comment.deleteOne({ _id: commentId });
-    await Vlog.findByIdAndUpdate(vlogId, { $inc: { commentCount: -1 } });
+    // FIXED Bug #8: Prevent negative commentCount
+    await Vlog.findByIdAndUpdate(vlogId, {
+      $inc: { commentCount: -1 },
+      $max: { commentCount: 0 },
+    });
   }
 
   async recordView(vlogId, viewerId) {
