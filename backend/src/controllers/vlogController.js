@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const Vlog = require('../models/Vlog');
+const Like = require('../models/Like');
+const Comment = require('../models/Comment');
 const { deleteImage } = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
@@ -208,7 +210,12 @@ exports.deleteVlog = asyncHandler(async (req, res, next) => {
     );
   }
 
-  await vlog.deleteOne();
+  // FIXED Bug #4: CASCADE DELETE - Remove associated records to prevent orphaned data
+  await Promise.all([
+    Like.deleteMany({ vlog: req.params.id }),
+    Comment.deleteMany({ vlog: req.params.id }),
+    vlog.deleteOne(),
+  ]);
 
   // PERFORMANCE: Invalidate vlog caches after deletion
   await invalidateVlogCache();
