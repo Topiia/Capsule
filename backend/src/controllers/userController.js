@@ -14,37 +14,37 @@ exports.getBookmarks = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 20;
   const skip = (page - 1) * limit;
 
-  const user = await User.findById(req.user.id).populate({
-    path: 'bookmarks',
-    options: {
-      skip,
-      limit,
-      sort: { createdAt: -1 },
-    },
-    populate: {
-      path: 'author',
-      select: 'username avatar bio followerCount',
-    },
-  });
+  // FIXED Bug #6: Mongoose populate doesn't support skip/limit on arrays
+  // Fetch user with bookmarks array only
+  const user = await User.findById(req.user.id).select('bookmarks');
 
   if (!user) {
     return next(new ErrorResponse('User not found', 404));
   }
 
-  // Get total count of bookmarks for pagination
-  const totalBookmarks = await User.findById(req.user.id).select('bookmarks');
-  const total = totalBookmarks.bookmarks.length;
+  const total = user.bookmarks.length;
   const totalPages = Math.ceil(total / limit);
+
+  // Manual pagination: slice the bookmarks array
+  const paginatedBookmarkIds = user.bookmarks.slice(skip, skip + limit);
+
+  // Fetch vlogs with proper population
+  const vlogs = await Vlog.find({ _id: { $in: paginatedBookmarkIds } })
+    .populate({
+      path: 'author',
+      select: 'username avatar bio followerCount',
+    })
+    .sort({ createdAt: -1 });
 
   res.status(200).json({
     success: true,
-    count: user.bookmarks.length,
+    count: vlogs.length,
     total,
     totalPages,
     currentPage: page,
     hasNextPage: page < totalPages,
     hasPrevPage: page > 1,
-    data: user.bookmarks,
+    data: vlogs,
   });
 });
 

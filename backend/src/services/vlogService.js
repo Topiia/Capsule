@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Vlog = require('../models/Vlog');
 const Like = require('../models/Like');
 const Comment = require('../models/Comment');
+const User = require('../models/User');
 const ErrorResponse = require('../utils/errorResponse');
 const redis = require('../config/redis');
 const logger = require('../config/logger');
@@ -24,17 +25,20 @@ class VlogService {
 
     let isLiked = false;
     let isDisliked = false;
+    let isBookmarked = false;
     let isFollowedByCurrentUser = false;
 
     if (userId) {
       // Check interactions in parallel
-      const [like, dislike] = await Promise.all([
+      const [like, dislike, user] = await Promise.all([
         Like.findOne({ vlog: vlogId, user: userId, type: 'like' }),
         Like.findOne({ vlog: vlogId, user: userId, type: 'dislike' }),
+        User.findById(userId).select('bookmarks'),
       ]);
 
       isLiked = !!like;
       isDisliked = !!dislike;
+      isBookmarked = user ? user.bookmarks.includes(vlogId) : false;
 
       if (vlog.author) {
         isFollowedByCurrentUser = vlog.author.followers.includes(userId);
@@ -48,6 +52,7 @@ class VlogService {
     const vlogData = vlog.toObject();
     vlogData.isLiked = isLiked;
     vlogData.isDisliked = isDisliked;
+    vlogData.isBookmarked = isBookmarked;
     vlogData.author.isFollowedByCurrentUser = isFollowedByCurrentUser;
 
     // Fetch latest 10 comments (pagination should be separate endpoint for full list)
