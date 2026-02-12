@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Vlog = require('../models/Vlog');
 const Like = require('../models/Like');
@@ -104,75 +105,133 @@ exports.followUser = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Cannot follow yourself', 400));
   }
 
-  // Check if user exists
-  const userToFollow = await User.findById(userId);
-  if (!userToFollow) {
-    return next(new ErrorResponse('User not found', 404));
+  // FIXED Bug #3: Use MongoDB transactions for atomicity
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Check if user exists
+    const userToFollow = await User.findById(userId).session(session);
+    if (!userToFollow) {
+      throw new ErrorResponse('User not found', 404);
+    }
+
+    const follower = await User.findById(followerId).session(session);
+
+    // Check if already following
+    if (follower.following.includes(userId)) {
+      throw new ErrorResponse('Already following this user', 400);
+    }
+
+    // FIXED Bug #3: Use $addToSet for atomic updates (prevents duplicates)
+    await User.findByIdAndUpdate(
+      followerId,
+      { $addToSet: { following: userId } },
+      { session },
+    );
+
+    await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { followers: followerId } },
+      { session },
+    );
+
+    // Commit transaction
+    await session.commitTransaction();
+
+    // Fetch updated counts (outside transaction for better performance)
+    const updatedFollower = await User.findById(followerId).select(
+      'followingCount following',
+    );
+    const updatedUserToFollow = await User.findById(userId).select(
+      'followerCount',
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isFollowing: true,
+        followerCount: updatedUserToFollow.followerCount,
+        followingCount: updatedFollower.followingCount,
+        following: updatedFollower.following,
+      },
+    });
+  } catch (error) {
+    // Rollback on error
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    // Always end session
+    session.endSession();
   }
-
-  const follower = await User.findById(followerId);
-
-  // Check if already following
-  if (follower.following.includes(userId)) {
-    return next(new ErrorResponse('Already following this user', 400));
-  }
-
-  // Update both users atomically
-  follower.following.push(userId);
-  userToFollow.followers.push(followerId);
-
-  await Promise.all([follower.save(), userToFollow.save()]);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      isFollowing: true,
-      followerCount: userToFollow.followerCount,
-      followingCount: follower.followingCount,
-      following: follower.following, // Include updated following array
-    },
-  });
 });
 
 /* ----------------------------------------------------------
    UNFOLLOW USER
 ---------------------------------------------------------- */
-exports.unfollowUser = asyncHandler(async (req, res, next) => {
+exports.unfollowUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const followerId = req.user.id;
 
-  // Check if user exists
-  const userToUnfollow = await User.findById(userId);
-  if (!userToUnfollow) {
-    return next(new ErrorResponse('User not found', 404));
+  // FIXED Bug #3: Use MongoDB transactions for atomicity
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Check if user exists
+    const userToUnfollow = await User.findById(userId).session(session);
+    if (!userToUnfollow) {
+      throw new ErrorResponse('User not found', 404);
+    }
+
+    const follower = await User.findById(followerId).session(session);
+
+    // Check if currently following
+    if (!follower.following.includes(userId)) {
+      throw new ErrorResponse('Not following this user', 400);
+    }
+
+    // FIXED Bug #3: Use $pull for atomic removal
+    await User.findByIdAndUpdate(
+      followerId,
+      { $pull: { following: userId } },
+      { session },
+    );
+
+    await User.findByIdAndUpdate(
+      userId,
+      { $pull: { followers: followerId } },
+      { session },
+    );
+
+    // Commit transaction
+    await session.commitTransaction();
+
+    // Fetch updated counts (outside transaction for better performance)
+    const updatedFollower = await User.findById(followerId).select(
+      'followingCount following',
+    );
+    const updatedUserToUnfollow = await User.findById(userId).select(
+      'followerCount',
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isFollowing: false,
+        followerCount: updatedUserToUnfollow.followerCount,
+        followingCount: updatedFollower.followingCount,
+        following: updatedFollower.following,
+      },
+    });
+  } catch (error) {
+    // Rollback on error
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    // Always end session
+    session.endSession();
   }
-
-  const follower = await User.findById(followerId);
-
-  // Check if currently following
-  if (!follower.following.includes(userId)) {
-    return next(new ErrorResponse('Not following this user', 400));
-  }
-
-  // Update both users atomically
-  follower.following = follower.following.filter(
-    (id) => id.toString() !== userId,
-  );
-  userToUnfollow.followers = userToUnfollow.followers.filter(
-    (id) => id.toString() !== followerId,
-  );
-
-  await Promise.all([follower.save(), userToUnfollow.save()]);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      isFollowing: false,
-      followerCount: userToUnfollow.followerCount,
-      followingCount: follower.followingCount,
-      following: follower.following, // Include updated following array
-    },
-  });
 });
 
 /* ----------------------------------------------------------
