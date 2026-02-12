@@ -17,7 +17,6 @@ const commentSchema = new mongoose.Schema(
       required: true,
       maxlength: [500, 'Comment cannot exceed 500 characters'],
       trim: true,
-      escape: true, // Basic XSS protection
     },
   },
   {
