@@ -243,14 +243,8 @@ exports.getFollowers = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 20;
   const skip = (page - 1) * limit;
 
-  const user = await User.findById(userId).populate({
-    path: 'followers',
-    select: 'username avatar bio followerCount',
-    options: {
-      skip,
-      limit,
-    },
-  });
+  // FIXED Bug #7: Mongoose populate doesn't support skip/limit on arrays
+  const user = await User.findById(userId).select('followers');
 
   if (!user) {
     return next(new ErrorResponse('User not found', 404));
@@ -259,12 +253,21 @@ exports.getFollowers = asyncHandler(async (req, res, next) => {
   const total = user.followers.length;
   const totalPages = Math.ceil(total / limit);
 
+  // Manual pagination: slice the followers array
+  const paginatedFollowerIds = user.followers.slice(skip, skip + limit);
+
+  // Fetch users with proper selection
+  const followers = await User.find({ _id: { $in: paginatedFollowerIds } })
+    .select('username avatar bio followerCount');
+
   // Add isFollowing status for current user
-  const currentUser = req.user ? await User.findById(req.user.id) : null;
-  const followersWithStatus = user.followers.map((follower) => ({
+  const currentUser = req.user
+    ? await User.findById(req.user.id).select('following')
+    : null;
+  const followersWithStatus = followers.map((follower) => ({
     ...follower.toObject(),
     isFollowing: currentUser
-      ? currentUser.following.includes(follower._id)
+      ? currentUser.following.some((id) => id.equals(follower._id))
       : false,
   }));
 
@@ -287,14 +290,8 @@ exports.getFollowing = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 20;
   const skip = (page - 1) * limit;
 
-  const user = await User.findById(userId).populate({
-    path: 'following',
-    select: 'username avatar bio followerCount',
-    options: {
-      skip,
-      limit,
-    },
-  });
+  // FIXED Bug #7: Mongoose populate doesn't support skip/limit on arrays
+  const user = await User.findById(userId).select('following');
 
   if (!user) {
     return next(new ErrorResponse('User not found', 404));
@@ -303,12 +300,21 @@ exports.getFollowing = asyncHandler(async (req, res, next) => {
   const total = user.following.length;
   const totalPages = Math.ceil(total / limit);
 
+  // Manual pagination: slice the following array
+  const paginatedFollowingIds = user.following.slice(skip, skip + limit);
+
+  // Fetch users with proper selection
+  const following = await User.find({ _id: { $in: paginatedFollowingIds } })
+    .select('username avatar bio followerCount');
+
   // Add isFollowing status for current user
-  const currentUser = req.user ? await User.findById(req.user.id) : null;
-  const followingWithStatus = user.following.map((followedUser) => ({
+  const currentUser = req.user
+    ? await User.findById(req.user.id).select('following')
+    : null;
+  const followingWithStatus = following.map((followedUser) => ({
     ...followedUser.toObject(),
     isFollowing: currentUser
-      ? currentUser.following.includes(followedUser._id)
+      ? currentUser.following.some((id) => id.equals(followedUser._id))
       : false,
   }));
 
