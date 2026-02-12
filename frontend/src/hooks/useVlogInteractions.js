@@ -176,6 +176,7 @@ export const useVlogInteractions = () => {
       queryClient.invalidateQueries({ queryKey: ["latestVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["trendingVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["likedVlogs"] });
     },
   });
 
@@ -338,6 +339,7 @@ export const useVlogInteractions = () => {
       queryClient.invalidateQueries({ queryKey: ["latestVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["trendingVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["likedVlogs"] });
     },
   });
 

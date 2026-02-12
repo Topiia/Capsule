@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Vlog = require('../models/Vlog');
+const Like = require('../models/Like');
 const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const userDeletionService = require('../services/userDeletionService');
@@ -292,8 +293,13 @@ exports.getLikedVlogs = asyncHandler(async (req, res) => {
   const sortBy = req.query.sort || '-createdAt';
   const { category } = req.query;
 
-  // Build query to find vlogs where current user ID exists in likes array
-  const query = { likes: req.user.id };
+  // FIXED Bug #1: Query Like collection to get vlog IDs that user has liked
+  const likeQuery = { user: req.user.id, type: 'like' };
+  const likes = await Like.find(likeQuery).select('vlog');
+  const vlogIds = likes.map((like) => like.vlog);
+
+  // Build query for vlogs using the liked vlog IDs
+  const query = { _id: { $in: vlogIds } };
 
   // Add category filter if provided
   if (category && category !== 'all') {
@@ -314,6 +320,7 @@ exports.getLikedVlogs = asyncHandler(async (req, res) => {
     .skip(skip)
     .limit(limit);
 
+  // FIXED Bug #2: Added missing data field
   res.status(200).json({
     success: true,
     count: vlogs.length,
@@ -322,6 +329,7 @@ exports.getLikedVlogs = asyncHandler(async (req, res) => {
     currentPage: page,
     hasNextPage: page < totalPages,
     hasPrevPage: page > 1,
+    data: vlogs,
   });
 });
 
