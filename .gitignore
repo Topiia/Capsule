@@ -94,3 +94,5 @@ test_output_*.json
 test_output_*.txt
 test_full_output*.txt
 debug_*.log
+
+backend/test-bugs-8-12.js
