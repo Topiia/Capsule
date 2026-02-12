@@ -89,6 +89,9 @@ export const useFollowUser = () => {
         exact: true,
       });
       queryClient.invalidateQueries({ queryKey: ["currentUser"], exact: true });
+      // Invalidate followers/following lists for real-time updates
+      queryClient.invalidateQueries({ queryKey: ["followers"] });
+      queryClient.invalidateQueries({ queryKey: ["following"] });
     },
   });
 
@@ -170,6 +173,9 @@ export const useFollowUser = () => {
         exact: true,
       });
       queryClient.invalidateQueries({ queryKey: ["currentUser"], exact: true });
+      // Invalidate followers/following lists for real-time updates
+      queryClient.invalidateQueries({ queryKey: ["followers"] });
+      queryClient.invalidateQueries({ queryKey: ["following"] });
     },
   });
 
