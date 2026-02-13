@@ -71,7 +71,6 @@ class VlogService {
    */
   /* eslint-disable class-methods-use-this */
   async toggleLike(vlogId, userId) {
-    // FIXED Bug #9: Check if vlog exists first
     const vlog = await Vlog.findById(vlogId);
     if (!vlog) {
       throw new ErrorResponse('Vlog not found', 404);
@@ -94,37 +93,41 @@ class VlogService {
 
       let isLiked = false;
       const isDisliked = false;
+      const vlogUpdate = { $inc: {} };
 
       if (existingLike) {
-        // Unlike: Remove existing like
+        // User already liked -> Untoggle (Remove Like)
         await Like.deleteOne({ _id: existingLike._id }).session(session);
-        await Vlog.findByIdAndUpdate(vlogId, {
-          $inc: { likeCount: -1 },
-          $max: { likeCount: 0 },
-        }).session(session);
+        vlogUpdate.$inc.likeCount = -1;
+        isLiked = false;
+        // isDisliked remains false (neutral state)
       } else {
-        // Like: First remove dislike if it exists (CRITICAL: prevent duplicate key error)
+        // User hasn't liked -> Add Like
+        // If they disliked, remove that first (Switch)
         if (existingDislike) {
           await Like.deleteOne({ _id: existingDislike._id }).session(session);
-          await Vlog.findByIdAndUpdate(vlogId, {
-            $inc: { dislikeCount: -1 },
-            $max: { dislikeCount: 0 },
-          }).session(session);
+          vlogUpdate.$inc.dislikeCount = -1;
         }
 
-        // Then create the like
         await Like.create([{ vlog: vlogId, user: userId, type: 'like' }], {
           session,
         });
-        await Vlog.findByIdAndUpdate(vlogId, {
-          $inc: { likeCount: 1 },
-        }).session(session);
+        vlogUpdate.$inc.likeCount = 1;
         isLiked = true;
+        // isDisliked is false because we switched or were neutral
+      }
+
+      // Execute single atomic update for Vlog counters
+      if (Object.keys(vlogUpdate.$inc).length > 0) {
+        await Vlog.findByIdAndUpdate(vlogId, vlogUpdate, {
+          new: true,
+          session,
+        });
       }
 
       await session.commitTransaction();
 
-      // Return new state
+      // Fetch fresh state to return accurate numbers
       const updatedVlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
       return {
         likeCount: updatedVlog.likeCount,
@@ -144,7 +147,6 @@ class VlogService {
    * Toggle Dislike status
    */
   async toggleDislike(vlogId, userId) {
-    // FIXED Bug #9: Check if vlog exists first
     const vlog = await Vlog.findById(vlogId);
     if (!vlog) {
       throw new ErrorResponse('Vlog not found', 404);
@@ -154,53 +156,54 @@ class VlogService {
     session.startTransaction();
 
     try {
-      const existingDislike = await Like.findOne({
-        vlog: vlogId,
-        user: userId,
-        type: 'dislike',
-      }).session(session);
       const existingLike = await Like.findOne({
         vlog: vlogId,
         user: userId,
         type: 'like',
       }).session(session);
+      const existingDislike = await Like.findOne({
+        vlog: vlogId,
+        user: userId,
+        type: 'dislike',
+      }).session(session);
 
-      let isLiked = false;
+      const isLiked = false;
       let isDisliked = false;
+      const vlogUpdate = { $inc: {} };
 
       if (existingDislike) {
-        // Undislike: Remove existing dislike
+        // User already disliked -> Untoggle (Remove Dislike)
         await Like.deleteOne({ _id: existingDislike._id }).session(session);
-        await Vlog.findByIdAndUpdate(vlogId, {
-          $inc: { dislikeCount: -1 },
-          $max: { dislikeCount: 0 },
-        }).session(session);
-
-        // FIXED Bug #12: Explicit state - after undislike, user is neutral
-        isLiked = false;
+        vlogUpdate.$inc.dislikeCount = -1;
         isDisliked = false;
+        // isLiked remains false (neutral state)
       } else {
-        // Dislike: First remove like if it exists (CRITICAL: prevent duplicate key error)
+        // User hasn't disliked -> Add Dislike
+        // If they liked, remove that first (Switch)
         if (existingLike) {
           await Like.deleteOne({ _id: existingLike._id }).session(session);
-          await Vlog.findByIdAndUpdate(vlogId, {
-            $inc: { likeCount: -1 },
-            $max: { likeCount: 0 },
-          }).session(session);
+          vlogUpdate.$inc.likeCount = -1;
         }
 
-        // Then create the dislike
         await Like.create([{ vlog: vlogId, user: userId, type: 'dislike' }], {
           session,
         });
-        await Vlog.findByIdAndUpdate(vlogId, {
-          $inc: { dislikeCount: 1 },
-        }).session(session);
+        vlogUpdate.$inc.dislikeCount = 1;
         isDisliked = true;
+        // isLiked is false because we switched or were neutral
+      }
+
+      // Execute single atomic update for Vlog counters
+      if (Object.keys(vlogUpdate.$inc).length > 0) {
+        await Vlog.findByIdAndUpdate(vlogId, vlogUpdate, {
+          new: true,
+          session,
+        });
       }
 
       await session.commitTransaction();
 
+      // Fetch fresh state to return accurate numbers
       const updatedVlog = await Vlog.findById(vlogId, 'likeCount dislikeCount');
       return {
         likeCount: updatedVlog.likeCount,
