@@ -136,11 +136,11 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
         initial="hidden"
         animate="visible"
         whileHover="hover"
-        className="glass-card rounded-xl overflow-hidden group cursor-pointer"
+        className="glass-card rounded-xl overflow-hidden group cursor-pointer w-full block"
       >
-        <Link to={`/vlog/${vlog._id}`}>
+        <Link to={`/vlog/${vlog._id}`} className="block w-full">
           {/* Image */}
-          <div className="relative aspect-video overflow-hidden">
+          <div className="relative w-full block">
             <motion.img
               variants={imageVariants}
               key={currentImageIndex}
@@ -152,7 +152,9 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
               }
               alt={vlog.title}
-              className="w-full h-full object-cover absolute inset-0"
+              className="w-full h-auto block"
+              loading="lazy"
+              decoding="async"
             />
              {/* Background Image for Smooth Transition (Previous Image) */}
              {vlog.images?.length > 1 && (
@@ -213,12 +215,11 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
       initial="hidden"
       animate="visible"
       whileHover="hover"
-      className={`glass-card rounded-2xl overflow-hidden group cursor-pointer ${featured ? "lg:col-span-2" : ""
-        }`}
+      className={`glass-card rounded-2xl overflow-hidden group cursor-pointer w-full block ${featured ? "mb-6" : ""}`}
     >
-      <Link to={`/vlog/${vlog._id}`}>
+      <Link to={`/vlog/${vlog._id}`} className="block w-full">
         {/* Image Section */}
-        <div className="relative aspect-video overflow-hidden">
+        <div className="relative w-full block">
           <motion.img
             variants={imageVariants}
             key={currentImageIndex}
@@ -230,7 +231,9 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
               'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
             }
             alt={vlog.title}
-            className="w-full h-full object-cover absolute inset-0"
+            className="w-full h-auto block"
+            loading="lazy"
+            decoding="async"
           />
            {/* Background Image for Smooth Transition (Previous Image) */}
            {vlog.images?.length > 1 && (

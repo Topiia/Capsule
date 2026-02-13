@@ -7,6 +7,7 @@ import Button from "../components/UI/Button";
 import HeroSection from "../components/Home/HeroSection";
 import FeatureShowcase from "../components/Home/FeatureShowcase";
 import StatsSection from "../components/Home/StatsSection";
+import MasonryGrid from "../components/UI/MasonryGrid";
 
 const Home = () => {
   // Fetch featured vlogs
@@ -48,32 +49,35 @@ const Home = () => {
           </motion.div>
 
           {loadingFeatured ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
+            <MasonryGrid
+              items={[1, 2, 3]}
+              renderItem={(i) => (
                 <div
                   key={i}
-                  className="glass-card p-4 rounded-xl animate-pulse"
+                  className="glass-card p-4 rounded-xl animate-pulse w-full block"
                 >
                   <div className="h-48 bg-gray-600 rounded-lg mb-4"></div>
                   <div className="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
                   <div className="h-3 bg-gray-600 rounded w-1/2"></div>
                 </div>
-              ))}
-            </div>
+              )}
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredVlogs?.map((vlog, index) => (
+            <MasonryGrid
+              items={featuredVlogs || []}
+              renderItem={(vlog, index) => (
                 <motion.div
                   key={vlog._id}
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="w-full block"
                 >
                   <CapsuleCard vlog={vlog} featured />
                 </motion.div>
-              ))}
-            </div>
+              )}
+            />
           )}
 
           <div className="text-center mt-12">
@@ -108,32 +112,35 @@ const Home = () => {
           </motion.div>
 
           {loadingLatest ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
+            <MasonryGrid
+              items={[1, 2, 3, 4]}
+              renderItem={(i) => (
                 <div
                   key={i}
-                  className="glass-card p-4 rounded-xl animate-pulse"
+                  className="glass-card p-4 rounded-xl animate-pulse w-full block"
                 >
                   <div className="h-32 bg-gray-600 rounded-lg mb-4"></div>
                   <div className="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
                   <div className="h-3 bg-gray-600 rounded w-1/2"></div>
                 </div>
-              ))}
-            </div>
+              )}
+            />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {latestVlogs?.map((vlog, index) => (
+            <MasonryGrid
+              items={latestVlogs || []}
+              renderItem={(vlog, index) => (
                 <motion.div
                   key={vlog._id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.05 }}
+                  className="w-full block"
                 >
                   <CapsuleCard vlog={vlog} compact />
                 </motion.div>
-              ))}
-            </div>
+              )}
+            />
           )}
         </div>
       </section>

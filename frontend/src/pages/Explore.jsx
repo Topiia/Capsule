@@ -4,6 +4,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { vlogAPI } from "../services/api";
 import CapsuleCard from "../components/Vlog/CapsuleCard";
 import Button from "../components/UI/Button";
+import MasonryGrid from "../components/UI/MasonryGrid";
 
 const Explore = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,28 +163,30 @@ const Explore = () => {
 
       {/* Vlogs Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="animate-pulse">
+        <MasonryGrid
+          items={[1, 2, 3, 4, 5, 6, 7, 8]}
+          renderItem={(_i) => (
+            <div className="animate-pulse w-full block">
               <div className="h-48 bg-gray-600 rounded-xl mb-4"></div>
               <div className="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
               <div className="h-3 bg-gray-600 rounded w-1/2"></div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       ) : allVlogs.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {allVlogs.map((vlog, index) => (
+        <MasonryGrid
+          items={allVlogs}
+          renderItem={(vlog, index) => (
             <motion.div
-              key={vlog._id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + index * 0.05 }}
+              className="w-full block"
             >
               <CapsuleCard vlog={vlog} compact />
             </motion.div>
-          ))}
-        </div>
+          )}
+        />
       ) : (
         <motion.div
           initial={{ opacity: 0 }}
