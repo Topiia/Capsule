@@ -113,6 +113,20 @@ const vlogSchema = new mongoose.Schema(
       type: String,
       maxlength: [160, 'SEO description cannot exceed 160 characters'],
     },
+    // AI Moderation Fields
+    status: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'FLAGGED', 'LIMITED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    moderation: {
+      score: { type: Number, default: 0 },
+      details: { type: mongoose.Schema.Types.Mixed }, // JSON storage for AI/Rule output
+      version: { type: String },
+      reviewedAt: { type: Date },
+      overrideReason: { type: String },
+    },
   },
   {
     timestamps: true,

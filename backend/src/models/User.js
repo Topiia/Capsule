@@ -123,8 +123,22 @@ const userSchema = new mongoose.Schema(
         email: { type: Boolean, default: true },
         push: { type: Boolean, default: true },
         follows: { type: Boolean, default: true },
-        comments: { type: Boolean, default: true },
       },
+    },
+    // AI MODERATION: Trust Score System
+    trustScore: {
+      type: Number,
+      default: 50, // Start neutral
+      min: 0,
+      max: 100,
+    },
+    flagsCount: {
+      type: Number,
+      default: 0,
+    },
+    moderationVersion: {
+      type: String,
+      default: 'v1',
     },
   },
   {

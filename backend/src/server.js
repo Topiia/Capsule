@@ -83,6 +83,7 @@ const authRoutes = require('./routes/auth');
 const vlogRoutes = require('./routes/vlogs');
 const uploadRoutes = require('./routes/upload');
 const userRoutes = require('./routes/users');
+const adminModerationRoutes = require('./routes/admin.moderation.routes');
 
 // Initialize express app
 const app = express();
@@ -314,6 +315,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vlogs', vlogRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin/moderation', adminModerationRoutes);
 
 // Default route
 app.get('/', (req, res) => {
@@ -397,6 +399,15 @@ if (process.env.NODE_ENV !== 'test') {
       environment: process.env.NODE_ENV,
       nodeVersion: process.version,
     });
+
+    // Start Background Workers
+    try {
+      // eslint-disable-next-line global-require
+      const moderationWorker = require('./workers/moderation.worker');
+      moderationWorker.start();
+    } catch (err) {
+      logger.error('Failed to start workers', err);
+    }
   });
 }
 

@@ -93,7 +93,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % vlog.images.length);
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [vlog.images]);
@@ -152,7 +152,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
               }
               alt={vlog.title}
-              className="w-full h-auto block"
+              className="w-full aspect-video object-cover block"
               loading="lazy"
               decoding="async"
             />
@@ -231,7 +231,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
               'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
             }
             alt={vlog.title}
-            className="w-full h-auto block"
+            className="w-full aspect-video object-cover block"
             loading="lazy"
             decoding="async"
           />

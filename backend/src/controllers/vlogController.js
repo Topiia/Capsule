@@ -9,6 +9,7 @@ const { generateTags } = require('../services/aiService');
 const VlogService = require('../services/vlogService');
 const { invalidateVlogCache } = require('../middleware/cache');
 const logger = require('../config/logger');
+const moderationQueue = require('../queues/moderationQueue');
 
 /* ----------------------------------------------------------
    GET ALL VLOGS (Public)
@@ -126,9 +127,30 @@ exports.createVlog = asyncHandler(async (req, res) => {
     }
   }
 
+  // Set initial status
+  req.body.status = 'PENDING';
+
   const vlog = await Vlog.create(req.body);
 
   await vlog.populate('author', 'username avatar bio');
+
+  // Trigger Async Moderation
+  try {
+    moderationQueue.add(
+      { vlogId: vlog._id },
+      {
+        priority: 1, // High priority for new uploads
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: true,
+      },
+    );
+    logger.info(`Queued moderation for vlog ${vlog._id}`);
+  } catch (error) {
+    logger.error('Failed to queue moderation job', error);
+    // Don't fail the request, just log error.
+    // In production, might want alerting here.
+  }
 
   // PERFORMANCE: Invalidate vlog caches after creation
   await invalidateVlogCache();
