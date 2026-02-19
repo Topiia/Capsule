@@ -118,6 +118,10 @@ class ModerationService {
   async updateStatus(vlog, status, score, details) {
     const updatedVlog = vlog; // Avoid param reassignment lint
     updatedVlog.status = status;
+
+    // ENFORCEMENT: Only approved content becomes public
+    updatedVlog.isPublic = (status === 'APPROVED');
+
     updatedVlog.moderation = {
       score,
       details,
@@ -125,7 +129,7 @@ class ModerationService {
       reviewedAt: new Date(),
     };
     await updatedVlog.save();
-    logger.info(`Moderation complete for ${updatedVlog._id}. Status: ${status}, Score: ${score}`);
+    logger.info(`Moderation complete for ${updatedVlog._id}. Status: ${status}, Score: ${score}, Public: ${updatedVlog.isPublic}`);
   }
 }
 
