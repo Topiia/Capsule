@@ -36,6 +36,13 @@ class ModerationService {
       throw new Error(`Vlog not found: ${vlogId}`);
     }
 
+    // WORKER GUARD: Admin Decision Finality
+    // If a human has overridden this vlog, AI must NEVER touch it again.
+    if (vlog.moderation && vlog.moderation.overriddenBy) {
+      logger.info(`Skipped AI moderation for ${vlogId} – human override exists`);
+      return;
+    }
+
     // 0. Trust Score Check
     const userTrust = vlog.author
       ? trustScoreService.getTrustLevel(vlog.author.trustScore)

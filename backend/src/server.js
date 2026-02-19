@@ -105,6 +105,16 @@ app.use(
   }),
 );
 
+// DEBUG: Log cookies for auth debugging
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/auth')) {
+    console.log(`[DEBUG] ${req.method} ${req.path}`);
+    console.log('[DEBUG] Cookies:', req.cookies);
+    // console.log('[DEBUG] Auth Header:', req.headers.authorization);
+  }
+  next();
+});
+
 // CORS configuration
 const corsOptions = {
   origin(origin, callback) {

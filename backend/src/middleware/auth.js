@@ -115,7 +115,12 @@ exports.optionalAuth = asyncHandler(async (req, res, next) => {
 // SECURITY: Refresh token rotation middleware with reuse detection
 // Implements single-use tokens, bcrypt verification, and session revocation on compromise
 exports.refreshToken = asyncHandler(async (req, res, next) => {
-  const { refreshToken } = req.body;
+  let { refreshToken } = req.body;
+
+  // Check cookies if not in body
+  if (!refreshToken && req.cookies.refreshToken) {
+    refreshToken = req.cookies.refreshToken;
+  }
 
   if (!refreshToken) {
     return next(new ErrorResponse('Refresh token is required', 401));

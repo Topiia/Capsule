@@ -192,6 +192,62 @@ const Profile = () => {
         </div>
       </motion.div>
 
+
+
+      {/* Moderation Status Section (Owner Only) */}
+      {isOwnProfile && userVlogs?.data?.some(v => ['FLAGGED', 'REJECTED', 'LIMITED', 'PENDING'].includes(v.status)) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="glass-card p-6 rounded-2xl border-l-4 border-yellow-500 bg-yellow-500/5">
+             <h3 className="text-xl font-bold text-[var(--theme-text)] mb-4 flex items-center">
+               <span className="mr-2">⚠️</span> Content Status Updates
+             </h3>
+             <div className="grid gap-4">
+               {userVlogs.data
+                 .filter(v => ['FLAGGED', 'REJECTED', 'LIMITED', 'PENDING'].includes(v.status))
+                 .map(vlog => (
+                   <div key={vlog._id} className="bg-black/20 p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                     <div>
+                       <div className="flex items-center gap-3 mb-1">
+                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                           vlog.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                           vlog.status === 'FLAGGED' ? 'bg-orange-500/20 text-orange-400' :
+                           vlog.status === 'LIMITED' ? 'bg-yellow-500/20 text-yellow-400' :
+                           'bg-blue-500/20 text-blue-400'
+                         }`}>
+                           {vlog.status}
+                         </span>
+                         <h4 className="font-semibold text-[var(--theme-text)]">{vlog.title}</h4>
+                       </div>
+                       
+                       {/* Display Reason */}
+                       <p className="text-sm text-[var(--theme-text-secondary)]">
+                         {vlog.status === 'PENDING' 
+                           ? "Analysis in progress..." 
+                           : (vlog.moderation?.overrideReason || vlog.moderation?.details?.reason || vlog.moderation?.details?.error || "Content under review")}
+                       </p>
+                     </div>
+                     
+                     <div className="flex gap-2">
+                        <Link to={`/vlog/${vlog._id}`}>
+                          <Button size="sm" variant="outline">View</Button>
+                        </Link>
+                        {vlog.status === 'REJECTED' && (
+                          <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300">
+                            Delete
+                          </Button>
+                        )}
+                     </div>
+                   </div>
+                 ))}
+             </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Content Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

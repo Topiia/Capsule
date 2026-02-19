@@ -20,9 +20,9 @@ const getApiBaseURL = () => {
   // Vite sets import.meta.env.DEV = true in development
   if (import.meta.env.DEV && !apiUrl) {
     console.warn("⚠️ VITE_API_URL not set in .env file");
-    console.warn("Falling back to: http://localhost:5000/api");
-    console.warn("Create .env with: VITE_API_URL=http://localhost:5000/api");
-    return "http://localhost:5000/api";
+    console.warn("Falling back to: /api (using Vite Proxy)");
+    console.warn("Create .env with: VITE_API_URL=/api");
+    return "/api";
   }
 
   // Validate URL format (must start with http/https or be relative)
@@ -138,6 +138,14 @@ export const userAPI = {
   addBookmark: (vlogId) => api.post(`/users/bookmarks/${vlogId}`),
   removeBookmark: (vlogId) => api.delete(`/users/bookmarks/${vlogId}`),
   deleteAccount: (password) => api.delete("/users/me", { data: { password } }),
+};
+
+// Admin API methods
+export const adminAPI = {
+  getFlaggedVlogs: () => api.get("/admin/moderation/flagged"),
+  overrideDecision: (id, status, reason) =>
+    api.patch(`/admin/moderation/${id}/override`, { status, reason }),
+  getMetrics: () => api.get("/admin/moderation/metrics"),
 };
 
 // Convenience: export deleteUserAccount for direct import

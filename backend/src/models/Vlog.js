@@ -126,6 +126,10 @@ const vlogSchema = new mongoose.Schema(
       version: { type: String },
       reviewedAt: { type: Date },
       overrideReason: { type: String },
+      // Governance Fields (Admin Finality)
+      overriddenBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      overriddenAt: { type: Date },
+      previousStatus: { type: String },
     },
   },
   {

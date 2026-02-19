@@ -87,10 +87,10 @@ exports.getVlog = asyncHandler(async (req, res, next) => {
   const vlogData = await VlogService.getVlog(req.params.id, userId);
 
   // Authorization check for private vlogs
-  if (
-    !vlogData.isPublic
-    && (!userId || vlogData.author._id.toString() !== userId)
-  ) {
+  const isAdmin = req.user && req.user.role === 'admin';
+  const isAuthor = userId && vlogData.author._id.toString() === userId;
+
+  if (!vlogData.isPublic && !isAuthor && !isAdmin) {
     return next(new ErrorResponse('Not authorized to view this vlog', 403));
   }
 

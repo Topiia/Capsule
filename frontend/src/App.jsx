@@ -25,6 +25,10 @@ const Bookmarks = lazy(() => import("./pages/Bookmarks"));
 const Likes = lazy(() => import("./pages/Likes"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+// Admin Pages
+const ModerationDashboard = lazy(() => import("./pages/Admin/ModerationDashboard"));
+import AdminRoute from "./components/Auth/AdminRoute";
+
 function App() {
   return (
     <AnimatePresence mode="wait">
@@ -110,6 +114,17 @@ function App() {
                 <ProtectedRoute>
                   <Likes />
                 </ProtectedRoute>
+              }
+            />
+
+
+            {/* Admin Routes */}
+            <Route
+              path="admin/moderation"
+              element={
+                <AdminRoute>
+                  <ModerationDashboard />
+                </AdminRoute>
               }
             />
           </Route>

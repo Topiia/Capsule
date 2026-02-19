@@ -101,7 +101,7 @@ const CreateCapsule = ({ editMode = false }) => {
         toast.success(
           editMode
             ? "Capsule updated successfully!"
-            : "Capsule created successfully!",
+            : "Capsule uploaded! Check your profile for moderation status.",
         );
         // Redirect to the new vlog
         window.location.href = `/vlog/${response.data.data._id}`;

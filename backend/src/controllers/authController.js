@@ -166,6 +166,7 @@ The Capsule Team`,
       isVerified: user.isVerified,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      role: user.role,
     },
   });
 });
@@ -287,6 +288,7 @@ The Capsule Team`,
       isVerified: user.isVerified,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      role: user.role,
     },
   });
 });
@@ -314,6 +316,7 @@ exports.getMe = asyncHandler(async (req, res, _next) => {
       followers: user.followers,
       following: user.following,
       createdAt: user.createdAt,
+      role: user.role,
     },
   });
 });
@@ -351,6 +354,7 @@ exports.updateDetails = asyncHandler(async (req, res, _next) => {
       isVerified: user.isVerified,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      role: user.role,
     },
   });
 });
