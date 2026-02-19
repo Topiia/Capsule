@@ -166,6 +166,12 @@ vlogSchema.pre('save', function calculateReadingTime(next) {
     this.seoDescription = this.description.substring(0, 160);
   }
 
+  // ENFORCEMENT: Validate visibility consistency
+  // Only APPROVED content can be public
+  if (this.isPublic && this.status !== 'APPROVED') {
+    this.isPublic = false;
+  }
+
   next();
 });
 
