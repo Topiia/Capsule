@@ -19,7 +19,7 @@ exports.getVlogs = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   const startIndex = (page - 1) * limit;
 
-  const query = { isPublic: true };
+  const query = { isPublic: true, status: 'APPROVED' };
 
   if (req.query.category) query.category = req.query.category;
   if (req.query.tag) query.tags = { $in: [req.query.tag] };
@@ -129,6 +129,8 @@ exports.createVlog = asyncHandler(async (req, res) => {
 
   // Set initial status
   req.body.status = 'PENDING';
+  // ENFORCEMENT: Force private until AI moderation approves
+  req.body.isPublic = false;
 
   const vlog = await Vlog.create(req.body);
 
@@ -317,6 +319,7 @@ exports.getTrendingVlogs = asyncHandler(async (req, res) => {
   // For now, sorting by views + likes
   const vlogs = await Vlog.find({
     isPublic: true,
+    status: 'APPROVED',
     createdAt: { $gte: cutoff },
   })
     .sort({ views: -1, likeCount: -1 }) // Use mapped index
@@ -335,16 +338,26 @@ exports.getUserVlogs = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   const skip = (page - 1) * limit;
 
-  const vlogs = await Vlog.find({ author: req.params.userId, isPublic: true })
+  const viewerId = req.user ? req.user.id : null;
+  const isAuthor = viewerId && viewerId === req.params.userId;
+  const isAdmin = req.user && req.user.role === 'admin';
+
+  const query = { author: req.params.userId };
+
+  // Visibility Access Control:
+  // If NOT author AND NOT admin -> Only show APPROVED + Public content
+  if (!isAuthor && !isAdmin) {
+    query.isPublic = true;
+    query.status = 'APPROVED';
+  }
+
+  const vlogs = await Vlog.find(query)
     .populate('author', 'username avatar bio')
     .sort('-createdAt')
     .skip(skip)
     .limit(limit);
 
-  const total = await Vlog.countDocuments({
-    author: req.params.userId,
-    isPublic: true,
-  });
+  const total = await Vlog.countDocuments(query);
   const totalPages = Math.ceil(total / limit);
 
   res.status(200).json({

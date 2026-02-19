@@ -149,7 +149,7 @@ const commentValidation = [
 // Routes
 // Cached GET routes (TTL in seconds)
 router.get('/trending', cacheMiddleware(600), getTrendingVlogs); // Cache for 10 minutes
-router.get('/user/:userId', cacheMiddleware(300), getUserVlogs); // Cache for 5 minutes
+router.get('/user/:userId', optionalAuth, cacheMiddleware(300), getUserVlogs); // Cache for 5 minutes
 router.get('/', optionalAuth, cacheMiddleware(180), getVlogs); // Cache for 3 minutes
 router.get('/:id', optionalAuth, cacheMiddleware(300), getVlog); // Cache for 5 minutes
 router.post(
