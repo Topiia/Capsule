@@ -50,10 +50,10 @@ describe('Property 10: Unauthenticated request rejection', () => {
   });
 
   // Helper function to create a user
-  const createUser = async (userData) => await User.create(userData);
+  const createUser = async (userData) => User.create(userData);
 
   // Helper function to create a vlog
-  const createVlog = async (authorId, vlogData) => await Vlog.create({
+  const createVlog = async (authorId, vlogData) => Vlog.create({
     ...vlogData,
     author: authorId,
   });

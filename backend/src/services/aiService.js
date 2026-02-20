@@ -379,7 +379,7 @@ exports.extractKeyPhrases = async (description, maxPhrases = 5) => {
         .filter((word) => word.length > 2 && !stopwords.includes(word));
 
       // Extract bigrams and trigrams
-      for (let i = 0; i < words.length - 1; i++) {
+      for (let i = 0; i < words.length - 1; i += 1) {
         if (i < words.length - 2) {
           const trigram = words.slice(i, i + 3).join(' ');
           if (trigram.length > 8) phrases.push(trigram);

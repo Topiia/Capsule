@@ -64,7 +64,7 @@ describe('Property 6: Deletion removes vlog', () => {
   };
 
   // Helper function to create a vlog
-  const createVlog = async (authorId, vlogData) => await Vlog.create({
+  const createVlog = async (authorId, vlogData) => Vlog.create({
     ...vlogData,
     author: authorId,
   });

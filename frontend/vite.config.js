@@ -27,5 +27,19 @@ export default defineConfig({
     env: {
       VITE_API_URL: "http://localhost:5000/api",
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov", "html"],
+      reportsDirectory: "./coverage",
+      exclude: [
+        "node_modules/**",
+        "src/tests/**",
+        "**/*.config.*",
+        "dist/**",
+      ],
+      thresholds: {
+        lines: 40,
+      },
+    },
   },
 });

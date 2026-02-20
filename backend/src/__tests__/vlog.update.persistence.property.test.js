@@ -64,7 +64,7 @@ describe('Property 4: Update persistence and navigation', () => {
   };
 
   // Helper function to create a vlog
-  const createVlog = async (authorId, vlogData) => await Vlog.create({
+  const createVlog = async (authorId, vlogData) => Vlog.create({
     ...vlogData,
     author: authorId,
   });

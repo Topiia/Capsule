@@ -1,4 +1,4 @@
-/* eslint-disable global-require */
+/* eslint-disable global-require, no-unused-vars */
 const { queueEmail } = require('../queues/emailQueue');
 
 // Mock dependencies

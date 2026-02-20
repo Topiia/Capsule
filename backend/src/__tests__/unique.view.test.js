@@ -1,3 +1,4 @@
+/* eslint-disable func-names */
 // Don't import the model, just test the logic directly
 
 describe('Unique View Tracking', () => {

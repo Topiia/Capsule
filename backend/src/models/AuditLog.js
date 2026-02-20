@@ -126,6 +126,7 @@ auditLogSchema.index({ action: 1, timestamp: -1 });
 auditLogSchema.index({ resourceType: 1, resourceId: 1 });
 
 // Prevent modification of audit logs
+// eslint-disable-next-line func-names
 auditLogSchema.pre('save', function (next) {
   if (!this.isNew) {
     return next(new Error('Audit logs cannot be modified'));

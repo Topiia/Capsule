@@ -247,6 +247,7 @@ describe('Vlog Edit & Delete Integration Tests', () => {
 
   describe('Complete Delete Flow', () => {
     test('should successfully delete vlog and clean up images', async () => {
+      // eslint-disable-next-line global-require
       const { deleteImage } = require('../middleware/upload');
 
       // Delete the vlog
@@ -286,6 +287,7 @@ describe('Vlog Edit & Delete Integration Tests', () => {
     });
 
     test('should continue deletion even if image cleanup fails', async () => {
+      // eslint-disable-next-line global-require
       const { deleteImage } = require('../middleware/upload');
 
       // Mock image deletion to fail
@@ -582,6 +584,7 @@ describe('Vlog Edit & Delete Integration Tests', () => {
       const originalUpdatedAt = testVlog.updatedAt;
 
       // Wait a bit to ensure timestamp difference
+      // eslint-disable-next-line no-promise-executor-return
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const updateData = {

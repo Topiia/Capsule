@@ -1,4 +1,4 @@
-/* eslint-disable global-require, prefer-destructuring */
+/* eslint-disable global-require, prefer-destructuring, no-shadow, no-unused-vars */
 const Queue = require('bull');
 const logger = require('../config/logger');
 

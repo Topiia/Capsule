@@ -210,7 +210,7 @@ describe('Refresh Token Security Tests', () => {
 
   test('SECURITY: Token family must match for refresh to succeed', async () => {
     // Create two users with different token families
-    const user1 = await createAndLoginUser();
+    const _user1 = await createAndLoginUser(); // eslint-disable-line no-unused-vars
 
     await User.deleteMany({});
 
@@ -227,6 +227,7 @@ describe('Refresh Token Security Tests', () => {
     const user2RefreshToken = user2Res.body.refreshToken;
 
     // Decode user2's token to get tokenFamily
+    // eslint-disable-next-line no-unused-vars
     const decoded = jwt.verify(
       user2RefreshToken,
       process.env.JWT_REFRESH_SECRET,

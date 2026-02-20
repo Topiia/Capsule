@@ -84,7 +84,7 @@ describe('Property 7: Image cleanup on deletion', () => {
   };
 
   // Helper function to create a vlog
-  const createVlog = async (authorId, vlogData) => await Vlog.create({
+  const createVlog = async (authorId, vlogData) => Vlog.create({
     ...vlogData,
     author: authorId,
   });

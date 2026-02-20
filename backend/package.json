@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "description": "Production-ready backend for Capsule vlogging platform",
   "main": "src/server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "worker:email": "node src/workers/emailWorker.js",
-    "test": "jest",
-    "lint": "eslint src/",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/ --max-warnings 0",
     "seed": "node src/utils/seedDatabase.js"
   },
   "dependencies": {

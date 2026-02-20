@@ -238,6 +238,7 @@ exports.logSecurityEvent = async (
  * @param {number} limit - Max results
  * @returns {Promise<Array>} - Audit log entries
  */
+// eslint-disable-next-line max-len
 exports.getUserAuditLogs = async (userId, limit = 100) => AuditLog.find({ userId }).sort({ timestamp: -1 }).limit(limit).lean();
 
 /**

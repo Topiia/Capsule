@@ -1,4 +1,12 @@
-# CAPSULE - AI-Ready Visual Vlogging Platform
+# CAPSULE — AI-Ready Visual Vlogging Platform
+
+[![Backend CI](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/frontend-ci.yml)
+![Node](https://img.shields.io/badge/node-20.x-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+> 🔒 **CI enforces:** ESLint (zero warnings) · Jest ≥ 60% line coverage · Vitest ≥ 40% line coverage · Vite production build  
+> 🚀 **Auto-deployed:** Backend → [Render](https://render.com) · Frontend → [Vercel](https://vercel.com)
 
 ## 🚀 Overview
 
@@ -122,7 +130,7 @@ capsule/
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.x (see `.nvmrc`)
 - MongoDB (local installation OR MongoDB Atlas)
 - npm or yarn
 - Cloudinary account (for image storage)
@@ -244,15 +252,26 @@ capsule/
 
 ## 🧪 Testing
 
-```bash
-# Backend tests
-cd backend
-npm test
+All tests run fully isolated — no live database, Redis, or external API credentials required.
 
-# Frontend tests
+```bash
+# Backend — lint + jest + coverage (≥ 60% lines required)
+cd backend
+npm run lint       # zero warnings enforced
+npm test           # Jest 19 test suites + coverage report
+npm run test:watch # watch mode for local dev
+
+# Frontend — lint + build + vitest + coverage (≥ 40% lines required)
 cd frontend
-npm test
+npm run lint         # zero warnings enforced
+npm run build        # production build validation
+npm test             # Vitest 21 test files (single-pass)
+npm run test:watch   # watch mode for local dev
+npm run test:coverage  # explicit coverage report
 ```
+
+> **CI Pipeline:** Both test pipelines run automatically on every pull request via GitHub Actions.
+> See [`docs/internal/ci.md`](docs/internal/ci.md) for full pipeline documentation.
 
 ## 🚀 Deployment
 
