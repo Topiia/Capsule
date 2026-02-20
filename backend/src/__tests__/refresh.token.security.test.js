@@ -8,7 +8,7 @@ const User = require('../models/User');
 jest.mock('../config/database', () => jest.fn());
 
 // Import app after mocking
-const app = require('../server');
+const app = require('../app');
 
 /**
  * SECURITY TEST SUITE: Refresh Token Rotation & Secure Storage

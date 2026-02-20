@@ -16,7 +16,7 @@ jest.mock('../middleware/upload', () => ({
 }));
 
 // Import app after mocking
-const app = require('../server');
+const app = require('../app');
 
 /**
  * Unit Tests for Bookmark Controller Methods

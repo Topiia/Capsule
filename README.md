@@ -1,7 +1,7 @@
 # CAPSULE — AI-Ready Visual Vlogging Platform
 
-[![Backend CI](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/backend-ci.yml)
-[![Frontend CI](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/YOUR_GITHUB_USERNAME/Capsule/actions/workflows/frontend-ci.yml)
+[![Backend CI](https://github.com/Topiia/Capsule/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Topiia/Capsule/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/Topiia/Capsule/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Topiia/Capsule/actions/workflows/frontend-ci.yml)
 ![Node](https://img.shields.io/badge/node-20.x-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 

@@ -1,6 +1,6 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../server');
+const app = require('../app');
 const User = require('../models/User');
 
 describe('GET /api/users/profile/:username', () => {

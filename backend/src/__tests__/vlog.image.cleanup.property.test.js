@@ -18,7 +18,7 @@ jest.mock('../middleware/upload', () => ({
 }));
 
 // Import app after mocking
-const app = require('../server');
+const app = require('../app');
 
 /**
  * Feature: vlog-edit-delete, Property 7: Image cleanup on deletion

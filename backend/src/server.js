@@ -1,39 +1,25 @@
-const express = require('express');
+/**
+ * server.js — Production bootstrap entry point
+ *
+ * Responsibilities (ONLY runs in production, NOT imported by tests):
+ *   1. Validate critical environment variables (fail fast)
+ *   2. Attach process-level crash handlers
+ *   3. Start the HTTP server
+ *   4. Launch background workers
+ *
+ * Tests import app.js directly — this file is never loaded by Jest.
+ */
+
 const dotenv = require('dotenv');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const compression = require('compression');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-const path = require('path');
-const mongoose = require('mongoose');
-const statusMonitor = require('express-status-monitor');
 
-// OBSERVABILITY: Structured logging
-const logger = require('./config/logger');
-const { correlationMiddleware } = require('./middleware/correlation');
-
-// PRODUCTION SAFETY: Early crash handlers (before any async code)
-process.on('uncaughtException', (err) => {
-  console.error('[FATAL] Uncaught Exception:', err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error('[FATAL] Unhandled Promise Rejection:', err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
-
-// Load environment variables
+// Load .env in non-production environments
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
 // PRODUCTION SAFETY: Validate CRITICAL environment variables EARLY
-// Fail fast if truly critical vars are missing
+// Fail fast if any required production secrets are missing.
+// This block ONLY runs here in server.js, never in app.js.
 const criticalEnv = [
   'MONGODB_URI',
   'JWT_SECRET',
@@ -46,6 +32,7 @@ const criticalEnv = [
   'FROM_EMAIL',
   'NODE_ENV',
 ];
+
 const missingCritical = criticalEnv.filter((key) => !process.env[key]);
 
 if (missingCritical.length > 0) {
@@ -74,352 +61,43 @@ if (missingOptional.length > 0) {
   console.warn('[WARN] App will run with reduced functionality.');
 }
 
-// Import middleware
-const errorHandler = require('./middleware/errorHandler');
-const connectDB = require('./config/database');
-
-// Import routes
-const authRoutes = require('./routes/auth');
-const vlogRoutes = require('./routes/vlogs');
-const uploadRoutes = require('./routes/upload');
-const userRoutes = require('./routes/users');
-const adminModerationRoutes = require('./routes/admin.moderation.routes');
-
-// Initialize express app
-const app = express();
-
-// Connect to database
-connectDB();
-
-// Trust proxy for rate limiting behind reverse proxy
-app.set('trust proxy', 1);
-
-// OBSERVABILITY: Correlation ID middleware (must be early in stack)
-app.use(correlationMiddleware);
-
-// Security middleware
-app.use(
-  helmet({
-    contentSecurityPolicy: false, // Will be handled by frontend
-    crossOriginEmbedderPolicy: false,
-  }),
-);
-
-// DEBUG: Log cookies for auth debugging
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/auth')) {
-    console.log(`[DEBUG] ${req.method} ${req.path}`);
-    console.log('[DEBUG] Cookies:', req.cookies);
-    // console.log('[DEBUG] Auth Header:', req.headers.authorization);
-  }
-  next();
+// PRODUCTION SAFETY: Global crash handlers (attach before any async code)
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err.message);
+  console.error(err.stack);
+  process.exit(1);
 });
 
-// CORS configuration
-const corsOptions = {
-  origin(origin, callback) {
-    const allowedOrigins = process.env.CORS_ORIGINS
-      ? process.env.CORS_ORIGINS.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-      : ['http://localhost:3000'];
-
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    // Check if origin is in explicit allowlist
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
-
-    // PRODUCTION: Support Vercel preview deployments safely
-    // Only allow preview URLs for the vlogspherefrontend project
-    // Pattern: https://vlogspherefrontend-*.vercel.app
-    try {
-      const { hostname, protocol } = new URL(origin);
-      const isValidVercelPreview = protocol === 'https:'
-        && hostname.endsWith('.vercel.app')
-        && (hostname === 'vlogspherefrontend.vercel.app'
-          || hostname.startsWith('vlogspherefrontend-')
-          || hostname === 'capsule-frontend.vercel.app'
-          || hostname.startsWith('capsule-frontend-'));
-
-      if (isValidVercelPreview) {
-        return callback(null, true);
-      }
-    } catch (err) {
-      // Invalid URL, fall through to rejection
-    }
-
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-};
-
-app.use(cors(corsOptions));
-
-// OBSERVABILITY: Real-time monitoring dashboard
-// Accessible at /status - Shows CPU, Memory, Request stats
-// Configuration below app.use(cors())
-
-app.use(
-  statusMonitor({
-    title: 'Capsule Status',
-    path: '/status',
-    spans: [
-      {
-        interval: 1, // Every second
-        retention: 60, // Keep for 60 seconds
-      },
-      {
-        interval: 5, // Every 5 seconds
-        retention: 60, // Keep for 5 minutes
-      },
-      {
-        interval: 15, // Every 15 seconds
-        retention: 60, // Keep for 15 minutes
-      },
-    ],
-    chartVisibility: {
-      cpu: true,
-      mem: true,
-      load: true,
-      responseTime: true,
-      rps: true,
-      statusCodes: true,
-    },
-    healthChecks: [
-      {
-        protocol: 'http',
-        host: 'localhost',
-        path: '/health',
-        port: process.env.PORT || 5000,
-      },
-    ],
-  }),
-);
-
-// Rate limiting (disabled in test mode)
-if (process.env.NODE_ENV !== 'test') {
-  const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
-    message: {
-      success: false,
-      error: 'Too many requests from this IP, please try again later.',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  app.use('/api/', limiter);
-}
-
-// SECURITY: Separate rate limiters for different auth endpoint types
-// 1. Login/Register limiter - Strict (prevent brute force)
-const loginLimiter = process.env.NODE_ENV !== 'test'
-  ? rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 login attempts per window
-    message: {
-      success: false,
-      errorType: 'ratelimit',
-      error: 'Too many login attempts. Please try again in 15 minutes.',
-    },
-    skipSuccessfulRequests: true, // Don't count successful logins
-    standardHeaders: true, // Return rate limit info in RateLimit-* headers
-    handler: (req, res) => {
-      res.status(429).json({
-        success: false,
-        errorType: 'ratelimit',
-        error: 'Too many login attempts. Please try again in 15 minutes.',
-        retryAfterSeconds: Math.ceil(
-          (req.rateLimit.resetTime - Date.now()) / 1000,
-        ),
-      });
-    },
-  })
-  : (req, res, next) => next();
-
-// 2. Session check limiter - Lenient (allow normal app usage)
-const sessionLimiter = process.env.NODE_ENV !== 'test'
-  ? rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 session checks per window (allows active browsing)
-    message: {
-      success: false,
-      errorType: 'ratelimit',
-      error: 'Too many requests. Please wait a moment.',
-    },
-    standardHeaders: true,
-    handler: (req, res) => {
-      res.status(429).json({
-        success: false,
-        errorType: 'ratelimit',
-        error: 'Too many requests. Please wait a moment.',
-        retryAfterSeconds: Math.ceil(
-          (req.rateLimit.resetTime - Date.now()) / 1000,
-        ),
-      });
-    },
-  })
-  : (req, res, next) => next();
-
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
-
-// Compression middleware
-app.use(compression());
-
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
-
-// Static file serving
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  const env = process.env.NODE_ENV || 'unknown';
-  const isProduction = env === 'production';
-
-  res.status(200).json({
-    status: 'ok',
-    service: 'capsule-backend',
-    env,
-    isProduction,
-    timestamp: new Date().toISOString(),
-    warning: !isProduction ? 'Not running in production mode!' : undefined,
-  });
+process.on('unhandledRejection', (err) => {
+  console.error('[FATAL] Unhandled Promise Rejection:', err.message);
+  console.error(err.stack);
+  process.exit(1);
 });
 
-// DB Health Check (Safe)
-app.get('/health/db', (req, res) => {
-  const states = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting',
-  };
-  const state = mongoose.connection.readyState;
-
-  if (state === 1) {
-    res.status(200).json({ status: 'ok', database: 'connected' });
-  } else {
-    res
-      .status(503)
-      .json({ status: 'error', database: states[state] || 'unknown' });
-  }
-});
-
-// API routes with appropriate rate limiting
-// Pass limiters to auth routes
-authRoutes.setLimiters(loginLimiter, sessionLimiter);
-app.use('/api/auth', authRoutes);
-app.use('/api/vlogs', vlogRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin/moderation', adminModerationRoutes);
-
-// Default route
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Welcome to Capsule API',
-    version: '1.0.0',
-    documentation: '/api/docs',
-  });
-});
-
-// API documentation route
-app.get('/api/docs', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Capsule API Documentation',
-    endpoints: {
-      authentication: {
-        'POST /api/auth/register': 'Register a new user',
-        'POST /api/auth/login': 'Login user',
-        'GET /api/auth/me': 'Get current user',
-        'PUT /api/auth/updatedetails': 'Update user details',
-        'PUT /api/auth/updatepassword': 'Update password',
-        'POST /api/auth/forgotpassword': 'Forgot password',
-        'PUT /api/auth/resetpassword/:token': 'Reset password',
-        'GET /api/auth/verify/:token': 'Verify email',
-        'POST /api/auth/refresh': 'Refresh access token',
-        'POST /api/auth/logout': 'Logout user',
-      },
-      vlogs: {
-        'GET /api/vlogs': 'Get all vlogs (paginated, filtered)',
-        'GET /api/vlogs/trending': 'Get trending vlogs',
-        'GET /api/vlogs/user/:userId': 'Get user vlogs',
-        'GET /api/vlogs/:id': 'Get single vlog',
-        'POST /api/vlogs': 'Create new vlog',
-        'PUT /api/vlogs/:id': 'Update vlog',
-        'DELETE /api/vlogs/:id': 'Delete vlog',
-        'PUT /api/vlogs/:id/like': 'Toggle like on vlog',
-        'PUT /api/vlogs/:id/dislike': 'Toggle dislike on vlog',
-        'POST /api/vlogs/:id/comments': 'Add comment to vlog',
-        'DELETE /api/vlogs/:id/comments/:commentId': 'Delete comment from vlog',
-      },
-      upload: {
-        'POST /api/upload/single': 'Upload single image',
-        'POST /api/upload/multiple': 'Upload multiple images',
-        'DELETE /api/upload/:publicId': 'Delete image',
-      },
-    },
-    features: {
-      authentication: 'JWT-based authentication with refresh tokens',
-      authorization: 'Role-based access control',
-      fileUpload: 'Image upload with Cloudinary integration',
-      aiFeatures: 'Auto-tagging and content analysis',
-      security: 'Rate limiting, CORS, Helmet security headers',
-      validation: 'Input validation and sanitization',
-      pagination: 'Paginated responses with metadata',
-      filtering: 'Advanced filtering and search capabilities',
-    },
-  });
-});
-
-// Handle 404 errors
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: `Route ${req.originalUrl} not found`,
-  });
-});
-
-// Error handler middleware (must be last)
-app.use(errorHandler);
+// Import the configured Express app (no side-effects beyond Express setup)
+const app = require('./app');
+const logger = require('./config/logger');
 
 const PORT = process.env.PORT || 5000;
 
-// Start server and export for potential shutdown handling
-let server;
-if (process.env.NODE_ENV !== 'test') {
-  server = app.listen(PORT, () => {
-    logger.info('Server started', {
-      port: PORT,
-      environment: process.env.NODE_ENV,
-      nodeVersion: process.version,
-    });
-
-    // Start Background Workers
-    try {
-      // eslint-disable-next-line global-require
-      const moderationWorker = require('./workers/moderation.worker');
-      moderationWorker.start();
-    } catch (err) {
-      logger.error('Failed to start workers', err);
-    }
+// Start HTTP server
+const server = app.listen(PORT, () => {
+  logger.info('Server started', {
+    port: PORT,
+    environment: process.env.NODE_ENV,
+    nodeVersion: process.version,
   });
-}
 
+  // Start Background Workers
+  try {
+    // eslint-disable-next-line global-require
+    const moderationWorker = require('./workers/moderation.worker');
+    moderationWorker.start();
+  } catch (err) {
+    logger.error('Failed to start workers', err);
+  }
+});
+
+// Export for graceful shutdown tooling
 module.exports = app;
-module.exports.server = server; // Export server for graceful shutdown if needed
+module.exports.server = server;

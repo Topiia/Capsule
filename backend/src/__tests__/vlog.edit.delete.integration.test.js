@@ -16,7 +16,7 @@ jest.mock('../middleware/upload', () => ({
 }));
 
 // Import app after mocking
-const app = require('../server');
+const app = require('../app');
 
 /**
  * Integration Tests for Edit & Delete Vlog Feature

@@ -9,7 +9,7 @@ const Vlog = require('../models/Vlog');
 jest.mock('../config/database', () => jest.fn());
 
 // Import app after mocking
-const app = require('../server');
+const app = require('../app');
 
 /**
  * Feature: vlog-edit-delete, Property 6: Deletion removes vlog
