@@ -96,3 +96,10 @@ test_full_output*.txt
 debug_*.log
 
 backend/test-bugs-8-12.js
+
+# --- SECURITY AUDIT ENFORCEMENT ---
+_archive/
+docs/internal/lint_output*
+*.rdb
+token.txt
+cookies.txt
