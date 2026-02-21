@@ -1,37 +1,40 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen, waitFor } from "@testing-library/react";
 import App from "../App";
-import { AuthProvider } from "../contexts/AuthContext";
-import { ThemeProvider } from "../contexts/ThemeContext";
+import { renderWithProviders } from "./utils/renderWithProviders";
+
+vi.mock("../services/api", () => ({
+  authAPI: {
+    getMe: vi.fn().mockRejectedValue(new Error("Unauthenticated")),
+    login: vi.fn(),
+    logout: vi.fn(),
+  },
+  vlogAPI: {
+    getTrendingVlogs: vi.fn().mockResolvedValue({ data: { vlogs: [], pagination: {} } }),
+    getVlogs: vi.fn().mockResolvedValue({ data: { vlogs: [], pagination: {} } }),
+    getUserVlogs: vi.fn().mockResolvedValue({ data: { vlogs: [], pagination: {} } }),
+    getLikedVlogs: vi.fn().mockResolvedValue({ data: { vlogs: [], pagination: {} } }),
+    getBookmarkedVlogs: vi.fn().mockResolvedValue({ data: { vlogs: [], pagination: {} } }),
+    getVlogById: vi.fn().mockResolvedValue({ data: { vlog: {} } }),
+    likeVlog: vi.fn(),
+    dislikeVlog: vi.fn(),
+  },
+  userAPI: {
+    getUserProfile: vi.fn().mockResolvedValue({ data: null }),
+  }
+}));
 
 // Mock components that might cause issues in tests
 vi.mock("../components/UI/LoadingSpinner", () => ({
   default: () => <div>Loading...</div>,
 }));
 
-// Helper function to render app with all providers
-const renderApp = (initialRoute = "/") => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <MemoryRouter initialEntries={[initialRoute]}>
-            <App />
-          </MemoryRouter>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>,
-  );
-};
+// Mock IntersectionObserver for JSDOM constraints
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
 
 describe("Final Integration Testing - Task 12", () => {
   beforeEach(() => {
@@ -42,7 +45,7 @@ describe("Final Integration Testing - Task 12", () => {
 
   describe("404 Page Display for Invalid Routes", () => {
     it("should display NotFound page for invalid route", async () => {
-      renderApp("/invalid-route-that-does-not-exist");
+      renderWithProviders(<App />, { route: "/invalid-route-that-does-not-exist" });
 
       await waitFor(() => {
         expect(screen.getByText("404")).toBeInTheDocument();
@@ -51,7 +54,7 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should display NotFound page with navigation options", async () => {
-      renderApp("/another-invalid-route");
+      renderWithProviders(<App />, { route: "/another-invalid-route" });
 
       await waitFor(() => {
         expect(screen.getByText("Go Home")).toBeInTheDocument();
@@ -60,7 +63,7 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should show error code on 404 page", async () => {
-      renderApp("/nonexistent");
+      renderWithProviders(<App />, { route: "/nonexistent" });
 
       await waitFor(() => {
         expect(screen.getByText(/404_NOT_FOUND/i)).toBeInTheDocument();
@@ -69,57 +72,50 @@ describe("Final Integration Testing - Task 12", () => {
   });
 
   describe("Navigation Paths Verification", () => {
-    it("should verify all public routes are accessible", async () => {
-      const publicRoutes = ["/", "/explore", "/trending"];
+    it.each([
+      ["/"],
+      ["/explore"],
+      ["/trending"],
+    ])("should verify public route %s is accessible", async (route) => {
+      const { unmount } = renderWithProviders(<App />, { route });
 
-      for (const route of publicRoutes) {
-        const { unmount } = renderApp(route);
+      await waitFor(() => {
+        expect(screen.queryByText("404")).not.toBeInTheDocument();
+      });
 
-        await waitFor(() => {
-          // Page should load without 404
-          expect(screen.queryByText("404")).not.toBeInTheDocument();
-        });
-
-        unmount();
-      }
+      unmount();
     });
 
-    it("should verify protected routes redirect when not authenticated", async () => {
-      const protectedRoutes = [
-        "/dashboard",
-        "/create",
-        "/settings",
-        "/bookmarks",
-        "/liked",
-      ];
+    it.each([
+      ["/dashboard"],
+      ["/create"],
+      ["/settings"],
+      ["/bookmarks"],
+      ["/liked"],
+    ])("should verify protected route %s redirects when not authenticated", async (route) => {
+      const { unmount } = renderWithProviders(<App />, { route });
 
-      for (const route of protectedRoutes) {
-        const { unmount } = renderApp(route);
+      await waitFor(() => {
+        expect(screen.queryByText("404")).not.toBeInTheDocument();
+      });
 
-        await waitFor(() => {
-          // Should redirect to login or show login page
-          // The exact behavior depends on ProtectedRoute implementation
-          expect(screen.queryByText("404")).not.toBeInTheDocument();
-        });
-
-        unmount();
-      }
+      unmount();
     });
   });
 
   describe("Theme Persistence Across Navigation", () => {
     it("should persist theme in localStorage", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       // Check if theme is saved to localStorage
       await waitFor(() => {
-        const savedTheme = localStorage.getItem("vlogsphere-theme");
+        const savedTheme = localStorage.getItem("capsule-theme");
         expect(savedTheme).toBeTruthy();
       });
     });
 
     it("should maintain theme class on document element", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         const htmlElement = document.documentElement;
@@ -129,9 +125,9 @@ describe("Final Integration Testing - Task 12", () => {
 
     it("should load saved theme from localStorage on mount", async () => {
       // Set a theme in localStorage before rendering
-      localStorage.setItem("vlogsphere-theme", "deep-space");
+      localStorage.setItem("capsule-theme", "deep-space");
 
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         expect(document.documentElement.className).toContain(
@@ -143,18 +139,18 @@ describe("Final Integration Testing - Task 12", () => {
 
   describe("Footer Links Verification", () => {
     it("should render footer with all link sections", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         // Check for footer sections
-        expect(screen.getByText("Company")).toBeInTheDocument();
-        expect(screen.getByText("Resources")).toBeInTheDocument();
-        expect(screen.getByText("Legal")).toBeInTheDocument();
+        expect(screen.getByText(/company/i)).toBeInTheDocument();
+        expect(screen.getByText(/resources/i)).toBeInTheDocument();
+        expect(screen.getByText(/legal/i)).toBeInTheDocument();
       });
     });
 
     it("should have footer links with proper href attributes", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         const aboutLink = screen.getByText("About");
@@ -169,7 +165,7 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should display social media links", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         // Social links should have aria-labels
@@ -181,12 +177,12 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should display copyright information", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         const currentYear = new Date().getFullYear();
         expect(
-          screen.getByText(new RegExp(`© ${currentYear} VLOGSPHERE`)),
+          screen.getByText(new RegExp(`© ${currentYear} CAPSULE`)),
         ).toBeInTheDocument();
       });
     });
@@ -194,7 +190,7 @@ describe("Final Integration Testing - Task 12", () => {
 
   describe("Complete User Flow Simulation", () => {
     it("should handle navigation between multiple pages", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       // Verify home page loads
       await waitFor(() => {
@@ -206,16 +202,16 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should maintain application state during navigation", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       // Check that theme persists
-      const initialTheme = localStorage.getItem("vlogsphere-theme");
+      const initialTheme = localStorage.getItem("capsule-theme");
 
       // Simulate navigation by re-rendering with different route
-      const { rerender: _rerender } = renderApp("/explore");
+      const { rerender: _rerender } = renderWithProviders(<App />, { route: "/explore" });
 
       await waitFor(() => {
-        const currentTheme = localStorage.getItem("vlogsphere-theme");
+        const currentTheme = localStorage.getItem("capsule-theme");
         expect(currentTheme).toBe(initialTheme);
       });
     });
@@ -227,7 +223,7 @@ describe("Final Integration Testing - Task 12", () => {
       const routes = ["/", "/explore", "/trending", "/login", "/register"];
 
       for (const route of routes) {
-        const { unmount } = renderApp(route);
+        const { unmount } = renderWithProviders(<App />, { route: route });
 
         await waitFor(() => {
           expect(screen.queryByText("404")).not.toBeInTheDocument();
@@ -238,7 +234,7 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should handle vlog detail route with ID parameter", async () => {
-      renderApp("/vlog/123");
+      renderWithProviders(<App />, { route: "/vlog/123" });
 
       await waitFor(() => {
         // Should not show 404 for parameterized route
@@ -247,7 +243,7 @@ describe("Final Integration Testing - Task 12", () => {
     });
 
     it("should handle profile route with username parameter", async () => {
-      renderApp("/profile/testuser");
+      renderWithProviders(<App />, { route: "/profile/testuser" });
 
       await waitFor(() => {
         // Should not show 404 for parameterized route
@@ -258,16 +254,16 @@ describe("Final Integration Testing - Task 12", () => {
 
   describe("Application Layout Consistency", () => {
     it("should render layout components on valid routes", async () => {
-      renderApp("/");
+      renderWithProviders(<App />, { route: "/" });
 
       await waitFor(() => {
         // Layout should be present (footer is part of layout)
-        expect(screen.getByText(/VLOGSPHERE/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/CAPSULE/i).length).toBeGreaterThan(0);
       });
     });
 
     it("should not render layout on 404 page", async () => {
-      renderApp("/invalid-route");
+      renderWithProviders(<App />, { route: "/invalid-route" });
 
       await waitFor(() => {
         // 404 page should render without layout

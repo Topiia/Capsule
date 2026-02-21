@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import FollowButton from "../components/UI/FollowButton";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import { useAuth } from "../contexts/AuthContext";
 import { useVlogInteractions } from "../hooks/useVlogInteractions";
 import { updateFollowCache } from "../utils/cacheHelpers";
@@ -78,7 +78,7 @@ describe("Follow System Integration Tests", () => {
   });
 
   describe("Cross-page synchronization", () => {
-    it("should update followerCount across all VlogCards when following", () => {
+    it("should update followerCount across all CapsuleCards when following", () => {
       const author = {
         _id: "author1",
         username: "author",
@@ -127,8 +127,8 @@ describe("Follow System Integration Tests", () => {
 
       const { rerender } = render(
         <>
-          <VlogCard vlog={mockVlog1} />
-          <VlogCard vlog={mockVlog2} />
+          <CapsuleCard vlog={mockVlog1} />
+          <CapsuleCard vlog={mockVlog2} />
         </>,
         { wrapper: createWrapper() },
       );
@@ -142,8 +142,8 @@ describe("Follow System Integration Tests", () => {
 
       rerender(
         <>
-          <VlogCard vlog={mockVlog1} />
-          <VlogCard vlog={mockVlog2} />
+          <CapsuleCard vlog={mockVlog1} />
+          <CapsuleCard vlog={mockVlog2} />
         </>,
       );
 

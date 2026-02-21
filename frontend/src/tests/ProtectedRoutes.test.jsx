@@ -1,6 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { Routes, Route } from "react-router-dom";
+import { authAPI, vlogAPI } from "../services/api";
+
+vi.mock("../services/api", () => ({
+  authAPI: {
+    getMe: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    refreshToken: vi.fn(),
+    setAuthHeader: vi.fn(),
+  },
+  vlogAPI: {
+    getBookmarkedVlogs: vi.fn(),
+    getLikedVlogs: vi.fn(),
+  },
+}));
+
 import ProtectedRoute from "../components/Auth/ProtectedRoute";
 import Settings from "../pages/Settings";
 import Bookmarks from "../pages/Bookmarks";
@@ -10,6 +26,10 @@ import { renderWithProviders } from "./utils/renderWithProviders";
 describe("Protected Route Authentication Tests", () => {
 
   describe("Unauthenticated Access", () => {
+    beforeEach(() => {
+      vi.mocked(authAPI.getMe).mockRejectedValue(new Error("Unauthenticated"));
+    });
+
     it("should redirect to login when accessing /settings without authentication", async () => {
       renderWithProviders(
         <Routes>
@@ -75,6 +95,18 @@ describe("Protected Route Authentication Tests", () => {
   });
 
   describe("Authenticated Access", () => {
+    beforeEach(() => {
+      vi.mocked(authAPI.getMe).mockResolvedValue({
+        data: {
+          user: {
+            _id: "123",
+            username: "testuser",
+            email: "test@example.com",
+          },
+        },
+      });
+    });
+
     it("should render Settings component when accessing /settings with authentication", async () => {
       renderWithProviders(
         <Routes>
@@ -149,6 +181,10 @@ describe("Protected Route Authentication Tests", () => {
   });
 
   describe("Login Redirect Behavior", () => {
+    beforeEach(() => {
+      vi.mocked(authAPI.getMe).mockRejectedValue(new Error("Unauthenticated"));
+    });
+
     it("should store the intended destination when redirecting to login", async () => {
       let _capturedLocation = null;
 
@@ -187,11 +223,20 @@ describe("Protected Route Authentication Tests", () => {
       // This is tested by checking the Login component implementation
 
       // Mock successful login
-      // API mocked globally via setup.js/mockApi.js
+      vi.mocked(authAPI.login).mockResolvedValue({
+        data: {
+          token: "new-token",
+          refreshToken: "new-refresh-token",
+          user: {
+            _id: "123",
+            username: "testuser",
+            email: "test@example.com",
+          },
+        },
+      });
 
       // The actual redirect behavior is handled by the Login component
       // which reads location.state.from and navigates there after login
-      // expect(authAPI.login).toBeDefined(); // This line would cause an error as authAPI is no longer imported here.
     });
   });
 
@@ -202,6 +247,9 @@ describe("Protected Route Authentication Tests", () => {
       const authPromise = new Promise((resolve) => {
         resolveAuth = resolve;
       });
+
+      // Intercept getMe with pending promise
+      vi.mocked(authAPI.getMe).mockReturnValue(authPromise);
 
       renderWithProviders(
         <Routes>
@@ -218,11 +266,6 @@ describe("Protected Route Authentication Tests", () => {
         {
           route: "/settings",
           authenticated: true,
-          apiMocks: {
-            authAPI: {
-              getMe: vi.fn(() => authPromise) // Intercept getMe with pending promise
-            }
-          }
         }
       );
 

@@ -17,8 +17,8 @@ const useInteractionsMock = {
     isBookmarking: false,
 };
 
-// Inlined logic from VlogCard to verify rendering logic without import issues
-const VlogCardLogic = ({ vlog }) => {
+// Inlined logic from CapsuleCard to verify rendering logic without import issues
+const CapsuleCardLogic = ({ vlog }) => {
     // Simplified context usage
     const _isAuthenticated = useAuthMock.isAuthenticated;
     const user = useAuthMock.user;
@@ -44,7 +44,7 @@ const VlogCardLogic = ({ vlog }) => {
 };
 
 
-describe("VlogCard Logic Isolated", () => {
+describe("CapsuleCard Logic Isolated", () => {
     it("renders like count from vlogs.likes array (legacy behavior)", () => {
         const vlog = {
             _id: "1",
@@ -53,7 +53,7 @@ describe("VlogCard Logic Isolated", () => {
             isLiked: false,
         };
 
-        render(<VlogCardLogic vlog={vlog} />);
+        render(<CapsuleCardLogic vlog={vlog} />);
         expect(screen.getByTestId("like-count")).toHaveTextContent("2");
     });
 
@@ -65,7 +65,7 @@ describe("VlogCard Logic Isolated", () => {
             isLiked: true,
         };
 
-        render(<VlogCardLogic vlog={vlog} />);
+        render(<CapsuleCardLogic vlog={vlog} />);
         expect(screen.getByTestId("like-count")).toHaveTextContent("5");
         expect(screen.getByTestId("is-liked")).toHaveTextContent("yes");
     });

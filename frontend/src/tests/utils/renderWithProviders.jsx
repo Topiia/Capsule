@@ -1,13 +1,9 @@
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vi } from "vitest";
 import { ThemeProvider } from "../../contexts/ThemeProvider";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { ToastProvider } from "../../contexts/ToastContext";
-import { authAPI, vlogAPI, userAPI, uploadAPI, adminAPI } from "../../services/api";
-
-const api = { authAPI, vlogAPI, userAPI, uploadAPI, adminAPI };
 
 
 /**
@@ -25,13 +21,6 @@ export const renderWithProviders = (
   ui,
   {
     authenticated = false,
-    user = {
-      _id: "testuser123",
-      username: "testuser",
-      email: "test@example.com",
-      role: "user",
-    },
-    apiMocks = {},
     route = "/",
     ...renderOptions
   } = {},
@@ -49,32 +38,11 @@ export const renderWithProviders = (
     },
   });
 
-  // 2. Handle specific Auth State Deterministically
+  // 2. Handle specific Auth State Deterministically via Storage Only
   if (authenticated) {
     localStorage.setItem("token", "deterministic-test-token");
-    if (authAPI && authAPI.getMe) {
-      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user } });
-    }
   } else {
     localStorage.removeItem("token");
-    if (authAPI && authAPI.getMe) {
-      vi.mocked(authAPI.getMe).mockRejectedValue(new Error("Unauthenticated"));
-    }
-  }
-
-  // 3. Apply custom API mock overrides provided by the test
-  if (apiMocks) {
-    Object.keys(apiMocks).forEach((moduleKey) => {
-      const moduleMocks = apiMocks[moduleKey];
-      Object.keys(moduleMocks).forEach((fnKey) => {
-        if (api[moduleKey] && api[moduleKey][fnKey]) {
-          api[moduleKey][fnKey].mockImplementation(
-             moduleMocks[fnKey].getMockImplementation() 
-             || moduleMocks[fnKey] // Support direct async functions or vi.fn()
-          );
-        }
-      });
-    });
   }
 
   // 4. Wrap component in all required specific providers

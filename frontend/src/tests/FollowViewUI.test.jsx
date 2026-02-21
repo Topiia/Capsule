@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import VlogCard from "../components/Vlog/VlogCard";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
 import { useAuth } from "../contexts/AuthContext";
 import { useVlogInteractions } from "../hooks/useVlogInteractions";
 
@@ -68,7 +68,7 @@ describe("Follow & View UI Tests", () => {
     });
   });
 
-  it("should show updated view count in VlogCard", () => {
+  it("should show updated view count in CapsuleCard", () => {
     const mockVlog = {
       _id: "vlog1",
       title: "Test Vlog",
@@ -88,13 +88,13 @@ describe("Follow & View UI Tests", () => {
       createdAt: new Date().toISOString(),
     };
 
-    render(<VlogCard vlog={mockVlog} />, { wrapper: createWrapper() });
+    render(<CapsuleCard vlog={mockVlog} />, { wrapper: createWrapper() });
 
     // Check if view count is displayed (formatted as 1.2K)
     expect(screen.getByText(/1\.2K|1,234/)).toBeInTheDocument();
   });
 
-  it("should show follower count in VlogCard", () => {
+  it("should show follower count in CapsuleCard", () => {
     const mockVlog = {
       _id: "vlog1",
       title: "Test Vlog",
@@ -114,7 +114,7 @@ describe("Follow & View UI Tests", () => {
       createdAt: new Date().toISOString(),
     };
 
-    render(<VlogCard vlog={mockVlog} />, { wrapper: createWrapper() });
+    render(<CapsuleCard vlog={mockVlog} />, { wrapper: createWrapper() });
 
     // Check if follower count is displayed
     expect(screen.getByText(/500 followers/)).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe("Follow & View UI Tests", () => {
       createdAt: new Date().toISOString(),
     };
 
-    render(<VlogCard vlog={mockVlog} />, { wrapper: createWrapper() });
+    render(<CapsuleCard vlog={mockVlog} />, { wrapper: createWrapper() });
 
     expect(screen.getByText("Follow")).toBeInTheDocument();
   });
@@ -170,7 +170,7 @@ describe("Follow & View UI Tests", () => {
       createdAt: new Date().toISOString(),
     };
 
-    render(<VlogCard vlog={mockVlog} />, { wrapper: createWrapper() });
+    render(<CapsuleCard vlog={mockVlog} />, { wrapper: createWrapper() });
 
     expect(screen.queryByText("Follow")).not.toBeInTheDocument();
   });

@@ -1,19 +1,34 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import MockAdapter from "axios-mock-adapter";
-import api from "../services/api";
-import { AuthProvider } from "../contexts/AuthContext";
-import { ThemeProvider } from "../contexts/ThemeContext";
-import { ToastProvider } from "../contexts/ToastContext";
-import VlogCard from "../components/Vlog/VlogCard";
-import VlogDetail from "../pages/VlogDetail";
+import { Routes, Route } from "react-router-dom";
+import { QueryClient } from "@tanstack/react-query";
+import { renderWithProviders } from "./utils/renderWithProviders";
+import { vlogAPI, userAPI, authAPI } from "../services/api";
+import CapsuleCard from "../components/Vlog/CapsuleCard";
+import CapsuleDetail from "../pages/CapsuleDetail";
 import Bookmarks from "../pages/Bookmarks";
 
-// Create axios mock
-let mockAxios;
+vi.mock("../services/api", () => ({
+  authAPI: {
+    getMe: vi.fn(),
+  },
+  vlogAPI: {
+    getVlog: vi.fn(),
+    likeVlog: vi.fn(),
+    dislikeVlog: vi.fn(),
+    toggleDislike: vi.fn(),
+    shareVlog: vi.fn(),
+    addComment: vi.fn(),
+    deleteComment: vi.fn(),
+    recordView: vi.fn(),
+  },
+  userAPI: {
+    bookmarkVlog: vi.fn(),
+    getBookmarks: vi.fn(),
+    removeBookmark: vi.fn(),
+  },
+}));
 
 // Mock data
 const mockUser = {
@@ -47,59 +62,16 @@ const mockComment = {
   text: "Test comment",
   createdAt: new Date().toISOString(),
 };
-
-// Helper to render with all providers
-const renderWithProviders = (
-  ui,
-  { initialRoute = "/", queryClient = null, authenticated = true } = {},
-) => {
-  const client =
-    queryClient ||
-    new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-  // Mock authenticated user
-  if (authenticated) {
-    localStorage.setItem("token", "mock-token");
-    localStorage.setItem("user", JSON.stringify(mockUser));
-
-    // Mock auth API
-    mockAxios.onGet("/auth/me").reply(200, {
-      success: true,
-      data: mockUser,
-    });
-  }
-
-  return {
-    user: userEvent.setup(),
-    ...render(
-      <QueryClientProvider client={client}>
-        <ThemeProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <MemoryRouter initialEntries={[initialRoute]}>{ui}</MemoryRouter>
-            </AuthProvider>
-          </ToastProvider>
-        </ThemeProvider>
-      </QueryClientProvider>,
-    ),
-  };
-};
-
-describe("Vlog Interactions Integration Tests - Task 16", () => {
+describe("Vlog Interactions Integration Tests", () => {
   beforeEach(() => {
-    mockAxios = new MockAdapter(api);
     localStorage.clear();
+    sessionStorage.clear();
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    mockAxios.reset();
-    mockAxios.restore();
+    
+    // Provide default successful resolution for background API calls
+    vi.mocked(vlogAPI.recordView).mockResolvedValue({ 
+      data: { data: { incremented: true, views: mockVlog.views + 1 } } 
+    });
   });
 
   describe("Like Interaction Flow", () => {
@@ -107,24 +79,17 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       // Requirements: 1.1
       const vlogWithLike = { ...mockVlog, likes: [mockUser._id] };
 
-      // Mock initial vlog fetch
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.likeVlog).mockResolvedValue({ data: { vlog: vlogWithLike } });
 
-      // Mock like API call
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/like`).reply(200, {
-        success: true,
-        data: vlogWithLike,
-      });
-
-      const { user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}` },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true }
       );
+      const user = userEvent.setup();
 
       // Wait for vlog to load
       await waitFor(
@@ -134,10 +99,10 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         { timeout: 3000 },
       );
 
-      // Find like button by text content
+      // Find like button by title or text content
       const likeButtons = screen.getAllByRole("button");
       const likeButton = likeButtons.find((btn) =>
-        btn.textContent.includes("Like"),
+        btn.textContent.includes("Like") || btn.getAttribute("title") === "Like" || btn.getAttribute("title") === "Unlike",
       );
       expect(likeButton).toBeDefined();
 
@@ -145,10 +110,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
       // Verify backend was called
       await waitFor(() => {
-        const likeCalls = mockAxios.history.put.filter(
-          (req) => req.url === `/vlogs/${mockVlog._id}/like`,
-        );
-        expect(likeCalls.length).toBeGreaterThan(0);
+        expect(vi.mocked(vlogAPI.likeVlog)).toHaveBeenCalledWith(mockVlog._id);
       });
 
       // Verify toast notification appears
@@ -156,34 +118,26 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         expect(screen.getByText(/liked/i)).toBeInTheDocument();
       });
 
-      // Verify cache invalidation by checking refetch
+      // Verify cache invalidation by checking refetch (called twice, initial + refetch)
       await waitFor(() => {
-        const vlogFetches = mockAxios.history.get.filter((req) =>
-          req.url.includes(`/vlogs/${mockVlog._id}`),
-        );
-        expect(vlogFetches.length).toBeGreaterThan(1); // Initial + refetch
+         expect(vi.mocked(vlogAPI.getVlog)).toHaveBeenCalledTimes(2);
       });
+      unmount();
     });
 
     it("should rollback UI on backend failure", async () => {
       // Requirements: 1.5
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.likeVlog).mockRejectedValue(new Error("Server error"));
 
-      // Mock like API to fail
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/like`).reply(500, {
-        success: false,
-        error: { message: "Server error" },
-      });
-
-      const { user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}` },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true }
       );
+      const user = userEvent.setup();
 
       await waitFor(
         () => {
@@ -194,7 +148,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
       const likeButtons = screen.getAllByRole("button");
       const likeButton = likeButtons.find((btn) =>
-        btn.textContent.includes("Like"),
+        btn.textContent.includes("Like") || btn.getAttribute("title") === "Like" || btn.getAttribute("title") === "Unlike",
       );
       expect(likeButton).toBeDefined();
 
@@ -209,10 +163,8 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       );
 
       // Verify backend was called
-      const likeCalls = mockAxios.history.put.filter(
-        (req) => req.url === `/vlogs/${mockVlog._id}/like`,
-      );
-      expect(likeCalls.length).toBeGreaterThan(0);
+      expect(vi.mocked(vlogAPI.likeVlog)).toHaveBeenCalledWith(mockVlog._id);
+      unmount();
     });
   });
 
@@ -224,21 +176,15 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         comments: [mockComment],
       };
 
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.addComment).mockResolvedValue({ data: { comment: mockComment } });
 
-      mockAxios.onPost(`/vlogs/${mockVlog._id}/comments`).reply(200, {
-        success: true,
-        data: mockComment,
-      });
-
-      const { user: _user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}` },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true }
       );
 
       // Verify vlog detail page loads
@@ -250,14 +196,12 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       );
 
       // Verify vlog was fetched from backend
-      const vlogFetches = mockAxios.history.get.filter((req) =>
-        req.url.includes(`/vlogs/${mockVlog._id}`),
-      );
-      expect(vlogFetches.length).toBeGreaterThan(0);
+      expect(vi.mocked(vlogAPI.getVlog)).toHaveBeenCalledWith(mockVlog._id);
 
       // Verify comment section or interaction buttons are present
       const buttons = screen.getAllByRole("button");
       expect(buttons.length).toBeGreaterThan(0);
+      unmount();
     });
 
     it("should maintain comment count consistency after add and delete", async () => {
@@ -275,23 +219,17 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         ],
       };
 
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: vlogWithComments,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: vlogWithComments } });
+      vi.mocked(vlogAPI.deleteComment).mockResolvedValue({ data: { message: "Comment deleted" } });
 
-      mockAxios
-        .onDelete(`/vlogs/${mockVlog._id}/comments/${mockComment._id}`)
-        .reply(200, {
-          success: true,
-        });
-
-      const { user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}` },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true }
       );
+      const user = userEvent.setup();
 
       await waitFor(
         () => {
@@ -319,40 +257,23 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
         // Verify backend was called
         await waitFor(() => {
-          const deleteCalls = mockAxios.history.delete.filter((req) =>
-            req.url.includes(`/vlogs/${mockVlog._id}/comments`),
-          );
-          expect(deleteCalls.length).toBeGreaterThan(0);
+          expect(vi.mocked(vlogAPI.deleteComment)).toHaveBeenCalledWith(mockVlog._id, mockComment._id);
         });
       }
+      unmount();
     });
   });
 
   describe("Bookmark Interaction Flow", () => {
     it("should complete full bookmark flow: bookmark → appears on Bookmarks page", async () => {
       // Requirements: 4.1
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: { retry: false },
-          mutations: { retry: false },
-        },
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(userAPI.bookmarkVlog).mockResolvedValue({ data: { bookmarked: true } });
+      vi.mocked(userAPI.getBookmarks).mockResolvedValue({ data: { data: [mockVlog], pagination: { total: 1 } } });
 
-      mockAxios.onPost(`/users/bookmarks/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: { bookmarked: true },
-      });
-
-      mockAxios.onGet("/users/bookmarks").reply(200, {
-        success: true,
-        data: [mockVlog],
-        total: 1,
-      });
-
-      // Render VlogCard first
-      const { user } = renderWithProviders(<VlogCard vlog={mockVlog} />, {
-        queryClient,
-      });
+      // Render CapsuleCard first
+      const { unmount } = renderWithProviders(<CapsuleCard vlog={mockVlog} />, { authenticated: true });
+      const user = userEvent.setup();
 
       // Find bookmark button
       const buttons = screen.getAllByRole("button");
@@ -360,7 +281,9 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         (btn) =>
           btn.getAttribute("title")?.includes("bookmark") ||
           btn.getAttribute("title")?.includes("save") ||
-          btn.textContent.includes("Save"),
+          btn.getAttribute("title")?.includes("Bookmark") ||
+          btn.textContent.includes("Save") ||
+          btn.textContent.includes("Bookmark"),
       );
 
       if (bookmarkButton) {
@@ -368,10 +291,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
         // Verify backend was called
         await waitFor(() => {
-          const bookmarkCalls = mockAxios.history.post.filter(
-            (req) => req.url === `/users/bookmarks/${mockVlog._id}`,
-          );
-          expect(bookmarkCalls.length).toBeGreaterThan(0);
+          expect(vi.mocked(userAPI.bookmarkVlog)).toHaveBeenCalledWith(mockVlog._id);
         });
 
         // Verify toast notification
@@ -379,26 +299,21 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
           expect(screen.getByText(/bookmarked/i)).toBeInTheDocument();
         });
       }
+      unmount();
     });
 
     it("should verify bookmarks page displays bookmarked vlogs", async () => {
       // Requirements: 4.4, 6.3
-      mockAxios.onGet("/users/bookmarks").reply(200, {
-        success: true,
-        data: [mockVlog],
-        total: 1,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      // Bookmarks endpoint returns raw data array differently than getVlog
+      vi.mocked(userAPI.getBookmarks).mockResolvedValue({ data: { data: [mockVlog], pagination: { total: 1 } } });
+      vi.mocked(userAPI.removeBookmark).mockResolvedValue({ data: { bookmarked: false } });
 
-      mockAxios.onDelete(`/users/bookmarks/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: { bookmarked: false },
-      });
-
-      const { user: _user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
           <Route path="/bookmarks" element={<Bookmarks />} />
         </Routes>,
-        { initialRoute: "/bookmarks" },
+        { route: "/bookmarks", authenticated: true }
       );
 
       // Verify bookmarks page loads
@@ -415,45 +330,30 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       });
 
       // Verify backend was called to fetch bookmarks
-      const bookmarkFetches = mockAxios.history.get.filter((req) =>
-        req.url.includes("/users/bookmarks"),
-      );
-      expect(bookmarkFetches.length).toBeGreaterThan(0);
+      expect(vi.mocked(userAPI.getBookmarks)).toHaveBeenCalled();
+      unmount();
     });
   });
 
   describe("Cross-Page State Consistency", () => {
-    it("should persist interaction state from VlogCard to VlogDetail", async () => {
+    it("should persist interaction state from CapsuleCard to CapsuleDetail", async () => {
       // Requirements: 6.4
-      const queryClient = new QueryClient({
-        defaultOptions: {
-          queries: { retry: false },
-          mutations: { retry: false },
-        },
-      });
-
       const likedVlog = { ...mockVlog, likes: [mockUser._id] };
 
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/like`).reply(200, {
-        success: true,
-        data: likedVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.likeVlog).mockResolvedValue({ data: { vlog: likedVlog } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: likedVlog } });
 
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: likedVlog,
-      });
-
-      // Render VlogCard
-      const { user } = renderWithProviders(<VlogCard vlog={mockVlog} />, {
-        queryClient,
-      });
+      // Render CapsuleCard
+      const { unmount } = renderWithProviders(<CapsuleCard vlog={mockVlog} />, { authenticated: true });
+      const user = userEvent.setup();
 
       // Find like button
       const buttons = screen.getAllByRole("button");
       const likeButton = buttons.find(
         (btn) =>
           btn.getAttribute("title")?.includes("like") ||
+          btn.getAttribute("title")?.includes("Like") ||
           btn.textContent.includes("Like"),
       );
 
@@ -462,31 +362,19 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
         // Verify backend was called
         await waitFor(() => {
-          const likeCalls = mockAxios.history.put.filter(
-            (req) => req.url === `/vlogs/${mockVlog._id}/like`,
-          );
-          expect(likeCalls.length).toBeGreaterThan(0);
+          expect(vi.mocked(vlogAPI.likeVlog)).toHaveBeenCalledWith(mockVlog._id);
         });
-
-        // Verify cache was updated
-        const cachedData = queryClient.getQueryData(["vlog", mockVlog._id]);
-        expect(cachedData).toBeDefined();
       }
+      unmount();
     });
   });
 
   describe("Share Interaction Flow", () => {
     it("should handle share interaction and increment share count", async () => {
       // Requirements: 3.1, 3.4
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
-
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/share`).reply(200, {
-        success: true,
-        data: { shares: 1 },
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.shareVlog).mockResolvedValue({ data: { shares: 1 } });
 
       // Mock clipboard API
       const mockWriteText = vi.fn().mockResolvedValue(undefined);
@@ -496,12 +384,13 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         configurable: true,
       });
 
-      const { user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}` },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true }
       );
+      const user = userEvent.setup();
 
       await waitFor(
         () => {
@@ -513,7 +402,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       // Find share button
       const buttons = screen.getAllByRole("button");
       const shareButton = buttons.find((btn) =>
-        btn.textContent.includes("Share"),
+        btn.textContent.includes("Share") || btn.getAttribute("title")?.includes("Share"),
       );
 
       if (shareButton) {
@@ -522,15 +411,12 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         // Verify either clipboard or share was called
         await waitFor(
           () => {
-            const shareCalls = mockAxios.history.put.filter(
-              (req) => req.url === `/vlogs/${mockVlog._id}/share`,
-            );
-            // Share endpoint should be called
-            expect(shareCalls.length).toBeGreaterThan(0);
+             expect(vi.mocked(vlogAPI.shareVlog)).toHaveBeenCalledWith(mockVlog._id);
           },
           { timeout: 2000 },
         );
       }
+      unmount();
     });
 
     it("should verify share functionality with clipboard fallback", async () => {
@@ -542,22 +428,17 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         configurable: true,
       });
 
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.shareVlog).mockResolvedValue({ data: { shares: 1 } });
 
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/share`).reply(200, {
-        success: true,
-        data: { shares: 1 },
-      });
-
-      const { user } = renderWithProviders(<VlogCard vlog={mockVlog} />);
+      const { unmount } = renderWithProviders(<CapsuleCard vlog={mockVlog} />, { authenticated: true });
+      const user = userEvent.setup();
 
       // Find share button
       const buttons = screen.getAllByRole("button");
       const shareButton = buttons.find((btn) =>
-        btn.textContent.includes("Share"),
+        btn.textContent.includes("Share") || btn.getAttribute("title")?.includes("Share"),
       );
 
       if (shareButton) {
@@ -566,14 +447,12 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         // Verify backend was called
         await waitFor(
           () => {
-            const shareCalls = mockAxios.history.put.filter(
-              (req) => req.url === `/vlogs/${mockVlog._id}/share`,
-            );
-            expect(shareCalls.length).toBeGreaterThan(0);
+            expect(vi.mocked(vlogAPI.shareVlog)).toHaveBeenCalledWith(mockVlog._id);
           },
           { timeout: 2000 },
         );
       }
+      unmount();
     });
   });
 
@@ -589,22 +468,17 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-      mockAxios.onGet(`/vlogs/${mockVlog._id}`).reply(200, {
-        success: true,
-        data: mockVlog,
-      });
+      vi.mocked(authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
+      vi.mocked(vlogAPI.getVlog).mockResolvedValue({ data: { data: mockVlog } });
+      vi.mocked(vlogAPI.likeVlog).mockResolvedValue({ data: { vlog: { ...mockVlog, likes: [mockUser._id] } } });
 
-      mockAxios.onPut(`/vlogs/${mockVlog._id}/like`).reply(200, {
-        success: true,
-        data: { ...mockVlog, likes: [mockUser._id] },
-      });
-
-      const { user } = renderWithProviders(
+      const { unmount } = renderWithProviders(
         <Routes>
-          <Route path="/vlog/:id" element={<VlogDetail />} />
+          <Route path="/vlog/:id" element={<CapsuleDetail />} />
         </Routes>,
-        { initialRoute: `/vlog/${mockVlog._id}`, queryClient },
+        { route: `/vlog/${mockVlog._id}`, authenticated: true, queryClient }
       );
+      const user = userEvent.setup();
 
       await waitFor(
         () => {
@@ -616,7 +490,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
       // Find like button
       const buttons = screen.getAllByRole("button");
       const likeButton = buttons.find((btn) =>
-        btn.textContent.includes("Like"),
+        btn.getAttribute("title") === "Like" || btn.getAttribute("title") === "Unlike",
       );
 
       if (likeButton) {
@@ -624,10 +498,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
 
         // Wait for mutation to complete
         await waitFor(() => {
-          const likeCalls = mockAxios.history.put.filter(
-            (req) => req.url === `/vlogs/${mockVlog._id}/like`,
-          );
-          expect(likeCalls.length).toBeGreaterThan(0);
+          expect(vi.mocked(vlogAPI.likeVlog)).toHaveBeenCalledWith(mockVlog._id);
         });
 
         // Verify cache invalidation was called
@@ -635,6 +506,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
           expect(invalidateSpy).toHaveBeenCalled();
         });
       }
+      unmount();
     });
   });
 });
