@@ -1,11 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import FollowButton from "../components/UI/FollowButton";
 import VlogCard from "../components/Vlog/VlogCard";
 import { useAuth } from "../contexts/AuthContext";
-import { useFollowUser } from "../hooks/useFollowUser";
 import { useVlogInteractions } from "../hooks/useVlogInteractions";
 import { updateFollowCache } from "../utils/cacheHelpers";
 
@@ -29,8 +28,8 @@ global.IntersectionObserver = class IntersectionObserver {
 
 describe("Follow System Integration Tests", () => {
   let queryClient;
-  let mockFollowUser;
-  let mockUnfollowUser;
+  let _mockFollowUser;
+  let _mockUnfollowUser;
 
   const createWrapper = () => {
     return ({ children }) => (
@@ -50,8 +49,8 @@ describe("Follow System Integration Tests", () => {
       },
     });
 
-    mockFollowUser = vi.fn();
-    mockUnfollowUser = vi.fn();
+    _mockFollowUser = vi.fn();
+    _mockUnfollowUser = vi.fn();
 
     useAuth.mockReturnValue({
       isAuthenticated: true,

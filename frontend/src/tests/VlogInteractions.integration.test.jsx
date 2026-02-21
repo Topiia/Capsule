@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -219,7 +219,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
   describe("Comment Interaction Flow", () => {
     it("should verify comment API integration and backend calls", async () => {
       // Requirements: 2.1
-      const vlogWithComment = {
+      const _vlogWithComment = {
         ...mockVlog,
         comments: [mockComment],
       };
@@ -234,7 +234,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         data: mockComment,
       });
 
-      const { user } = renderWithProviders(
+      const { user: _user } = renderWithProviders(
         <Routes>
           <Route path="/vlog/:id" element={<VlogDetail />} />
         </Routes>,
@@ -394,7 +394,7 @@ describe("Vlog Interactions Integration Tests - Task 16", () => {
         data: { bookmarked: false },
       });
 
-      const { user } = renderWithProviders(
+      const { user: _user } = renderWithProviders(
         <Routes>
           <Route path="/bookmarks" element={<Bookmarks />} />
         </Routes>,

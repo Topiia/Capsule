@@ -5,8 +5,8 @@ import Button from "./Button";
 
 const FollowButton = ({
   userId,
-  username,
-  variant = "default",
+  username: _username,
+  variant: _variant = "default",
   className = "",
 }) => {
   const {

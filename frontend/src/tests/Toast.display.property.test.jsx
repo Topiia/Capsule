@@ -34,7 +34,7 @@ describe("Toast Notification Display Property Test", () => {
     .filter((str) => str.trim().length > 0); // Exclude whitespace-only strings
 
   // Generator for toast durations (positive integers)
-  const toastDurationArbitrary = fc.integer({ min: 100, max: 10000 });
+  const _toastDurationArbitrary = fc.integer({ min: 100, max: 10000 });
 
   // Test component that uses the toast context
   const TestComponent = ({ onToastShown }) => {

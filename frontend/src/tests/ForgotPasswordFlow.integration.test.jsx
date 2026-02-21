@@ -149,7 +149,7 @@ describe("Forgot Password Flow Integration Tests", () => {
     });
 
     it("should validate email format before submission", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders("/forgot-password");
 
       await waitFor(() => {

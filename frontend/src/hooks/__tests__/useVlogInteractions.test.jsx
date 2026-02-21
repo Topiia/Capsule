@@ -5,7 +5,7 @@ import { useVlogInteractions } from "../useVlogInteractions";
 import { vlogAPI, userAPI } from "../../services/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import * as ReactRouterDom from "react-router-dom";
+
 
 // Mock dependencies
 vi.mock("../../services/api", () => ({

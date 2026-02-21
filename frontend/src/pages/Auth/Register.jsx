@@ -3,10 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../contexts/AuthContext";
-import { isValidEmail, isValidPassword } from "../../utils/helpers";
+import { isValidPassword } from "../../utils/helpers";
 import Button from "../../components/UI/Button";
 import Logo from "../../components/UI/Logo";
-import LoadingSpinner from "../../components/UI/LoadingSpinner";
 import {
   EyeIcon,
   EyeSlashIcon,

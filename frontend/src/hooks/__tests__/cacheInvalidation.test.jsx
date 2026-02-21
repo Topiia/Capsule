@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useVlogInteractions } from "../useVlogInteractions";
 import { useComments } from "../useComments";
-import { vlogAPI, userAPI } from "../../services/api";
+import { vlogAPI } from "../../services/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 

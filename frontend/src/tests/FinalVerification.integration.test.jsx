@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
@@ -14,8 +14,6 @@ import { AuthProvider } from "../contexts/AuthContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import VlogCard from "../components/Vlog/VlogCard";
-import VlogDetail from "../pages/VlogDetail";
-import Bookmarks from "../pages/Bookmarks";
 import * as api from "../services/api";
 
 // Test wrapper with all providers

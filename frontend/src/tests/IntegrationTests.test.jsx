@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { BrowserRouter, MemoryRouter } from "react-router-dom";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "../App";
 import { AuthProvider } from "../contexts/AuthContext";
@@ -213,7 +212,7 @@ describe("Final Integration Testing - Task 12", () => {
       const initialTheme = localStorage.getItem("vlogsphere-theme");
 
       // Simulate navigation by re-rendering with different route
-      const { rerender } = renderApp("/explore");
+      const { rerender: _rerender } = renderApp("/explore");
 
       await waitFor(() => {
         const currentTheme = localStorage.getItem("vlogsphere-theme");

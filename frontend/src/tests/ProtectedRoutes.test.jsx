@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../contexts/AuthContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
@@ -8,7 +8,7 @@ import ProtectedRoute from "../components/Auth/ProtectedRoute";
 import Settings from "../pages/Settings";
 import Bookmarks from "../pages/Bookmarks";
 import Likes from "../pages/Likes";
-import Login from "../pages/Auth/Login";
+
 
 // Mock the API module
 vi.mock("../services/api", async () => {
@@ -220,11 +220,11 @@ describe("Protected Route Authentication Tests", () => {
 
   describe("Login Redirect Behavior", () => {
     it("should store the intended destination when redirecting to login", async () => {
-      let capturedLocation = null;
+      let _capturedLocation = null;
 
       const LocationCapture = () => {
         const location = window.location;
-        capturedLocation = location;
+        _capturedLocation = location;
         return <div>Login Page</div>;
       };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -693,7 +693,7 @@ describe("Edit & Delete Vlog Integration Tests (Frontend)", () => {
 
       // Try to update
       const titleInput = screen.getByLabelText(/title/i);
-      const originalTitle = titleInput.value;
+      const _originalTitle = titleInput.value;
       await user.clear(titleInput);
       await user.type(titleInput, "Failed Update");
 

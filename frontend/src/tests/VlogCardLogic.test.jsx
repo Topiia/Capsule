@@ -1,8 +1,5 @@
-
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { BrowserRouter } from "react-router-dom";
-import { motion } from "framer-motion";
 
 // Mock dependencies locally
 const useAuthMock = {
@@ -23,9 +20,9 @@ const useInteractionsMock = {
 // Inlined logic from VlogCard to verify rendering logic without import issues
 const VlogCardLogic = ({ vlog }) => {
     // Simplified context usage
-    const isAuthenticated = useAuthMock.isAuthenticated;
+    const _isAuthenticated = useAuthMock.isAuthenticated;
     const user = useAuthMock.user;
-    const { toggleLike, isLiking, isLiked: _isLiked } = useInteractionsMock;
+    const { toggleLike: _toggleLike, isLiking: _isLiking, isLiked: _isLiked } = useInteractionsMock;
 
     // THE LOGIC UNDER TEST
     const isLiked =
