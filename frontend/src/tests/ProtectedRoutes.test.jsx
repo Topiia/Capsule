@@ -142,6 +142,10 @@ describe("Protected Route Authentication Tests", () => {
       });
     });
 
+    afterEach(() => {
+      localStorage.removeItem("token");
+    });
+
     it("should allow authenticated users to access /settings", async () => {
       render(
         <TestWrapper initialEntries={["/settings"]}>

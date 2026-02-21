@@ -172,7 +172,7 @@ export const useVlogInteractions = () => {
       queryClient.invalidateQueries({ queryKey: ["exploreVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["featuredVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["latestVlogs"] });
-      queryClient.invalidateQueries({ queryKey: ["trendingVlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
       queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["likedVlogs"] });
     },
@@ -333,7 +333,7 @@ export const useVlogInteractions = () => {
       queryClient.invalidateQueries({ queryKey: ["exploreVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["featuredVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["latestVlogs"] });
-      queryClient.invalidateQueries({ queryKey: ["trendingVlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
       queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
       queryClient.invalidateQueries({ queryKey: ["likedVlogs"] });
     },
@@ -442,10 +442,10 @@ export const useVlogInteractions = () => {
       }
 
       // Refetch to ensure consistency
-      queryClient.invalidateQueries(["vlog", vlogId]);
-      queryClient.invalidateQueries(["vlogs"]);
-      queryClient.invalidateQueries(["trending"]);
-      queryClient.invalidateQueries(["userVlogs"]);
+      queryClient.invalidateQueries({ queryKey: ["vlog", vlogId] });
+      queryClient.invalidateQueries({ queryKey: ["vlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
     },
   });
 
@@ -553,10 +553,10 @@ export const useVlogInteractions = () => {
       }
 
       // Refetch to ensure consistency
-      queryClient.invalidateQueries(["vlog", vlogId]);
-      queryClient.invalidateQueries(["vlogs"]);
+      queryClient.invalidateQueries({ queryKey: ["vlog", vlogId] });
+      queryClient.invalidateQueries({ queryKey: ["vlogs"] });
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-      queryClient.invalidateQueries(["user", "me"]);
+      queryClient.invalidateQueries({ queryKey: ["user", "me"] });
     },
   });
 

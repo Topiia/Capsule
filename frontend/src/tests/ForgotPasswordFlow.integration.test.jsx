@@ -8,7 +8,7 @@ import ForgotPassword from "../pages/Auth/ForgotPassword";
 import ResetPassword from "../pages/Auth/ResetPassword";
 import Login from "../pages/Auth/Login";
 import { AuthProvider } from "../contexts/AuthContext";
-import { ThemeProvider } from "../contexts/ThemeContext";
+import { ThemeProvider } from "../contexts/ThemeProvider";
 import { authAPI } from "../services/api";
 
 // Mock the API

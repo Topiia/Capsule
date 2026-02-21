@@ -123,7 +123,7 @@ const Likes = () => {
         <div className="flex items-center space-x-3 mb-2">
           <HeartIcon className="w-8 h-8 text-[var(--theme-accent)]" />
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">
-            Liked Capsules
+            Liked Vlogs
           </h1>
         </div>
         <p className="text-[var(--theme-text-secondary)]">

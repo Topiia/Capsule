@@ -147,10 +147,10 @@ export const useComments = () => {
       if (context?.skipUpdate) return;
 
       // Refetch to ensure consistency
-      queryClient.invalidateQueries(["vlog", vlogId]);
-      queryClient.invalidateQueries(["vlogs"]);
-      queryClient.invalidateQueries(["trending"]);
-      queryClient.invalidateQueries(["userVlogs"]);
+      queryClient.invalidateQueries({ queryKey: ["vlog", vlogId] });
+      queryClient.invalidateQueries({ queryKey: ["vlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
     },
   });
 
@@ -240,10 +240,10 @@ export const useComments = () => {
       if (context?.skipUpdate) return;
 
       // Refetch to ensure consistency
-      queryClient.invalidateQueries(["vlog", vlogId]);
-      queryClient.invalidateQueries(["vlogs"]);
-      queryClient.invalidateQueries(["trending"]);
-      queryClient.invalidateQueries(["userVlogs"]);
+      queryClient.invalidateQueries({ queryKey: ["vlog", vlogId] });
+      queryClient.invalidateQueries({ queryKey: ["vlogs"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["userVlogs"] });
     },
   });
 

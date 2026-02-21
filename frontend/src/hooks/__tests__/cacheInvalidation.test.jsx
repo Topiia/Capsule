@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useVlogInteractions } from "../useVlogInteractions";
 import { useComments } from "../useComments";
-import { vlogAPI } from "../../services/api";
+import { vlogAPI, userAPI } from "../../services/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -40,12 +40,22 @@ describe("Cache Invalidation Strategy", () => {
   let showToast;
 
   beforeEach(() => {
+    // Clear all mocks FIRST before setting up new return values
+    vi.clearAllMocks();
+
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
+
+    // Re-establish resolved values for API mocks after clearAllMocks()
+    vlogAPI.likeVlog.mockResolvedValue({ data: { likes: ["user123"] } });
+    vlogAPI.dislikeVlog.mockResolvedValue({ data: { dislikes: ["user123"] } });
+    vlogAPI.shareVlog.mockResolvedValue({ data: { shareCount: 1 } });
+    userAPI.addBookmark.mockResolvedValue({ data: { bookmarks: ["vlog123"] } });
+    userAPI.removeBookmark.mockResolvedValue({ data: { bookmarks: [] } });
 
     showToast = vi.fn();
     useToast.mockReturnValue({ showToast });
@@ -55,9 +65,6 @@ describe("Cache Invalidation Strategy", () => {
       isAuthenticated: true,
       user: { _id: "user123", username: "testuser", avatar: "avatar.jpg" },
     });
-
-    // Clear all mocks
-    vi.clearAllMocks();
   });
 
   const wrapper = ({ children }) => (
@@ -161,10 +168,10 @@ describe("Cache Invalidation Strategy", () => {
       });
 
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
   });

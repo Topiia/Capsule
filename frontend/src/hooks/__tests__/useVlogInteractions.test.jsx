@@ -38,12 +38,22 @@ describe("useVlogInteractions", () => {
   let showToast;
 
   beforeEach(() => {
+    // Clear all mocks FIRST before setting up new return values
+    vi.clearAllMocks();
+
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
       },
     });
+
+    // Re-establish resolved values for API mocks after clearAllMocks()
+    vlogAPI.likeVlog.mockResolvedValue({ data: { likes: ["user123"] } });
+    vlogAPI.dislikeVlog.mockResolvedValue({ data: { dislikes: ["user123"] } });
+    vlogAPI.shareVlog.mockResolvedValue({ data: { shareCount: 1 } });
+    userAPI.addBookmark.mockResolvedValue({ data: { bookmarks: ["vlog123"] } });
+    userAPI.removeBookmark.mockResolvedValue({ data: { bookmarks: [] } });
 
     showToast = vi.fn();
     useToast.mockReturnValue({ showToast });
@@ -53,9 +63,6 @@ describe("useVlogInteractions", () => {
       isAuthenticated: true,
       user: { _id: "user123" },
     });
-
-    // Clear all mocks
-    vi.clearAllMocks();
   });
 
   const wrapper = ({ children }) => (

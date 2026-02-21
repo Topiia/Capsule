@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const {
     register,
@@ -24,6 +25,7 @@ const ForgotPassword = () => {
 
   const onSubmit = async (data) => {
     setLoading(true);
+    setErrorMessage("");
     try {
       await authAPI.forgotPassword(data.email);
       setSubmitted(true);
@@ -45,6 +47,7 @@ const ForgotPassword = () => {
           error.response?.data?.error?.message ||
           error.message ||
           "Failed to send reset email";
+        setErrorMessage(message);
         toast.error(message);
       }
     } finally {
@@ -132,6 +135,15 @@ const ForgotPassword = () => {
                     className="mt-2 text-sm text-red-400"
                   >
                     {errors.email.message}
+                  </motion.p>
+                )}
+                {errorMessage && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 text-sm text-red-400"
+                  >
+                    {errorMessage}
                   </motion.p>
                 )}
               </div>

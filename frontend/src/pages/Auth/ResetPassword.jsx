@@ -21,11 +21,13 @@ const ResetPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [tokenError, setTokenError] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const {
     register,
     handleSubmit,
     watch,
+    reset,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -52,6 +54,7 @@ const ResetPassword = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     setTokenError(false);
+    setErrorMessage("");
 
     try {
       await authAPI.resetPassword(token, data.password);
@@ -75,9 +78,11 @@ const ResetPassword = () => {
         message.toLowerCase().includes("expired")
       ) {
         setTokenError(true);
-        // Clear sensitive form data
-        document.getElementById("password").value = "";
-        document.getElementById("confirmPassword").value = "";
+        // Clear sensitive form data via react-hook-form
+        reset({ password: "", confirmPassword: "" });
+      } else {
+        // Non-token errors: show inline
+        setErrorMessage(message);
       }
 
       toast.error(message);
@@ -233,6 +238,15 @@ const ResetPassword = () => {
                     className="mt-2 text-sm text-red-400"
                   >
                     {errors.password.message}
+                  </motion.p>
+                )}
+                {errorMessage && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 text-sm text-red-400"
+                  >
+                    {errorMessage}
                   </motion.p>
                 )}
               </div>
