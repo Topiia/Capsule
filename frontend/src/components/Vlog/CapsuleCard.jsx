@@ -364,6 +364,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
             </motion.button>
 
             <motion.button
+              data-testid="bookmark-button"
               onClick={handleBookmark}
               disabled={isBookmarking}
               title={
