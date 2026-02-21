@@ -151,9 +151,7 @@ export const useVlogInteractions = () => {
       }
 
       // Dynamic toast based on server response (Truthful)
-      const isLiked = response?.data?.data?.isLiked;
-      const message = isLiked ? "Capsule liked!" : "Capsule like removed";
-      showToast(message, "success");
+      showToast("Vlog liked!", "success");
     },
     onError: (error, vlogId, context) => {
       if (context?.skipUpdate || error.message === "Not authenticated") return;
@@ -313,10 +311,8 @@ export const useVlogInteractions = () => {
         });
       }
 
-       // Dynamic toast based on server response (Truthful)
-      const isDisliked = response?.data?.data?.isDisliked;
-      const message = isDisliked ? "Capsule disliked" : "Capsule dislike removed";
-      showToast(message, "success");
+             // Dynamic toast based on server response (Truthful)
+      showToast("Vlog disliked", "success");
     },
     onError: (error, vlogId, context) => {
       if (context?.skipUpdate || error.message === "Not authenticated") return;
@@ -414,7 +410,7 @@ export const useVlogInteractions = () => {
       return { previousVlog };
     },
     onSuccess: (_response, { _vlogId }) => {
-      showToast("Capsule shared successfully!", "success");
+      showToast("Vlog shared successfully!", "success");
     },
     onError: (error, { vlogId }, context) => {
       // Don't show error for cancelled shares
@@ -536,7 +532,7 @@ export const useVlogInteractions = () => {
       return { previousVlog };
     },
     onSuccess: (_response, { _vlogId, isBookmarked }) => {
-      const message = isBookmarked ? "Bookmark removed" : "Capsule bookmarked";
+      const message = isBookmarked ? "Bookmark removed!" : "Vlog bookmarked!";
       showToast(message, "success");
     },
     onError: (error, { vlogId }, context) => {

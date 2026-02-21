@@ -30,6 +30,11 @@ vi.mock("../../contexts/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock("react-router-dom", () => ({
+  useNavigate: vi.fn(() => vi.fn()),
+  useLocation: vi.fn(() => ({ pathname: "/test" })),
+}));
+
 describe("Cache Invalidation Strategy", () => {
   let queryClient;
   let showToast;
@@ -75,11 +80,11 @@ describe("Cache Invalidation Strategy", () => {
 
       await waitFor(() => {
         // Should invalidate specific vlog query
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
         // Should invalidate vlog list queries
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
 
@@ -97,10 +102,10 @@ describe("Cache Invalidation Strategy", () => {
       });
 
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
   });
@@ -132,10 +137,10 @@ describe("Cache Invalidation Strategy", () => {
       });
 
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
 
@@ -192,10 +197,10 @@ describe("Cache Invalidation Strategy", () => {
       });
 
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
 
@@ -296,13 +301,13 @@ describe("Cache Invalidation Strategy", () => {
         () => {
           const vlogInvalidations = invalidateSpy.mock.calls.filter(
             (call) =>
-              JSON.stringify(call[0]) === JSON.stringify(["vlog", "vlog123"]),
+              JSON.stringify(call[0]) === JSON.stringify({ queryKey: ["vlog", "vlog123"] }),
           );
           // Should be invalidated at least 2 times (like, comment)
           expect(vlogInvalidations.length).toBeGreaterThanOrEqual(2);
 
           const vlogsInvalidations = invalidateSpy.mock.calls.filter(
-            (call) => JSON.stringify(call[0]) === JSON.stringify(["vlogs"]),
+            (call) => JSON.stringify(call[0]) === JSON.stringify({ queryKey: ["vlogs"] }),
           );
           // Should be invalidated at least 2 times
           expect(vlogsInvalidations.length).toBeGreaterThanOrEqual(2);
@@ -328,10 +333,10 @@ describe("Cache Invalidation Strategy", () => {
 
       // Even on error, queries should be invalidated to ensure consistency
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlog", "vlog123"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["vlogs"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["trending"]);
-        expect(invalidateSpy).toHaveBeenCalledWith(["userVlogs"]);
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlog", "vlog123"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["vlogs"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["trending"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["userVlogs"] });
       });
     });
   });
