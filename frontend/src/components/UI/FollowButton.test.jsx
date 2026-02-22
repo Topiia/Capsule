@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FollowButton from "./FollowButton";
 import { useFollowUser } from "../../hooks/useFollowUser";
@@ -44,6 +44,14 @@ describe("FollowButton", () => {
     useAuth.mockReturnValue({
       user: { _id: "currentUser" },
     });
+  });
+
+  afterEach(() => {
+    // Drain any pending Button.jsx ripple setTimeout(600ms) before
+    // JSDOM is torn down — prevents "window is not defined" Uncaught Exception
+    vi.useFakeTimers();
+    vi.runAllTimers();
+    vi.useRealTimers();
   });
 
   it('should render "Follow" when not following (reads from cache)', () => {

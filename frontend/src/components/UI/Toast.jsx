@@ -59,9 +59,11 @@ const Toast = ({ id, message, type = "info", duration = 3000, onClose }) => {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -20, scale: 0.95 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
+      role="alert"
+      aria-live="assertive"
       className={`
         relative flex items-center gap-3 p-4 rounded-xl
-        backdrop-blur-md bg-white/10 border border-white/20
+        backdrop-blur-md ${config.bgColor} border ${config.borderColor}
         shadow-lg shadow-black/30
         min-w-[300px] max-w-[500px]
       `}
@@ -76,7 +78,10 @@ const Toast = ({ id, message, type = "info", duration = 3000, onClose }) => {
       </div>
 
       {/* Message */}
-      <div className={`flex-1 ${config.textColor} text-sm font-medium`}>
+      <div 
+        data-testid="toast-message"
+        className={`flex-1 ${config.textColor} text-sm font-medium`}
+      >
         {message}
       </div>
 

@@ -16,6 +16,7 @@ import {
   DocumentTextIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { mapVlogToFormData } from "../utils/vlogTransformers";
 
 const EditCapsule = () => {
   const { id } = useParams();
@@ -55,7 +56,7 @@ const EditCapsule = () => {
 
   // Check authorization after vlog is loaded
   useEffect(() => {
-    if (vlog && user && vlog.author._id !== user.id) {
+    if (vlog && user && (vlog.author._id || vlog.author.id) !== (user._id || user.id)) {
       toast.error("You are not authorized to edit this vlog");
       navigate(`/vlog/${id}`);
     }
@@ -81,13 +82,14 @@ const EditCapsule = () => {
   // Populate form with existing data
   useEffect(() => {
     if (vlog) {
-      setValue("title", vlog.title);
-      setValue("description", vlog.description);
-      setValue("content", vlog.content || "");
-      setValue("category", vlog.category);
-      setValue("tags", vlog.tags?.join(", ") || "");
-      setValue("isPublic", vlog.isPublic);
-      setUploadedImages(vlog.images || []);
+      const formData = mapVlogToFormData(vlog);
+      setValue("title", formData.title);
+      setValue("description", formData.description);
+      setValue("content", formData.content);
+      setValue("category", formData.category);
+      setValue("tags", formData.tags);
+      setValue("isPublic", String(formData.isPublic));
+      setUploadedImages(formData.images);
     }
   }, [vlog, setValue]);
 
@@ -274,7 +276,7 @@ const EditCapsule = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form data-testid="edit-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           {/* Basic Information */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

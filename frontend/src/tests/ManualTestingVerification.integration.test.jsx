@@ -294,7 +294,7 @@ describe("Manual Testing Verification - Likes Page", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("No liked vlogs yet")).toBeInTheDocument();
+      expect(screen.getByText("No liked capsules yet")).toBeInTheDocument();
     });
   });
 });
@@ -431,7 +431,7 @@ describe("Manual Testing Verification - Explore Page", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Showing 2 vlogs/i)).toBeInTheDocument();
+      expect(screen.getByText(/Showing 2 capsules/i)).toBeInTheDocument();
     });
   });
 });

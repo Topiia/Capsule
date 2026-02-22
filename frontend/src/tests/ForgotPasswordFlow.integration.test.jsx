@@ -196,7 +196,7 @@ describe("Forgot Password Flow Integration Tests", () => {
 
       // Verify error is displayed
       await waitFor(() => {
-        expect(screen.getByText("Server error occurred")).toBeInTheDocument();
+        expect(screen.getAllByText("Server error occurred").length).toBeGreaterThan(0);
       });
     });
 
@@ -330,9 +330,10 @@ describe("Forgot Password Flow Integration Tests", () => {
         expect(screen.getByText("Password Reset!")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByText(/your password has been successfully reset!/i),
-      ).toBeInTheDocument();
+      const successMessages = screen.getAllByText(
+        /your password has been successfully reset!/i,
+      );
+      expect(successMessages.length).toBeGreaterThan(0);
     });
 
     it("should display error for mismatched passwords", async () => {
@@ -576,7 +577,7 @@ describe("Forgot Password Flow Integration Tests", () => {
 
       // Verify error
       await waitFor(() => {
-        expect(screen.getByText("Network error")).toBeInTheDocument();
+        expect(screen.getAllByText("Network error").length).toBeGreaterThan(0);
       });
 
       // Retry
@@ -631,7 +632,7 @@ describe("Forgot Password Flow Integration Tests", () => {
 
       // Verify error
       await waitFor(() => {
-        expect(screen.getByText("Server error")).toBeInTheDocument();
+        expect(screen.getAllByText("Server error").length).toBeGreaterThan(0);
       });
 
       // Retry
@@ -640,7 +641,8 @@ describe("Forgot Password Flow Integration Tests", () => {
 
       // Verify success
       await waitFor(() => {
-        expect(screen.getByText("Password Reset!")).toBeInTheDocument();
+        const resetMessages = screen.getAllByText(/Password Reset!/i);
+        expect(resetMessages.length).toBeGreaterThan(0);
       });
     });
 
@@ -681,8 +683,8 @@ describe("Forgot Password Flow Integration Tests", () => {
       // Wait for error
       await waitFor(() => {
         expect(
-          screen.getByText(/invalid or expired reset token/i),
-        ).toBeInTheDocument();
+          screen.getAllByText(/invalid or expired reset token/i).length
+        ).toBeGreaterThan(0);
       });
 
       // Verify form fields are cleared

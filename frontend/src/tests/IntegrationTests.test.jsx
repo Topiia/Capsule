@@ -141,12 +141,26 @@ describe("Final Integration Testing - Task 12", () => {
     it("should render footer with all link sections", async () => {
       renderWithProviders(<App />, { route: "/" });
 
-      await waitFor(() => {
-        // Check for footer sections
-        expect(screen.getByText(/company/i)).toBeInTheDocument();
-        expect(screen.getByText(/resources/i)).toBeInTheDocument();
-        expect(screen.getByText(/legal/i)).toBeInTheDocument();
-      });
+      // Phase 1: Wait for text to be present in the DOM (text resolves before ARIA tree in JSDOM)
+      await screen.findByText(/company/i);
+
+      // Phase 2: Assert semantic heading roles — JSDOM ARIA tree resolves after text settles.
+      // Using waitFor → getByRole preserves a11y verification without arbitrary timeouts.
+      await waitFor(() =>
+        expect(
+          screen.getByRole("heading", { name: /company/i }),
+        ).toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("heading", { name: /resources/i }),
+        ).toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("heading", { name: /legal/i }),
+        ).toBeInTheDocument(),
+      );
     });
 
     it("should have footer links with proper href attributes", async () => {

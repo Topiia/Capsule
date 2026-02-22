@@ -6,15 +6,20 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "../contexts/AuthContext";
-import { ToastProvider } from "../contexts/ToastContext";
-import { ThemeProvider } from "../contexts/ThemeProvider";
+import { useQuery } from "@tanstack/react-query";
 import CapsuleCard from "../components/Vlog/CapsuleCard";
 import * as api from "../services/api";
+import { renderWithProviders } from "./utils/renderWithProviders";
+
+const TestVlogWrapper = ({ initialVlog, ...props }) => {
+  const { data: vlog } = useQuery({
+    queryKey: ["vlog", initialVlog._id],
+    initialData: { data: { data: initialVlog } },
+  });
+  return <CapsuleCard vlog={vlog?.data?.data || initialVlog} {...props} />;
+};
 
 vi.mock("../services/api", () => ({
   authAPI: {
@@ -36,28 +41,6 @@ vi.mock("../services/api", () => ({
     removeBookmark: vi.fn(),
   },
 }));
-
-// Test wrapper with all providers
-const AllTheProviders = ({ children }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
-};
 
 // Mock vlog data
 const mockVlog = {
@@ -94,23 +77,21 @@ const mockUser = {
 describe("Final Verification - Interaction Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem("user", JSON.stringify(mockUser));
-    localStorage.setItem("token", "mock-token");
     vi.mocked(api.authAPI.getMe).mockResolvedValue({ data: { user: mockUser } });
   });
 
   describe("1. Interaction Buttons Presence", () => {
     it("should render all interaction buttons on CapsuleCard", () => {
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      expect(screen.getByTestId("like-count").closest("button")).toBeInTheDocument();
-      expect(screen.getByTestId("bookmark-button")).toBeInTheDocument();
-      expect(screen.getByTestId("share-button")).toBeInTheDocument();
+      const actionBar = screen.getByTestId("action-bar");
+      expect(within(actionBar).getByRole("button", { name: "Like" })).toBeInTheDocument();
+      expect(within(screen.getByTestId("overlay-actions")).getByRole("button", { name: "Bookmark" })).toBeInTheDocument();
+      expect(within(actionBar).getByRole("button", { name: "Share" })).toBeInTheDocument();
     });
   });
 
@@ -123,14 +104,13 @@ describe("Final Verification - Interaction Features", () => {
         likes: [mockUser.id],
       };
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={likedVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={likedVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Unlike" });
       expect(likeButton).toBeInTheDocument();
     });
 
@@ -140,22 +120,19 @@ describe("Final Verification - Interaction Features", () => {
         isBookmarked: true,
       };
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={bookmarkedVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={bookmarkedVlog} />,
+        { authenticated: true }
       );
 
 
-      const bookmarkButton = screen.getByTestId("bookmark-button");
+      const bookmarkButton = within(screen.getByTestId("overlay-actions")).getByRole("button", { name: "Remove bookmark" });
       expect(bookmarkButton).toBeInTheDocument();
     });
   });
 
   describe("3. Toast Notifications", () => {
     it("should show success toast after liking", async () => {
-      localStorage.setItem("token", "mock-jwt-token");
-      localStorage.setItem("user", JSON.stringify(mockUser));
       const user = userEvent.setup();
 
       vi.spyOn(api.vlogAPI, "likeVlog").mockResolvedValue({
@@ -165,14 +142,13 @@ describe("Final Verification - Interaction Features", () => {
         },
       });
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
       await user.click(likeButton);
 
       await waitFor(() => {
@@ -187,18 +163,17 @@ describe("Final Verification - Interaction Features", () => {
         new Error("Network error"),
       );
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
       await user.click(likeButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/failed/i)).toBeInTheDocument();
+        expect(screen.getByText(/Network error/i)).toBeInTheDocument();
       });
     });
   });
@@ -224,14 +199,13 @@ describe("Final Verification - Interaction Features", () => {
           ),
       );
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <TestVlogWrapper initialVlog={mockVlog} featured={true} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
 
       // Initial count should be 0
       expect(screen.getByTestId("like-count")).toHaveTextContent("0");
@@ -271,19 +245,18 @@ describe("Final Verification - Interaction Features", () => {
         },
       });
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={dislikedVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <TestVlogWrapper initialVlog={dislikedVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
       await user.click(likeButton);
 
       await waitFor(() => {
 
-        const unlikeBtn = screen.getByTestId("like-count").closest("button");
+        const unlikeBtn = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Unlike" });
         expect(unlikeBtn).toBeInTheDocument();
       });
     });
@@ -292,16 +265,14 @@ describe("Final Verification - Interaction Features", () => {
   describe("6. Unauthenticated User Experience", () => {
     it("should show login prompt for unauthenticated users", async () => {
       const user = userEvent.setup();
-      localStorage.removeItem("user");
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: false }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getAllByRole("button", { name: "Login to interact" })[0];
       await user.click(likeButton);
 
       await waitFor(() => {
@@ -311,14 +282,12 @@ describe("Final Verification - Interaction Features", () => {
 
     it("should not make API call for unauthenticated interactions", async () => {
       const user = userEvent.setup();
-      localStorage.removeItem("user");
 
       const likeSpy = vi.spyOn(api.vlogAPI, "likeVlog");
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: false }
       );
 
 
@@ -345,14 +314,13 @@ describe("Final Verification - Interaction Features", () => {
         data: { success: true, data: { shares: 1 } },
       });
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const shareButton = screen.getByTestId("share-button");
+      const shareButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Share" });
       await user.click(shareButton);
 
       await waitFor(() => {
@@ -363,14 +331,13 @@ describe("Final Verification - Interaction Features", () => {
 
   describe("8. Theme Consistency", () => {
     it("should apply glass morphism styles to interaction buttons", () => {
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("overlay-actions")).getByRole("button", { name: "Like" });
 
       // Check for glass morphism classes
       expect(likeButton.className).toMatch(/backdrop-blur|glass/);
@@ -379,8 +346,6 @@ describe("Final Verification - Interaction Features", () => {
 
   describe("9. Loading States", () => {
     it("should disable button during interaction", async () => {
-      localStorage.setItem("token", "mock-jwt-token");
-      localStorage.setItem("user", JSON.stringify(mockUser));
       const user = userEvent.setup();
 
       vi.spyOn(api.vlogAPI, "likeVlog").mockImplementation(
@@ -396,14 +361,13 @@ describe("Final Verification - Interaction Features", () => {
           ),
       );
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <CapsuleCard vlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
       await user.click(likeButton);
 
       // Button should be disabled during API call
@@ -423,14 +387,13 @@ describe("Final Verification - Interaction Features", () => {
         new Error("Network error"),
       );
 
-      render(
-        <AllTheProviders>
-          <CapsuleCard vlog={mockVlog} />
-        </AllTheProviders>,
+      renderWithProviders(
+        <TestVlogWrapper initialVlog={mockVlog} />,
+        { authenticated: true }
       );
 
 
-      const likeButton = screen.getByTestId("like-count").closest("button");
+      const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
 
       // Initial count
       expect(screen.getByTestId("like-count")).toHaveTextContent("0");
@@ -457,18 +420,25 @@ describe("Final Verification - Performance", () => {
   it("should handle rapid clicks without double-submission", async () => {
     const user = userEvent.setup();
 
-    const likeSpy = vi.spyOn(api.vlogAPI, "likeVlog").mockResolvedValue({
-      data: { success: true, data: { ...mockVlog, isLiked: true } },
-    });
-
-    render(
-      <AllTheProviders>
-        <CapsuleCard vlog={mockVlog} />
-      </AllTheProviders>,
+    const likeSpy = vi.spyOn(api.vlogAPI, "likeVlog").mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                data: { success: true, data: { ...mockVlog, isLiked: true } },
+              }),
+            500, // Increased to 500ms to ensure all clicks happen during loading state
+          ),
+        ),
     );
 
-    const buttons = screen.getAllByRole("button");
-    const likeButton = screen.getByTestId("like-count").closest("button");
+    renderWithProviders(
+      <CapsuleCard vlog={mockVlog} />,
+      { authenticated: true }
+    );
+
+    const likeButton = within(screen.getByTestId("action-bar")).getByRole("button", { name: "Like" });
 
     // Click rapidly 5 times
     await user.click(likeButton);
@@ -478,7 +448,7 @@ describe("Final Verification - Performance", () => {
     await user.click(likeButton);
 
     await waitFor(() => {
-      // Should only call API once or twice (toggle)
+      // Should only call API heavily reduced times due to mutation pending state protection
       expect(likeSpy.mock.calls.length).toBeLessThanOrEqual(2);
     });
   });

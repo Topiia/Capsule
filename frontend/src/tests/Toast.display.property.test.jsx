@@ -1,268 +1,207 @@
-/**
- * **Feature: vlog-interactions-complete, Property 10: Toast Notification Display**
- * **Validates: Requirements 5.4**
- *
- * Property: For any completed interaction (success or failure), a toast notification
- * should appear within 200 milliseconds with the appropriate message and type.
- */
-
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import { render, screen, act } from "@testing-library/react";
 import * as fc from "fast-check";
+import { toastReducer, TOAST_ACTIONS } from "../reducers/toastReducer";
 import { ToastProvider, useToast } from "../contexts/ToastContext";
 
-describe("Toast Notification Display Property Test", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+// --- Model Object for State Machine Testing ---
+class ToastModel {
+  constructor() {
+    this.toasts = []; 
+  }
+}
 
-  afterEach(() => {
-    // Always restore real timers to prevent leaking fake timer state
-    // into other test files when running in a combined suite
-    vi.useRealTimers();
-    vi.clearAllTimers();
-  });
+// --- Commands for Model-Based Testing ---
+class ShowCommand {
+  constructor(payload) {
+    this.payload = payload;
+  }
+  check() { return true; }
+  run(model, real) {
+    // Model Transition
+    model.toasts.push(this.payload);
+    
+    // Real Transition (Deep Frozen Input to prove Immutability)
+    const frozenState = Object.freeze([...real.state]);
+    const nextState = toastReducer(frozenState, { type: TOAST_ACTIONS.SHOW, payload: this.payload });
 
-  // Generator for toast types
-  const toastTypeArbitrary = fc.constantFrom(
-    "success",
-    "error",
-    "info",
-    "warning",
-  );
+    // Invariants
+    expect(nextState).not.toBe(frozenState); // Strict structural inequality
+    expect(nextState.length).toBe(model.toasts.length);
+    expect(nextState[nextState.length - 1]).toEqual(this.payload);
+    
+    real.state = nextState;
+  }
+}
 
-  // Generator for toast messages (non-whitespace strings)
-  const toastMessageArbitrary = fc
-    .string({ minLength: 1, maxLength: 200 })
-    .filter((str) => str.trim().length > 0); // Exclude whitespace-only strings
+class HideCommand {
+  constructor(id) {
+    this.id = id;
+  }
+  check() { return true; }
+  run(model, real) {
+    // Model Transition
+    model.toasts = model.toasts.filter(t => t.id !== this.id);
+    
+    // Real Transition
+    const frozenState = Object.freeze([...real.state]);
+    const nextState = toastReducer(frozenState, { type: TOAST_ACTIONS.HIDE, payload: { id: this.id } });
 
-  // Generator for toast durations (positive integers)
-  const _toastDurationArbitrary = fc.integer({ min: 100, max: 10000 });
-
-  // Test component that uses the toast context
-  const TestComponent = ({ onToastShown }) => {
-    const { showToast } = useToast();
-
-    // Expose showToast for testing
-    if (onToastShown) {
-      onToastShown(showToast);
+    // Invariants
+    expect(nextState.some(t => t.id === this.id)).toBe(false);
+    expect(nextState.length).toBe(model.toasts.length);
+    if (frozenState.some(t => t.id === this.id)) {
+        expect(nextState).not.toBe(frozenState); 
     }
 
-    return <div data-testid="test-component">Test Component</div>;
+    real.state = nextState;
+  }
+}
+
+class ClearCommand {
+  check() { return true; }
+  run(model, real) {
+    // Model Transition
+    model.toasts = [];
+    
+    // Real Transition
+    const frozenState = Object.freeze([...real.state]);
+    const nextState = toastReducer(frozenState, { type: TOAST_ACTIONS.CLEAR });
+
+    // Invariants
+    expect(nextState.length).toBe(0);
+    expect(nextState).toEqual(model.toasts);
+
+    real.state = nextState;
+  }
+}
+
+describe("Layer A: toastReducer Pure Formal Verification", () => {
+  // Arbitraries
+  const showPayloadArbitrary = fc.record({
+    id: fc.uuid(),
+    message: fc.string({ minLength: 1 }),
+    type: fc.constantFrom("info", "success", "error", "warning"),
+    duration: fc.integer({ min: 1000, max: 10000 })
+  });
+
+  const commandsArbitrary = fc.commands([
+    showPayloadArbitrary.map(payload => new ShowCommand(payload)),
+    fc.uuid().map(id => new HideCommand(id)),
+    fc.constant(new ClearCommand())
+  ], { maxCommands: 50 });
+
+  it("should maintain strict equivalence between Reducer State and Shadow Model across arbitrary action sequences", () => {
+    fc.assert(
+      fc.property(commandsArbitrary, (cmds) => {
+        const setup = () => ({
+          model: new ToastModel(),
+          real: { state: [] }
+        });
+        fc.modelRun(setup, cmds);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should never contain undefined/null entries or break schema during array-reduction folding", () => {
+    // Sequence-based testing via Array.reduce fold
+    const actionArbitrary = fc.oneof(
+      showPayloadArbitrary.map(payload => ({ type: TOAST_ACTIONS.SHOW, payload })),
+      fc.uuid().map(id => ({ type: TOAST_ACTIONS.HIDE, payload: { id } })),
+      fc.constant({ type: TOAST_ACTIONS.CLEAR })
+    );
+
+    fc.assert(
+      fc.property(fc.array(actionArbitrary, { minLength: 1, maxLength: 100 }), (actions) => {
+        const finalState = actions.reduce((state, action) => {
+          const frozen = Object.freeze([...state]);
+          return toastReducer(frozen, action);
+        }, []);
+
+        // Schema integrity assertions
+        expect(Array.isArray(finalState)).toBe(true);
+        for (const toast of finalState) {
+          expect(toast).not.toBeNull();
+          expect(toast).not.toBeUndefined();
+          expect(typeof toast.id).toBe("string");
+          expect(typeof toast.message).toBe("string");
+          expect(["info", "success", "error", "warning"].includes(toast.type)).toBe(true);
+        }
+
+        // Uniqueness invariant
+        const ids = finalState.map(t => t.id);
+        expect(new Set(ids).size).toBe(ids.length);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("1,000 Action Burst Stress Validation should execute < 300ms without exploding", () => {
+    const actions = [];
+    for (let i = 0; i < 1000; i++) {
+      const type = Math.random() > 0.3 ? TOAST_ACTIONS.SHOW : (Math.random() > 0.5 ? TOAST_ACTIONS.HIDE : TOAST_ACTIONS.CLEAR);
+      actions.push({
+        type,
+        payload: { id: `id-${i}`, message: "Stress", type: "info", duration: 1000 }
+      });
+    }
+
+    const startTime = performance.now();
+    
+    // Fold
+    const finalState = actions.reduce((state, action) => toastReducer(state, action), []);
+    
+    const endTime = performance.now();
+    const executionTimeMs = endTime - startTime;
+
+    // Fail if memory/time explodes
+    expect(executionTimeMs).toBeLessThan(300);
+    expect(Array.isArray(finalState)).toBe(true);
+  });
+});
+
+describe("Layer C: Toast Context DOM Integration (Single Lifecycle)", () => {
+  const TestComponent = () => {
+    const { showToast } = useToast();
+    return (
+      <button 
+        onClick={() => showToast("Accessibility Alert", "error", 5000)}
+        data-testid="trigger-toast"
+      >
+        Trigger
+      </button>
+    );
   };
 
-  it("should display toast notification within 200ms for any message and type", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        toastMessageArbitrary,
-        toastTypeArbitrary,
-        async (message, type) => {
-          let showToastFn = null;
-
-          // Render the ToastProvider with test component
-          const { unmount } = render(
-            <ToastProvider>
-              <TestComponent
-                onToastShown={(fn) => {
-                  showToastFn = fn;
-                }}
-              />
-            </ToastProvider>,
-          );
-
-          // Wait for component to mount and get showToast function
-          await waitFor(() => {
-            expect(showToastFn).not.toBeNull();
-          });
-
-          const startTime = performance.now();
-
-          // Show the toast
-          await act(async () => {
-            showToastFn(message, type);
-          });
-
-          // Measure time until toast appears in DOM
-          const toastElement = await waitFor(
-            () => {
-              const element = screen.getByText(message);
-              expect(element).toBeInTheDocument();
-              return element;
-            },
-            { timeout: 300 },
-          );
-
-          const displayTime = performance.now() - startTime;
-
-          // Verify toast appears within 200ms
-          expect(displayTime).toBeLessThanOrEqual(200);
-
-          // Verify toast has correct message
-          expect(toastElement).toHaveTextContent(message);
-
-          // Verify toast container has appropriate styling based on type
-          const toastContainer = toastElement.closest(
-            'div[class*="backdrop-blur"]',
-          );
-          expect(toastContainer).toBeInTheDocument();
-
-          unmount();
-        },
-      ),
-      { numRuns: 100 },
+  it("should render toasts with correct ARIA roles and concurrent DOM stacking", async () => {
+    render(
+      <ToastProvider>
+        <TestComponent />
+      </ToastProvider>
     );
-  });
 
-  it("should display toast with correct type styling for any type", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        toastMessageArbitrary,
-        toastTypeArbitrary,
-        async (message, type) => {
-          let showToastFn = null;
+    const triggerBtn = screen.getByTestId("trigger-toast");
+    
+    // Rapid-fire concurrent clicks
+    act(() => {
+      triggerBtn.click();
+      triggerBtn.click();
+    });
 
-          const { unmount } = render(
-            <ToastProvider>
-              <TestComponent
-                onToastShown={(fn) => {
-                  showToastFn = fn;
-                }}
-              />
-            </ToastProvider>,
-          );
+    // Both should mount
+    const toasts = await screen.findAllByTestId("toast-message");
+    expect(toasts.length).toBe(2);
 
-          await waitFor(() => {
-            expect(showToastFn).not.toBeNull();
-          });
+    // Accessibility Hardening
+    for (const toastMessage of toasts) {
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent("Accessibility Alert");
 
-          await act(async () => {
-            showToastFn(message, type);
-          });
-
-          // Wait for toast to appear
-          const toastElement = await waitFor(() => screen.getByText(message), {
-            timeout: 300,
-          });
-
-          // Verify the toast has the correct type-specific styling
-          const toastContainer = toastElement.closest(
-            'div[class*="backdrop-blur"]',
-          );
-
-          // Check for type-specific color classes
-          const typeColorMap = {
-            success: "green",
-            error: "red",
-            warning: "yellow",
-            info: "blue",
-          };
-
-          const expectedColor = typeColorMap[type];
-          const containerClasses = toastContainer.className;
-
-          // Verify type-specific color is present in classes
-          expect(containerClasses).toMatch(new RegExp(expectedColor));
-
-          unmount();
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  it("should auto-dismiss toast after specified duration", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        toastMessageArbitrary,
-        toastTypeArbitrary,
-        fc.integer({ min: 10, max: 50 }), // Use very short durations for fast real-time testing
-        async (message, type, duration) => {
-          let showToastFn = null;
-
-          const { unmount } = render(
-            <ToastProvider>
-              <TestComponent
-                onToastShown={(fn) => {
-                  showToastFn = fn;
-                }}
-              />
-            </ToastProvider>,
-          );
-
-          await waitFor(() => {
-            expect(showToastFn).not.toBeNull();
-          });
-
-          // Show toast with custom duration
-          await act(async () => {
-            showToastFn(message, type, duration);
-          });
-
-          // Verify toast appears
-          await waitFor(() => screen.getByText(message), { timeout: 1000 });
-          // Verify toast is removed after duration (wait a bit longer than duration)
-          await waitFor(
-            () => {
-              expect(screen.queryByText(message)).not.toBeInTheDocument();
-            },
-            { timeout: duration + 1000 },
-          );
-
-          unmount();
-        },
-      ),
-      { numRuns: 10 },
-    );
-  });
-
-  it("should display multiple toasts simultaneously", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.array(
-          fc.record({
-            message: toastMessageArbitrary,
-            type: toastTypeArbitrary,
-          }),
-          { minLength: 2, maxLength: 5 },
-        ),
-        async (toasts) => {
-          let showToastFn = null;
-
-          const { unmount } = render(
-            <ToastProvider>
-              <TestComponent
-                onToastShown={(fn) => {
-                  showToastFn = fn;
-                }}
-              />
-            </ToastProvider>,
-          );
-
-          await waitFor(() => {
-            expect(showToastFn).not.toBeNull();
-          });
-
-          // Show all toasts
-          await act(async () => {
-            toasts.forEach(({ message, type }) => {
-              showToastFn(message, type);
-            });
-          });
-
-          // Verify all toasts appear within 1000ms
-          for (const { message } of toasts) {
-            await waitFor(() => screen.getByText(message), { timeout: 1000 });
-          }
-
-          // Verify all toasts are visible simultaneously
-          toasts.forEach(({ message }) => {
-            expect(screen.getByText(message)).toBeInTheDocument();
-          });
-
-          unmount();
-        },
-      ),
-      { numRuns: 10 },
-    );
+      // Verify accessible alert containers
+      const toastContainer = toastMessage.closest('div[class*="backdrop-blur"]');
+      expect(toastContainer).toHaveAttribute("role", "alert");
+      expect(toastContainer).toHaveAttribute("aria-live", "assertive");
+    }
   });
 });

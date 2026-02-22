@@ -98,7 +98,7 @@ const ForgotPassword = () => {
         </div>
 
         {!submitted ? (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="glass-card p-8 rounded-2xl space-y-6">
               {/* Email Field */}
               <div>

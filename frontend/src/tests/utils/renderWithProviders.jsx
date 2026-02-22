@@ -1,9 +1,11 @@
+import { vi } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "../../contexts/ThemeProvider";
-import { AuthProvider } from "../../contexts/AuthContext";
 import { ToastProvider } from "../../contexts/ToastContext";
+import { AuthContext } from "../../contexts/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 
 /**
@@ -21,6 +23,8 @@ export const renderWithProviders = (
   ui,
   {
     authenticated = false,
+    user = null,
+    loading = false,
     route = "/",
     ...renderOptions
   } = {},
@@ -38,12 +42,15 @@ export const renderWithProviders = (
     },
   });
 
-  // 2. Handle specific Auth State Deterministically via Storage Only
-  if (authenticated) {
-    localStorage.setItem("token", "deterministic-test-token");
-  } else {
-    localStorage.removeItem("token");
-  }
+  // 2. Derive Auth State Deterministically via Context Injection (Cookie/Session Mode)
+  const authContextValue = {
+    isAuthenticated: authenticated,
+    user: authenticated ? (user || { _id: "mock-id", username: "testuser" }) : null,
+    loading: loading,
+    login: vi.fn(),
+    logout: vi.fn(),
+    register: vi.fn(),
+  };
 
   // 4. Wrap component in all required specific providers
   const Wrapper = ({ children }) => {
@@ -52,9 +59,10 @@ export const renderWithProviders = (
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <ToastProvider>
-              <AuthProvider>
+              <AuthContext.Provider value={authContextValue}>
+                <Toaster />
                 {children}
-              </AuthProvider>
+              </AuthContext.Provider>
             </ToastProvider>
           </ThemeProvider>
         </QueryClientProvider>

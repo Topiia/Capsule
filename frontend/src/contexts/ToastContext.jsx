@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useReducer, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import Toast from "../components/UI/Toast";
 
@@ -13,24 +13,23 @@ export const useToast = () => {
   return context;
 };
 
+import { toastReducer, TOAST_ACTIONS } from "../reducers/toastReducer";
+
 export const ToastProvider = ({ children }) => {
-  const [toasts, setToasts] = useState([]);
+  const [toasts, dispatch] = useReducer(toastReducer, []);
 
   const showToast = useCallback((message, type = "info", duration = 3000) => {
     const id = Date.now() + Math.random();
-    const newToast = { id, message, type, duration };
-
-    setToasts((prev) => [...prev, newToast]);
-
+    dispatch({ type: TOAST_ACTIONS.SHOW, payload: { id, message, type, duration } });
     return id;
   }, []);
 
   const hideToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    dispatch({ type: TOAST_ACTIONS.HIDE, payload: { id } });
   }, []);
 
   const clearAllToasts = useCallback(() => {
-    setToasts([]);
+    dispatch({ type: TOAST_ACTIONS.CLEAR });
   }, []);
 
   return (

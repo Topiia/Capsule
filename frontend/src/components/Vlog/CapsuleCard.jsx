@@ -207,7 +207,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 ) : (
                   <HeartIcon className="w-3 h-3" />
                 )}
-                <span>{formatNumber(likeCount)}</span>
+                <span data-testid="like-count">{formatNumber(likeCount)}</span>
               </div>
             </div>
           </div>
@@ -292,11 +292,18 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
           )}
 
           {/* Action Buttons */}
-          <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div data-testid="overlay-actions" className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <motion.button
               onClick={handleLike}
               disabled={isLiking}
               title={
+                !isAuthenticated
+                  ? "Login to interact"
+                  : isLiked
+                    ? "Unlike"
+                    : "Like"
+              }
+              aria-label={
                 !isAuthenticated
                   ? "Login to interact"
                   : isLiked
@@ -337,6 +344,13 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                     ? "Remove dislike"
                     : "Dislike"
               }
+              aria-label={
+                !isAuthenticated
+                  ? "Login to interact"
+                  : isDisliked
+                    ? "Remove dislike"
+                    : "Dislike"
+              }
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               animate={isDisliking ? { scale: [1, 1.1, 1] } : {}}
@@ -347,6 +361,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                   ? "bg-gradient-to-r from-[var(--theme-accent)] to-[var(--theme-secondary)] text-white shadow-lg"
                   : "bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/20"
                 } ${isDisliking ? "opacity-50 cursor-not-allowed" : ""}`}
+              data-testid="dislike-button"
               style={
                 !isDisliked
                   ? {
@@ -368,6 +383,13 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
               onClick={handleBookmark}
               disabled={isBookmarking}
               title={
+                !isAuthenticated
+                  ? "Login to interact"
+                  : isBookmarked
+                    ? "Remove bookmark"
+                    : "Bookmark"
+              }
+              aria-label={
                 !isAuthenticated
                   ? "Login to interact"
                   : isBookmarked
@@ -473,7 +495,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
           )}
 
           {/* Stats and Actions */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between" data-testid="action-bar">
             <div className="flex items-center space-x-4 text-sm text-[var(--theme-text-secondary)]">
               <div className="flex items-center space-x-1">
                 <EyeIcon className="w-4 h-4" />
@@ -491,6 +513,13 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 onClick={handleLike}
                 disabled={isLiking}
                 title={
+                  !isAuthenticated
+                    ? "Login to interact"
+                    : isLiked
+                      ? "Unlike"
+                      : "Like"
+                }
+                aria-label={
                   !isAuthenticated
                     ? "Login to interact"
                     : isLiked
@@ -517,6 +546,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                   )}
                 </motion.div>
                 <motion.span
+                  data-testid="like-count"
                   key={likeCount}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -531,6 +561,13 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 onClick={handleDislike}
                 disabled={isDisliking}
                 title={
+                  !isAuthenticated
+                    ? "Login to interact"
+                    : isDisliked
+                      ? "Remove dislike"
+                      : "Dislike"
+                }
+                aria-label={
                   !isAuthenticated
                     ? "Login to interact"
                     : isDisliked
@@ -591,6 +628,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 title={!isAuthenticated ? "Login to interact" : "Share"}
+                aria-label={!isAuthenticated ? "Login to interact" : "Share"}
               >
                 <Button
                   size="sm"
@@ -598,6 +636,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                   leftIcon={<ShareIcon className="w-4 h-4" />}
                   onClick={handleShare}
                   disabled={isSharing}
+                  data-testid="share-button"
                 >
                   {isSharing ? "Sharing..." : "Share"}
                 </Button>

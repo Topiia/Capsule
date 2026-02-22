@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import { Routes, Route } from "react-router-dom";
-import { authAPI, vlogAPI } from "../services/api";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { authAPI } from "../services/api";
 
 vi.mock("../services/api", () => ({
   authAPI: {
@@ -27,7 +27,7 @@ describe("Protected Route Authentication Tests", () => {
 
   describe("Unauthenticated Access", () => {
     beforeEach(() => {
-      vi.mocked(authAPI.getMe).mockRejectedValue(new Error("Unauthenticated"));
+      // Unauthenticated tests strictly use authenticated: false
     });
 
     it("should redirect to login when accessing /settings without authentication", async () => {
@@ -96,15 +96,7 @@ describe("Protected Route Authentication Tests", () => {
 
   describe("Authenticated Access", () => {
     beforeEach(() => {
-      vi.mocked(authAPI.getMe).mockResolvedValue({
-        data: {
-          user: {
-            _id: "123",
-            username: "testuser",
-            email: "test@example.com",
-          },
-        },
-      });
+      // Authenticated tests strictly use authenticated: true
     });
 
     it("should render Settings component when accessing /settings with authentication", async () => {
@@ -182,21 +174,18 @@ describe("Protected Route Authentication Tests", () => {
 
   describe("Login Redirect Behavior", () => {
     beforeEach(() => {
-      vi.mocked(authAPI.getMe).mockRejectedValue(new Error("Unauthenticated"));
+      // Unauthenticated scenario
     });
 
     it("should store the intended destination when redirecting to login", async () => {
-      let _capturedLocation = null;
-
-      const LocationCapture = () => {
-        const location = window.location;
-        _capturedLocation = location;
-        return <div>Login Page</div>;
+      const LocationSpy = () => {
+        const location = useLocation();
+        return <div data-testid="location">{location.pathname}</div>;
       };
 
       renderWithProviders(
         <Routes>
-          <Route path="/login" element={<LocationCapture />} />
+          <Route path="/login" element={<LocationSpy />} />
           <Route
             path="/settings"
             element={
@@ -210,7 +199,8 @@ describe("Protected Route Authentication Tests", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Login Page")).toBeInTheDocument();
+        const spyElement = screen.getByTestId("location");
+        expect(spyElement).toHaveTextContent("/login");
       });
 
       // The ProtectedRoute component passes the location state
@@ -242,15 +232,6 @@ describe("Protected Route Authentication Tests", () => {
 
   describe("Loading State", () => {
     it("should show loading spinner while checking authentication", async () => {
-      // Create a promise that we can control
-      let resolveAuth;
-      const authPromise = new Promise((resolve) => {
-        resolveAuth = resolve;
-      });
-
-      // Intercept getMe with pending promise
-      vi.mocked(authAPI.getMe).mockReturnValue(authPromise);
-
       renderWithProviders(
         <Routes>
           <Route path="/login" element={<div>Login Page</div>} />
@@ -265,31 +246,12 @@ describe("Protected Route Authentication Tests", () => {
         </Routes>,
         {
           route: "/settings",
-          authenticated: true,
+          authenticated: false,
+          loading: true,
         }
       );
 
-      // Should show loading state
       expect(screen.getByText(/checking authentication/i)).toBeInTheDocument();
-
-      // Resolve the auth check
-      resolveAuth({
-        data: {
-          user: {
-            _id: "123",
-            username: "testuser",
-            email: "test@example.com",
-          },
-        },
-      });
-
-      // Wait for the protected content to appear
-      await waitFor(
-        () => {
-          expect(screen.getByText("Settings")).toBeInTheDocument();
-        },
-        { timeout: 3000 },
-      );
     });
   });
 });

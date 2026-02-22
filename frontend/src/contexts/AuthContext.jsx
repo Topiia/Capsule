@@ -11,7 +11,7 @@ import {
 import { authAPI } from "../services/api";
 import toast from "react-hot-toast";
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -409,5 +409,19 @@ export const AuthProvider = ({ children }) => {
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {/* AUTH-READY SENTINEL: hidden marker that appears only after async auth initialization
+          completes. Tests use `await screen.findByTestId("auth-ready")` as a deterministic
+          wait boundary before asserting on auth-dependent UI. Zero visual/a11y impact. */}
+      {!loading && (
+        <div
+          data-testid="auth-ready"
+          style={{ display: "none" }}
+          aria-hidden="true"
+        />
+      )}
+      {children}
+    </AuthContext.Provider>
+  );
 };

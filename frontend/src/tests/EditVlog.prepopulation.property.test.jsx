@@ -1,356 +1,121 @@
-/**
- * **Feature: vlog-edit-delete, Property 2: Edit form pre-population**
- * **Validates: Requirements 1.2**
- *
- * Property: For any vlog, when navigating to the edit page, all form fields
- * should be populated with the vlog's current data (title, description,
- * category, tags, images)
- */
-
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../contexts/AuthContext";
-import EditVlog from "../pages/EditVlog";
+import EditCapsule from "../pages/EditCapsule";
+import { mapVlogToFormData } from "../utils/vlogTransformers";
 import * as fc from "fast-check";
-import { vlogAPI } from "../services/api";
+import { vlogAPI, authAPI } from "../services/api";
 
-// Mock the API
+// Mock API for integration tests: MUST be at top level
 vi.mock("../services/api", () => ({
-  vlogAPI: {
-    getVlog: vi.fn(),
-    updateVlog: vi.fn(),
-  },
-  uploadAPI: {
-    uploadMultiple: vi.fn(),
-  },
-  authAPI: {
-    setAuthHeader: vi.fn(),
-    getMe: vi.fn(),
-  },
+  vlogAPI: { getVlog: vi.fn(), updateVlog: vi.fn() },
+  uploadAPI: { uploadMultiple: vi.fn() },
+  authAPI: { setAuthHeader: vi.fn(), getMe: vi.fn() },
 }));
 
-// Mock react-hot-toast
-vi.mock("react-hot-toast", () => ({
-  default: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-global.localStorage = localStorageMock;
-
-describe("EditVlog Form Pre-population Property Test", () => {
-  let queryClient;
-
-  beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-    vi.clearAllMocks();
-  });
-
+describe("Layer A: EditVlog Pure State Transformations", () => {
   // Generator for MongoDB ObjectId (24 character hex string)
   const objectIdArbitrary = fc
     .array(fc.integer({ min: 0, max: 15 }), { minLength: 24, maxLength: 24 })
     .map((arr) => arr.map((n) => n.toString(16)).join(""));
 
-  // Generator for valid vlog data
-  const vlogArbitrary = fc.record({
+  const validVlogArbitrary = fc.record({
     _id: objectIdArbitrary,
-    title: fc.string({ minLength: 3, maxLength: 100 }),
-    description: fc.string({ minLength: 10, maxLength: 2000 }),
-    content: fc.option(fc.string({ maxLength: 10000 }), { nil: "" }),
-    category: fc.constantFrom(
-      "technology",
-      "travel",
-      "lifestyle",
-      "food",
-      "fashion",
-      "fitness",
-      "music",
-      "art",
-      "business",
-      "education",
-      "entertainment",
-      "gaming",
-      "sports",
-      "health",
-      "science",
-      "photography",
-      "diy",
-      "other",
-    ),
-    tags: fc.array(fc.string({ minLength: 1, maxLength: 30 }), {
-      maxLength: 10,
-    }),
-    images: fc.array(
-      fc.record({
-        url: fc.webUrl(),
-        publicId: fc.string({ minLength: 10, maxLength: 50 }),
-        caption: fc.string({ maxLength: 200 }),
-        order: fc.nat(),
-      }),
-      { maxLength: 10 },
-    ),
-    isPublic: fc.boolean(),
-    author: fc.record({
-      _id: objectIdArbitrary,
-      username: fc.string({ minLength: 3, maxLength: 30 }),
-      email: fc.emailAddress(),
-    }),
-    views: fc.nat(),
-    likes: fc.array(objectIdArbitrary),
-    createdAt: fc.date(),
-    updatedAt: fc.date(),
+    title: fc.string(),
+    description: fc.string(),
+    content: fc.option(fc.string(), { nil: undefined }),
+    category: fc.constantFrom("technology", "travel", "lifestyle", "food", "other"),
+    tags: fc.option(fc.array(fc.string()), { nil: undefined }),
+    images: fc.option(fc.array(fc.record({ url: fc.webUrl() })), { nil: undefined }),
+    isPublic: fc.option(fc.boolean(), { nil: undefined }),
   });
 
-  const renderEditVlog = (vlogId, userId) => {
-    // Mock localStorage to return a token
-    localStorageMock.getItem.mockReturnValue("mock-token");
+  it("should map any vlog perfectly to the target form data shape", () => {
+    fc.assert(
+      fc.property(validVlogArbitrary, (vlog) => {
+        const formData = mapVlogToFormData(vlog);
 
-    // Mock authAPI.getMe to return a user
-    const { authAPI } = require("../services/api");
-    authAPI.getMe.mockResolvedValue({
-      data: {
-        user: {
-          id: userId,
-          username: "testuser",
-          email: "test@example.com",
-        },
-      },
-    });
+        // Core Invariants
+        // 1. Never return undefined for text fields; fallback to empty string
+        expect(formData.title).toBe(vlog.title || "");
+        expect(formData.description).toBe(vlog.description || "");
+        expect(formData.content).toBe(vlog.content || "");
+        expect(formData.category).toBe(vlog.category || "");
 
-    return render(
+        // 2. Tags should always be joined safely or empty string
+        if (Array.isArray(vlog.tags)) {
+          expect(formData.tags).toBe(vlog.tags.join(", "));
+        } else {
+          expect(formData.tags).toBe("");
+        }
+
+        // 3. Fallbacks should handle booleans and arrays cleanly without throwing
+        expect(formData.isPublic).toBe(vlog.isPublic ?? true);
+        expect(formData.images).toEqual(vlog.images || []);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should handle completely empty null/undefined inputs", () => {
+    expect(mapVlogToFormData(null)).toBeNull();
+    expect(mapVlogToFormData(undefined)).toBeNull();
+  });
+});
+
+describe("Layer C: EditVlog Form Pre-population DOM Integration", () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
+  const mockVlog = {
+    _id: "60d21b4667d0d8992e610c85",
+    title: "Deterministic UI Test Vlog",
+    description: "This is a deterministic test for the DOM prepopulation.",
+    content: "Content section goes here.",
+    category: "technology",
+    tags: ["react", "testing"],
+    isPublic: false,
+    images: [],
+    author: { _id: "60d21b4667d0d8992e610c85", username: "testuser" }
+  };
+
+  it("should faithfully render the mapped form data into the DOM inputs", async () => {
+    authAPI.getMe.mockResolvedValue({ data: { user: { id: mockVlog.author._id } } });
+    vlogAPI.getVlog.mockResolvedValue({ data: { data: mockVlog } });
+    global.localStorage = { getItem: vi.fn().mockReturnValue("token"), setItem: vi.fn() };
+
+    render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <MemoryRouter initialEntries={[`/vlog/${vlogId}/edit`]}>
+          <MemoryRouter initialEntries={[`/vlog/${mockVlog._id}/edit`]}>
             <Routes>
-              <Route path="/vlog/:id/edit" element={<EditVlog />} />
+              <Route path="/vlog/:id/edit" element={<EditCapsule />} />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
-  };
 
-  it("should pre-populate all form fields with vlog data for any vlog", async () => {
-    await fc.assert(
-      fc.asyncProperty(vlogArbitrary, async (vlog) => {
-        // Setup: Mock API to return the generated vlog
-        vlogAPI.getVlog.mockResolvedValue({
-          data: { data: vlog },
-        });
+    // Wait for auth initialization to fully commit before asserting form values.
+    // AuthProvider.getMe() is async; the auth-ready sentinel appears only after loading=false,
+    // preventing EditCapsule's useEffect auth-check redirect from firing mid-assertion.
+    await screen.findByTestId("auth-ready");
 
-        // Render the component with the vlog author as the current user
-        const { container } = renderEditVlog(vlog._id, vlog.author._id);
+    // Assert Form population - wait for React Hook Form to set data
+    await waitFor(() => {
+      expect(screen.getByLabelText(/title/i)).toHaveValue("Deterministic UI Test Vlog");
+    });
 
-        // Wait for the vlog data to load
-        await waitFor(() => {
-          expect(vlogAPI.getVlog).toHaveBeenCalledWith(vlog._id);
-        });
+    expect(screen.getByLabelText(/description/i)).toHaveValue(mockVlog.description);
+    expect(screen.getByLabelText(/content/i)).toHaveValue(mockVlog.content);
+    expect(screen.getByLabelText(/category/i)).toHaveValue(mockVlog.category);
+    expect(screen.getByLabelText(/tags/i)).toHaveValue("react, testing");
 
-        // Wait for form to be populated
-        await waitFor(() => {
-          const titleInput = container.querySelector("#title");
-          expect(titleInput).toBeTruthy();
-          expect(titleInput.value).toBe(vlog.title);
-        });
-
-        // Verify all form fields are populated correctly
-        const titleInput = container.querySelector("#title");
-        const descriptionInput = container.querySelector("#description");
-        const contentInput = container.querySelector("#content");
-        const categoryInput = container.querySelector("#category");
-        const tagsInput = container.querySelector("#tags");
-
-        // Check title
-        expect(titleInput.value).toBe(vlog.title);
-
-        // Check description
-        expect(descriptionInput.value).toBe(vlog.description);
-
-        // Check content
-        expect(contentInput.value).toBe(vlog.content || "");
-
-        // Check category
-        expect(categoryInput.value).toBe(vlog.category);
-
-        // Check tags (should be comma-separated)
-        const expectedTags = vlog.tags?.join(", ") || "";
-        expect(tagsInput.value).toBe(expectedTags);
-
-        // Check images are displayed
-        if (vlog.images && vlog.images.length > 0) {
-          await waitFor(() => {
-            const images = container.querySelectorAll('img[alt^="Image"]');
-            expect(images.length).toBe(vlog.images.length);
-          });
-        }
-
-        // Check isPublic radio buttons
-        const publicRadio = container.querySelector(
-          'input[type="radio"][value="true"]',
-        );
-        const privateRadio = container.querySelector(
-          'input[type="radio"][value="false"]',
-        );
-
-        if (vlog.isPublic) {
-          expect(publicRadio.checked).toBe(true);
-        } else {
-          expect(privateRadio.checked).toBe(true);
-        }
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("should handle vlogs with empty optional fields", async () => {
-    const objectIdArbitrary = fc
-      .array(fc.integer({ min: 0, max: 15 }), { minLength: 24, maxLength: 24 })
-      .map((arr) => arr.map((n) => n.toString(16)).join(""));
-
-    await fc.assert(
-      fc.asyncProperty(
-        fc.record({
-          _id: objectIdArbitrary,
-          title: fc.string({ minLength: 3, maxLength: 100 }),
-          description: fc.string({ minLength: 10, maxLength: 2000 }),
-          content: fc.constant(""),
-          category: fc.constantFrom("technology", "travel", "lifestyle"),
-          tags: fc.constant([]),
-          images: fc.constant([]),
-          isPublic: fc.boolean(),
-          author: fc.record({
-            _id: objectIdArbitrary,
-            username: fc.string({ minLength: 3, maxLength: 30 }),
-            email: fc.emailAddress(),
-          }),
-          views: fc.nat(),
-          likes: fc.array(objectIdArbitrary),
-          createdAt: fc.date(),
-          updatedAt: fc.date(),
-        }),
-        async (vlog) => {
-          vlogAPI.getVlog.mockResolvedValue({
-            data: { data: vlog },
-          });
-
-          const { container } = renderEditVlog(vlog._id, vlog.author._id);
-
-          await waitFor(() => {
-            expect(vlogAPI.getVlog).toHaveBeenCalledWith(vlog._id);
-          });
-
-          await waitFor(() => {
-            const titleInput = container.querySelector("#title");
-            expect(titleInput).toBeTruthy();
-            expect(titleInput.value).toBe(vlog.title);
-          });
-
-          const contentInput = container.querySelector("#content");
-          const tagsInput = container.querySelector("#tags");
-
-          // Empty content should be empty string
-          expect(contentInput.value).toBe("");
-
-          // Empty tags should be empty string
-          expect(tagsInput.value).toBe("");
-
-          // No images should be displayed
-          const images = container.querySelectorAll('img[alt^="Image"]');
-          expect(images.length).toBe(0);
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  it("should handle vlogs with maximum allowed values", async () => {
-    const objectIdArbitrary = fc
-      .array(fc.integer({ min: 0, max: 15 }), { minLength: 24, maxLength: 24 })
-      .map((arr) => arr.map((n) => n.toString(16)).join(""));
-
-    await fc.assert(
-      fc.asyncProperty(
-        fc.record({
-          _id: objectIdArbitrary,
-          title: fc.string({ minLength: 100, maxLength: 100 }),
-          description: fc.string({ minLength: 2000, maxLength: 2000 }),
-          content: fc.string({ minLength: 10000, maxLength: 10000 }),
-          category: fc.constantFrom("technology", "travel"),
-          tags: fc.array(fc.string({ minLength: 30, maxLength: 30 }), {
-            minLength: 10,
-            maxLength: 10,
-          }),
-          images: fc.array(
-            fc.record({
-              url: fc.webUrl(),
-              publicId: fc.string({ minLength: 10, maxLength: 50 }),
-              caption: fc.string({ maxLength: 200 }),
-              order: fc.nat(),
-            }),
-            { minLength: 10, maxLength: 10 },
-          ),
-          isPublic: fc.boolean(),
-          author: fc.record({
-            _id: objectIdArbitrary,
-            username: fc.string({ minLength: 3, maxLength: 30 }),
-            email: fc.emailAddress(),
-          }),
-          views: fc.nat(),
-          likes: fc.array(objectIdArbitrary),
-          createdAt: fc.date(),
-          updatedAt: fc.date(),
-        }),
-        async (vlog) => {
-          vlogAPI.getVlog.mockResolvedValue({
-            data: { data: vlog },
-          });
-
-          const { container } = renderEditVlog(vlog._id, vlog.author._id);
-
-          await waitFor(() => {
-            expect(vlogAPI.getVlog).toHaveBeenCalledWith(vlog._id);
-          });
-
-          await waitFor(() => {
-            const titleInput = container.querySelector("#title");
-            expect(titleInput).toBeTruthy();
-            expect(titleInput.value).toBe(vlog.title);
-          });
-
-          const titleInput = container.querySelector("#title");
-          const descriptionInput = container.querySelector("#description");
-          const contentInput = container.querySelector("#content");
-          const tagsInput = container.querySelector("#tags");
-
-          // All fields should be populated with maximum values
-          expect(titleInput.value.length).toBe(100);
-          expect(descriptionInput.value.length).toBe(2000);
-          expect(contentInput.value.length).toBe(10000);
-          expect(tagsInput.value.split(", ").length).toBe(10);
-
-          // Maximum images should be displayed
-          await waitFor(() => {
-            const images = container.querySelectorAll('img[alt^="Image"]');
-            expect(images.length).toBe(10);
-          });
-        },
-      ),
-      { numRuns: 100 },
-    );
+    // Public/Private Radio validation
+    const privateRadio = screen.getByDisplayValue("false");
+    expect(privateRadio).toBeChecked();
   });
 });

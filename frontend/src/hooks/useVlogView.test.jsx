@@ -65,7 +65,7 @@ describe("useVlogView Hook", () => {
     });
   });
 
-  it("should NOT call recordView when user is not logged in", async () => {
+  it("should call recordView even when user is not logged in", async () => {
     useAuth.mockReturnValue({
       isAuthenticated: false,
     });
@@ -77,7 +77,7 @@ describe("useVlogView Hook", () => {
     });
 
     await waitFor(() => {
-      expect(vlogAPI.recordView).not.toHaveBeenCalled();
+      expect(vlogAPI.recordView).toHaveBeenCalledWith(vlogId);
     });
   });
 

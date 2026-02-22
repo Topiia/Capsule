@@ -55,9 +55,7 @@ describe("API Error Handling Integration Tests", () => {
       }
     });
 
-    it("should handle 401 Unauthorized and clear auth data", async () => {
-      localStorage.setItem("token", "test-token");
-      localStorage.setItem("refreshToken", "test-refresh");
+    it("should handle 401 Unauthorized and direct to login", async () => {
       window.location.pathname = "/dashboard";
 
       mock.onGet("/test").reply(401, { message: "Token expired" });
@@ -67,8 +65,6 @@ describe("API Error Handling Integration Tests", () => {
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error.message).toBe("Token expired");
-        expect(localStorage.getItem("token")).toBeNull();
-        expect(localStorage.getItem("refreshToken")).toBeNull();
         expect(window.location.href).toBe("/login");
       }
     });

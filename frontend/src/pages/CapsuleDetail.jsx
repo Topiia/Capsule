@@ -186,7 +186,7 @@ const CapsuleDetail = () => {
     );
   }
 
-  const isOwner = user && vlog.author && user.id === vlog.author._id;
+  const isOwner = user && vlog.author && (user._id || user.id) === (vlog.author._id || vlog.author.id);
 
   return (
     <div className="w-full">
