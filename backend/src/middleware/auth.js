@@ -141,9 +141,11 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
     // SECURITY: Check if session has been revoked (compromise or logout)
     if (user.revokedAt) {
-      console.warn(
-        `[SECURITY] Attempted use of revoked token - User: ${user.username}, TokenFamily: ${tokenFamily}`,
-      );
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(
+          `[SECURITY] Attempted use of revoked token - User: ${user.username}, TokenFamily: ${tokenFamily}`,
+        );
+      }
       return next(
         new ErrorResponse(
           'Session has been revoked. Please log in again.',
@@ -154,9 +156,11 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
     // SECURITY: Verify token family matches (prevents cross-session token use)
     if (user.tokenFamily !== tokenFamily) {
-      console.warn(
-        `[SECURITY] Token family mismatch - User: ${user.username}, Expected: ${user.tokenFamily}, Got: ${tokenFamily}`,
-      );
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(
+          `[SECURITY] Token family mismatch - User: ${user.username}, Expected: ${user.tokenFamily}, Got: ${tokenFamily}`,
+        );
+      }
       return next(new ErrorResponse('Invalid refresh token', 401));
     }
 
@@ -168,7 +172,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     );
 
     if (!isValidToken) {
-      console.warn(`[SECURITY] Token hash mismatch - User: ${user.username}`);
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(`[SECURITY] Token hash mismatch - User: ${user.username}`);
+      }
       return next(new ErrorResponse('Invalid refresh token', 401));
     }
 
@@ -176,12 +182,14 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     // If stored version > presented version, token is old (already used)
     // This indicates compromise - revoke all sessions immediately
     if (user.tokenVersion > tokenVersion) {
-      console.error(
-        `[SECURITY BREACH] Token reuse detected - User: ${user.username}, Stored: ${user.tokenVersion}, Presented: ${tokenVersion}`,
-      );
-      console.error(
-        `[SECURITY BREACH] Revoking all sessions for user: ${user.username}`,
-      );
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(
+          `[SECURITY BREACH] Token reuse detected - User: ${user.username}, Stored: ${user.tokenVersion}, Presented: ${tokenVersion}`,
+        );
+        console.error(
+          `[SECURITY BREACH] Revoking all sessions for user: ${user.username}`,
+        );
+      }
 
       // Revoke all active sessions
       user.revokeAllSessions();
@@ -197,9 +205,11 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
     // SECURITY: Enforce single-use - version must match exactly
     if (user.tokenVersion !== tokenVersion) {
-      console.warn(
-        `[SECURITY] Token version mismatch - User: ${user.username}, Expected: ${user.tokenVersion}, Got: ${tokenVersion}`,
-      );
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(
+          `[SECURITY] Token version mismatch - User: ${user.username}, Expected: ${user.tokenVersion}, Got: ${tokenVersion}`,
+        );
+      }
       return next(new ErrorResponse('Invalid refresh token', 401));
     }
 
@@ -231,9 +241,11 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     user.tokenVersion = newTokenVersion;
     await user.save();
 
-    console.log(
-      `[AUTH] Token refresh successful - User: ${user.username}, New version: ${newTokenVersion}`,
-    );
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(
+        `[AUTH] Token refresh successful - User: ${user.username}, New version: ${newTokenVersion}`,
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -265,7 +277,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
       );
     }
     // Other errors
-    console.error('[AUTH] Refresh token error:', error);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('[AUTH] Refresh token error:', error);
+    }
     return next(new ErrorResponse('Token refresh failed', 401));
   }
 });
