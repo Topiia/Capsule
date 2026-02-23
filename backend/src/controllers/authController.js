@@ -4,6 +4,7 @@ const User = require('../models/User');
 const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const sendEmail = require('../utils/sendEmail');
+const { queuePasswordResetEmail } = require('../queues/emailQueue');
 
 // Generate JWT Token
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -404,48 +405,25 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
   try {
-    await sendEmail({
-      to: user.email,
-      subject: 'Capsule Password Reset Request',
-      text: `Hi ${user.username},
+    await queuePasswordResetEmail(user.email, resetUrl);
 
-You are receiving this email because you (or someone else) has requested a password reset for your Capsule account.
-
-Please click the link below to reset your password:
-
-${resetUrl}
-
-This link will expire in 15 minutes.
-
-If you did not request this password reset, please ignore this email and your password will remain unchanged.
-
-Best regards,
-The Capsule Team`,
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>Hi ${user.username},</p>
-        <p>You are receiving this email because you (or someone else) has requested a password reset for your Capsule account.</p>
-        <p>Please click the button below to reset your password:</p>
-        <p style="text-align: center; margin: 30px 0;">
-          <a href="${resetUrl}" style="background-color: #DC2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Reset Password
-          </a>
-        </p>
-        <p>Or copy and paste this link into your browser:</p>
-        <p><a href="${resetUrl}">${resetUrl}</a></p>
-        <p><strong style="color: #DC2626;">⏰ This link will expire in 15 minutes.</strong></p>
-        <p>If you did not request this password reset, please ignore this email and your password will remain unchanged.</p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-        <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
-      `,
-    });
-
-    // Email sent successfully
+    // Email queued successfully
     res.status(200).json({
       success: true,
       message: 'Password reset email sent',
     });
   } catch (err) {
+    if (err.message.includes('Email queue unavailable')) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          message: 'Email service temporarily unavailable. Please try again later.',
+          code: 'EMAIL_SERVICE_UNAVAILABLE',
+          statusCode: 503,
+        },
+      });
+    }
+
     // SECURITY: Log error internally but don't expose to user
     console.error({
       level: 'error',

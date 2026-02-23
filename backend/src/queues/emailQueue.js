@@ -6,7 +6,7 @@ const { sendEmailSync } = require('../utils/sendEmailSync');
 /**
  * PERFORMANCE: Email Job Queue (Producer Only)
  *
- * This file initializes the queue producer for the API server.
+ * This file contains the queue producer factory for the API server.
  * The worker process (src/workers/emailWorker.js) handles job consumption.
  *
  * - Prevents email sending from blocking HTTP requests
@@ -18,44 +18,52 @@ const { sendEmailSync } = require('../utils/sendEmailSync');
 let emailQueue = null;
 let queueReady = false;
 
-// Initialize queue
-try {
-  emailQueue = new Queue('email', {
-    redis: emailConfig.redis,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000, // Start with 2s, then 4s, then 8s
-      },
-      removeOnComplete: true, // Clean up completed jobs
-      removeOnFail: false, // Keep failed jobs for debugging
-    },
-  });
+/**
+ * Initialize the email queue producer.
+ * Must be called explicitly during server startup.
+ * Prevents auto-connection during module import (useful for test isolation).
+ */
+exports.createEmailQueue = () => {
+  if (emailQueue) return emailQueue;
 
-  // Verify connectivity on init (async)
-  emailQueue.isReady().then(() => {
-    queueReady = true;
-    logger.info('Email queue ready (async mode enabled)', {
-      redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
+  try {
+    emailQueue = new Queue('email', {
+      redis: emailConfig.redis,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000, // Start with 2s, then 4s, then 8s
+        },
+        removeOnComplete: true, // Clean up completed jobs
+        removeOnFail: false, // Keep failed jobs for debugging
+      },
     });
-  }).catch((err) => {
+
+    // Verify connectivity on init (async)
+    emailQueue.isReady().then(() => {
+      queueReady = true;
+      logger.info('Email queue ready (async mode enabled)', {
+        redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
+      });
+    }).catch((err) => {
+      queueReady = false;
+      logger.warn('Email queue unavailable - using synchronous fallback', {
+        error: err.message,
+        impact: 'Emails will be sent synchronously (blocking)',
+      });
+    });
+  } catch (error) {
     queueReady = false;
-    logger.warn('Email queue unavailable - using synchronous fallback', {
-      error: err.message,
+    logger.warn('Bull queue initialization failed - using synchronous fallback', {
+      error: error.message,
       impact: 'Emails will be sent synchronously (blocking)',
     });
-  });
-} catch (error) {
-  queueReady = false;
-  logger.warn('Bull queue initialization failed - using synchronous fallback', {
-    error: error.message,
-    impact: 'Emails will be sent synchronously (blocking)',
-  });
-}
+  }
 
-// NOTE: Worker process registration removed
-// Email jobs are processed by separate worker: src/workers/emailWorker.js
+  return emailQueue;
+};
+
 /**
  * Queue an email for async processing
  * FALLBACK: If Redis unavailable, sends email synchronously
@@ -70,7 +78,7 @@ try {
  * @returns {Promise<object>} - Job object or fallback result
  */
 exports.queueEmail = async (emailData, priority = 5) => {
-  // GRACEFUL DEGRADATION: Use sync fallback if Redis unavailable
+  // GRACEFUL DEGRADATION: Use sync fallback if queue is not ready
   if (!queueReady || !emailQueue) {
     logger.warn('Redis unavailable - sending email synchronously (FALLBACK)', {
       to: emailData.to,
@@ -224,9 +232,9 @@ exports.cleanOldJobs = async () => {
   logger.info('Email queue cleaned');
 };
 
-// Graceful shutdown
+// Graceful shutdown (only closes if it was actually created)
 process.on('SIGTERM', async () => {
-  if (queueReady && emailQueue) {
+  if (emailQueue) {
     await emailQueue.close();
     logger.info('Email queue closed on SIGTERM');
   }

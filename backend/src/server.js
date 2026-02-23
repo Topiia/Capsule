@@ -88,13 +88,17 @@ const server = app.listen(PORT, () => {
     nodeVersion: process.version,
   });
 
-  // Start Background Workers
+  // Start Background Workers & Queues
   try {
+    // eslint-disable-next-line global-require
+    const { createEmailQueue } = require('./queues/emailQueue');
+    createEmailQueue();
+
     // eslint-disable-next-line global-require
     const moderationWorker = require('./workers/moderation.worker');
     moderationWorker.start();
   } catch (err) {
-    logger.error('Failed to start workers', err);
+    logger.error('Failed to start workers or queues', err);
   }
 });
 
