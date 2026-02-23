@@ -17,11 +17,11 @@ describe('View Count Logic - Bug Fix Verification', () => {
   describe('SUCCESS: Views increment only when intended', () => {
     test('Fetching single vlog does NOT auto-increment views', async () => {
       const mockVlog = {
-        _id: 'vlog123',
+        _id: '507f1f77bcf86cd799439012',
         title: 'Test Vlog',
         views: 100,
         author: {
-          _id: 'author123',
+          _id: '507f1f77bcf86cd799439013',
           username: 'testuser',
           followers: [],
         },
@@ -35,7 +35,7 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Like.findOne = jest.fn().mockResolvedValue(null);
 
       // Act: Fetch vlog (should NOT increment)
-      await vlogService.getVlog('vlog123', 'user123');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: No view increment calls made
       expect(Vlog.findByIdAndUpdate).not.toHaveBeenCalled();
@@ -46,19 +46,19 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Vlog.findByIdAndUpdate = jest.fn().mockResolvedValue({ views: 101 });
 
       // Act: Explicit view record
-      await vlogService.recordView('vlog123', 'user123');
+      await vlogService.recordView('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: Incremented exactly once
       expect(Vlog.findByIdAndUpdate).toHaveBeenCalledTimes(1);
-      expect(Vlog.findByIdAndUpdate).toHaveBeenCalledWith('vlog123', {
+      expect(Vlog.findByIdAndUpdate).toHaveBeenCalledWith('507f1f77bcf86cd799439012', {
         $inc: { views: 1 },
       });
     });
 
     test('Fetching vlog list does NOT increment views', async () => {
       const mockVlogs = [
-        { _id: 'vlog1', views: 50 },
-        { _id: 'vlog2', views: 75 },
+        { _id: '507f1f77bcf86cd799439014', views: 50 },
+        { _id: '507f1f77bcf86cd799439015', views: 75 },
       ];
 
       Vlog.find = jest.fn().mockReturnValue({
@@ -82,9 +82,9 @@ describe('View Count Logic - Bug Fix Verification', () => {
   describe('EDGE CASE: Prevent double increments', () => {
     test('Multiple fetches of same vlog do NOT increment views', async () => {
       const mockVlog = {
-        _id: 'vlog123',
+        _id: '507f1f77bcf86cd799439012',
         views: 100,
-        author: { _id: 'author123', followers: [] },
+        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
@@ -95,11 +95,11 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Like.findOne = jest.fn().mockResolvedValue(null);
 
       // Act: Fetch same vlog 5 times (simulating refetches)
-      await vlogService.getVlog('vlog123', 'user123');
-      await vlogService.getVlog('vlog123', 'user123');
-      await vlogService.getVlog('vlog123', 'user123');
-      await vlogService.getVlog('vlog123', 'user123');
-      await vlogService.getVlog('vlog123', 'user123');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: No increments from getVlog
       expect(Vlog.findByIdAndUpdate).not.toHaveBeenCalled();
@@ -107,9 +107,9 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
     test('React Query refetch does NOT trigger view increment', async () => {
       const mockVlog = {
-        _id: 'vlog123',
+        _id: '507f1f77bcf86cd799439012',
         views: 100,
-        author: { _id: 'author123', followers: [] },
+        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
@@ -120,7 +120,7 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Like.findOne = jest.fn().mockResolvedValue(null);
 
       // Act: Simulate refetch (cache invalidation)
-      await vlogService.getVlog('vlog123', 'user123');
+      await vlogService.getVlog('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: No auto-increment
       expect(Vlog.findByIdAndUpdate).not.toHaveBeenCalled();
@@ -128,9 +128,9 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
     test('Anonymous user vlog fetch does NOT auto-increment', async () => {
       const mockVlog = {
-        _id: 'vlog123',
+        _id: '507f1f77bcf86cd799439012',
         views: 100,
-        author: { _id: 'author123', followers: [] },
+        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
@@ -139,7 +139,7 @@ describe('View Count Logic - Bug Fix Verification', () => {
       });
 
       // Act: Fetch without userId (anonymous)
-      await vlogService.getVlog('vlog123', null);
+      await vlogService.getVlog('507f1f77bcf86cd799439012', null);
 
       // Assert: No auto-increment
       expect(Vlog.findByIdAndUpdate).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Vlog.findByIdAndUpdate = jest.fn().mockResolvedValue({ views: 101 });
 
       // Act: User opens detail page (frontend calls recordView)
-      await vlogService.recordView('vlog123', 'user123');
+      await vlogService.recordView('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: Incremented exactly once
       expect(Vlog.findByIdAndUpdate).toHaveBeenCalledTimes(1);
@@ -164,8 +164,8 @@ describe('View Count Logic - Bug Fix Verification', () => {
         .mockResolvedValueOnce({ views: 102 });
 
       // Act: Two different users view
-      await vlogService.recordView('vlog123', 'user1');
-      await vlogService.recordView('vlog123', 'user2');
+      await vlogService.recordView('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439016');
+      await vlogService.recordView('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439017');
 
       // Assert: Incremented twice (once per user)
       expect(Vlog.findByIdAndUpdate).toHaveBeenCalledTimes(2);
@@ -177,7 +177,7 @@ describe('View Count Logic - Bug Fix Verification', () => {
       Vlog.findByIdAndUpdate = jest.fn().mockResolvedValue({ views: 101 });
 
       // Act: Single recordView call
-      await vlogService.recordView('vlog123', 'user123');
+      await vlogService.recordView('507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011');
 
       // Assert: Only one increment
       expect(Vlog.findByIdAndUpdate).toHaveBeenCalledTimes(1);
