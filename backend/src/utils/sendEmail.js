@@ -30,7 +30,7 @@ const sendEmail = async (options) => {
     });
 
     // Log success in development
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
       console.log('\n✅ [EMAIL SENT via Resend]');
       console.log(`   To: ${options.to}`);
       console.log(`   Subject: ${options.subject}`);
@@ -41,16 +41,18 @@ const sendEmail = async (options) => {
     return data;
   } catch (error) {
     // Log error internally but don't expose details
-    console.error('\n❌ [EMAIL ERROR]:', error.message);
-    console.error({
-      level: 'error',
-      service: 'resend',
-      event: 'email_send_failed',
-      to: options.to,
-      subject: options.subject,
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('\n❌ [EMAIL ERROR]:', error.message);
+      console.error({
+        level: 'error',
+        service: 'resend',
+        event: 'email_send_failed',
+        to: options.to,
+        subject: options.subject,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Throw error so caller can handle
     throw new Error(`Email delivery failed: ${error.message}`);

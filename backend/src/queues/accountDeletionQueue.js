@@ -37,7 +37,9 @@ try {
 
   isQueueAvailable = true;
   logger.info('Bull account deletion queue initialized successfully');
-  console.log('[INFO] Bull account deletion queue ready');
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('[INFO] Bull account deletion queue ready');
+  }
 } catch (error) {
   isQueueAvailable = false;
   accountDeletionQueue = null;
@@ -47,7 +49,9 @@ try {
       error: error.message,
     },
   );
-  console.warn('[WARN] Bull account deletion queue unavailable');
+  if (process.env.NODE_ENV !== 'test') {
+    console.warn('[WARN] Bull account deletion queue unavailable');
+  }
 }
 
 // Process asset cleanup jobs (only if queue is available)

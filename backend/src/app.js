@@ -19,7 +19,7 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const mongoose = require('mongoose');
-const statusMonitor = require('express-status-monitor');
+const statusMonitor = process.env.NODE_ENV !== 'test' ? require('express-status-monitor') : null;
 
 // OBSERVABILITY: Structured logging
 const { correlationMiddleware } = require('./middleware/correlation');
@@ -114,33 +114,35 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // OBSERVABILITY: Real-time monitoring dashboard (accessible at /status)
-app.use(
-  statusMonitor({
-    title: 'Capsule Status',
-    path: '/status',
-    spans: [
-      { interval: 1, retention: 60 },
-      { interval: 5, retention: 60 },
-      { interval: 15, retention: 60 },
-    ],
-    chartVisibility: {
-      cpu: true,
-      mem: true,
-      load: true,
-      responseTime: true,
-      rps: true,
-      statusCodes: true,
-    },
-    healthChecks: [
-      {
-        protocol: 'http',
-        host: 'localhost',
-        path: '/health',
-        port: process.env.PORT || 5000,
+if (process.env.NODE_ENV !== 'test' && statusMonitor) {
+  app.use(
+    statusMonitor({
+      title: 'Capsule Status',
+      path: '/status',
+      spans: [
+        { interval: 1, retention: 60 },
+        { interval: 5, retention: 60 },
+        { interval: 15, retention: 60 },
+      ],
+      chartVisibility: {
+        cpu: true,
+        mem: true,
+        load: true,
+        responseTime: true,
+        rps: true,
+        statusCodes: true,
       },
-    ],
-  }),
-);
+      healthChecks: [
+        {
+          protocol: 'http',
+          host: 'localhost',
+          path: '/health',
+          port: process.env.PORT || 5000,
+        },
+      ],
+    }),
+  );
+}
 
 // Rate limiting (disabled in test mode)
 if (process.env.NODE_ENV !== 'test') {

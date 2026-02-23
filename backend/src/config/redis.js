@@ -120,7 +120,9 @@ redis.connect().catch((err) => {
       code: err.code,
     },
   });
-  console.warn('[WARN] Redis unavailable - caching disabled');
+  if (process.env.NODE_ENV !== 'test') {
+    console.warn('[WARN] Redis unavailable - caching disabled');
+  }
 });
 
 /**
