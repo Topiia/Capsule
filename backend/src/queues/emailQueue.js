@@ -123,14 +123,70 @@ exports.queueEmail = async (emailData, priority = 5) => {
 exports.queueVerificationEmail = async (email, verificationUrl) => exports.queueEmail(
   {
     to: email,
-    subject: 'Email Verification - Capsule',
+    subject: 'Verify Your Email - Capsule',
     html: `
-      <h2>Welcome to Capsule!</h2>
-      <p>Please verify your email address by clicking the link below:</p>
-      <a href="${verificationUrl}">${verificationUrl}</a>
-      <p>This link will expire in 24 hours.</p>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verify Your Email</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+          <tr>
+            <td style="padding: 40px 0;">
+              <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Capsule</h1>
+                  </td>
+                </tr>
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;">Welcome to Capsule!</h2>
+                    <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                      Thank you for signing up. To get started, please verify your email address by clicking the button below.
+                    </p>
+                    <!-- CTA Button -->
+                    <table role="presentation" style="margin: 30px 0;">
+                      <tr>
+                        <td style="border-radius: 6px; background-color: #4F46E5;">
+                          <a href="${verificationUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">Verify Email Address</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      This verification link will expire in 24 hours. If you didn't create an account with Capsule, you can safely ignore this email.
+                    </p>
+                    <p style="margin: 20px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6;">
+                      If the button doesn't work, copy and paste this link into your browser:<br>
+                      <a href="${verificationUrl}" style="color: #4F46E5; word-break: break-all;">${verificationUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                    <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                      <strong>Capsule</strong> - Your vlog platform
+                    </p>
+                    <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;">
+                      You're receiving this email because you signed up for Capsule.<br>
+                      If you'd like to stop receiving these emails, you can <a href="#" style="color: #4F46E5; text-decoration: none;">unsubscribe</a>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
-    text: `Welcome to Capsule! Please verify your email: ${verificationUrl}`,
+    text: `Welcome to Capsule!\n\nThank you for signing up. Please verify your email address by visiting this link:\n\n${verificationUrl}\n\nThis link will expire in 24 hours.\n\nIf you didn't create an account with Capsule, you can safely ignore this email.\n\n---\nCapsule - Your vlog platform`,
     critical: true,
   },
   10,
@@ -142,15 +198,77 @@ exports.queueVerificationEmail = async (email, verificationUrl) => exports.queue
 exports.queuePasswordResetEmail = async (email, resetUrl) => exports.queueEmail(
   {
     to: email,
-    subject: 'Password Reset - Capsule',
+    subject: 'Reset Your Password - Capsule',
     html: `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetUrl}">${resetUrl}</a>
-      <p>This link will expire in 10 minutes.</p>
-      <p>If you didn't request this, please ignore this email.</p>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your Password</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+          <tr>
+            <td style="padding: 40px 0;">
+              <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Capsule</h1>
+                  </td>
+                </tr>
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;">Password Reset Request</h2>
+                    <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                      We received a request to reset your password. Click the button below to create a new password.
+                    </p>
+                    <!-- CTA Button -->
+                    <table role="presentation" style="margin: 30px 0;">
+                      <tr>
+                        <td style="border-radius: 6px; background-color: #4F46E5;">
+                          <a href="${resetUrl}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">Reset Password</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <!-- Security Warning -->
+                    <table role="presentation" style="margin: 20px 0; background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px;">
+                      <tr>
+                        <td>
+                          <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                            <strong>⚠️ Security Notice:</strong> This link will expire in 10 minutes. If you didn't request a password reset, please ignore this email and your password will remain unchanged.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin: 20px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6;">
+                      If the button doesn't work, copy and paste this link into your browser:<br>
+                      <a href="${resetUrl}" style="color: #4F46E5; word-break: break-all;">${resetUrl}</a>
+                    </p>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                    <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                      <strong>Capsule</strong> - Your vlog platform
+                    </p>
+                    <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;">
+                      This is an automated security email from Capsule.<br>
+                      For security reasons, we cannot unsubscribe you from these notifications.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
-    text: `Password reset link: ${resetUrl} (expires in 10 minutes)`,
+    text: `Password Reset Request\n\nWe received a request to reset your password for your Capsule account.\n\nReset your password by visiting this link:\n\n${resetUrl}\n\n⚠️ SECURITY NOTICE:\n- This link will expire in 10 minutes\n- If you didn't request this reset, please ignore this email\n- Your password will remain unchanged if you don't click the link\n\n---\nCapsule - Your vlog platform\nThis is an automated security email.`,
     critical: true,
   },
   10,
@@ -164,16 +282,88 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
     to: email,
     subject: 'Welcome to Capsule!',
     html: `
-      <h2>Welcome ${username}!</h2>
-      <p>Thank you for joining Capsule. Start creating and sharing your vlogs today!</p>
-      <p>Get started by:</p>
-      <ul>
-        <li>Completing your profile</li>
-        <li>Creating your first vlog</li>
-        <li>Following other creators</li>
-      </ul>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Capsule</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;">
+          <tr>
+            <td style="padding: 40px 0;">
+              <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Capsule</h1>
+                  </td>
+                </tr>
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;">Welcome, ${username}! 🎉</h2>
+                    <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                      Thank you for joining Capsule! We're excited to have you as part of our creative community. You're all set to start creating and sharing your vlogs with the world.
+                    </p>
+                    <h3 style="margin: 30px 0 15px; color: #1f2937; font-size: 18px; font-weight: bold;">Get Started:</h3>
+                    <table role="presentation" style="width: 100%; margin: 0 0 20px;">
+                      <tr>
+                        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+                          <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                            <strong style="color: #4F46E5;">✓</strong> Complete your profile to let others know who you are
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+                          <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                            <strong style="color: #4F46E5;">✓</strong> Create your first vlog and share your story
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0;">
+                          <p style="margin: 0; color: #4b5563; font-size: 15px;">
+                            <strong style="color: #4F46E5;">✓</strong> Follow other creators and discover amazing content
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    <!-- CTA Button -->
+                    <table role="presentation" style="margin: 30px 0;">
+                      <tr>
+                        <td style="border-radius: 6px; background-color: #4F46E5;">
+                          <a href="${process.env.FRONTEND_URL || 'https://vlogspherefrontend.vercel.app'}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">Start Creating</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                      If you have any questions or need help getting started, feel free to reach out to our support team.
+                    </p>
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                    <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                      <strong>Capsule</strong> - Your vlog platform
+                    </p>
+                    <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;">
+                      You're receiving this email because you signed up for Capsule.<br>
+                      If you'd like to stop receiving these emails, you can <a href="#" style="color: #4F46E5; text-decoration: none;">unsubscribe</a>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
-    text: `Welcome ${username}! Thank you for joining Capsule.`,
+    text: `Welcome to Capsule, ${username}! 🎉\n\nThank you for joining Capsule! We're excited to have you as part of our creative community.\n\nGet Started:\n✓ Complete your profile to let others know who you are\n✓ Create your first vlog and share your story\n✓ Follow other creators and discover amazing content\n\nVisit Capsule: ${process.env.FRONTEND_URL || 'https://vlogspherefrontend.vercel.app'}\n\nIf you have any questions or need help getting started, feel free to reach out to our support team.\n\n---\nCapsule - Your vlog platform`,
   },
   5,
 );

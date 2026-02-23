@@ -15,7 +15,7 @@ const redis = {
 // Resend API configuration (REQUIRED for email)
 const resend = {
   apiKey: process.env.RESEND_API_KEY,
-  fromEmail: process.env.FROM_EMAIL || 'no-reply@topiiaa.site',
+  fromEmail: process.env.FROM_EMAIL || 'team@topiiaa.site',
   fromName: process.env.FROM_NAME || 'Capsule',
 };
 
