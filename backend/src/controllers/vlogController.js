@@ -415,13 +415,17 @@ exports.recordView = asyncHandler(async (req, res) => {
     ip: req.ip, // Useful for abuse monitoring (if generic IP logging allowed)
   });
 
+  // Response TTL: Use same logic as service for consistency
+  const VIEW_TTL_SECONDS = parseInt(process.env.VIEW_TTL_SECONDS, 10) || 300;
+
   res.status(200).json({
     success: true,
     data: {
       views: result.views,
       hasViewed: true,
       incremented: result.incremented,
-      ttl: parseInt(process.env.VIEW_TTL_SECONDS, 10) || 86400,
+      ttl: VIEW_TTL_SECONDS,
+      degraded: result.degraded || false,
     },
   });
 });

@@ -270,8 +270,9 @@ class VlogService {
   }
 
   async recordView(vlogId, viewerId) {
-    // 24 hours default
-    const VIEW_TTL_SECONDS = parseInt(process.env.VIEW_TTL_SECONDS, 10) || 86400;
+    // Default TTL: 5 minutes (300 seconds) - allows re-counting after this window
+    // Configurable via VIEW_TTL_SECONDS environment variable
+    const VIEW_TTL_SECONDS = parseInt(process.env.VIEW_TTL_SECONDS, 10) || 300;
 
     // Generate unique Redis key: view:{vlogId}:{viewerId}
     const redisKey = `view:${vlogId}:${viewerId}`;
