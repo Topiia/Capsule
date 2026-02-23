@@ -81,7 +81,7 @@ const logger = winston.createLogger({
     service: 'capsule-api',
     environment: process.env.NODE_ENV || 'development',
   },
-  transports: process.env.NODE_ENV === 'test' 
+  transports: process.env.NODE_ENV === 'test'
     ? [] // No transports in test environment to prevent log spam
     : [errorTransport, combinedTransport],
   exitOnError: false,
