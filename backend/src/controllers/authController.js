@@ -82,8 +82,6 @@ exports.register = asyncHandler(async (req, res, next) => {
     .update(verificationToken)
     .digest('hex');
 
-  await user.save();
-
   // SECURITY: Generate tokens with rotation tracking
   // Token family groups related tokens in rotation chain for compromise detection
   // Token version enforces single-use and enables reuse detection
@@ -101,6 +99,8 @@ exports.register = asyncHandler(async (req, res, next) => {
   user.tokenFamily = tokenFamily;
   user.tokenVersion = tokenVersion;
   user.revokedAt = null;
+
+  // Single save operation to prevent double-hashing password
   await user.save();
 
   // Send verification email

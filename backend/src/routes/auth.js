@@ -19,6 +19,7 @@ const {
   updatePasswordValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
+  validate,
 } = require('../middleware/validation');
 
 // Import rate limiters (defined in server.js, exported via app.locals)
@@ -38,12 +39,14 @@ router.post(
   '/register',
   (req, res, next) => loginLimiter(req, res, next),
   registerValidation,
+  validate,
   register,
 );
 router.post(
   '/login',
   (req, res, next) => loginLimiter(req, res, next),
   loginValidation,
+  validate,
   login,
 );
 router.post(

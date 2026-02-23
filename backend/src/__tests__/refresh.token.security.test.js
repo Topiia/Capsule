@@ -57,7 +57,7 @@ describe('Refresh Token Security Tests', () => {
     const userData = {
       username: 'testuser',
       email: 'test@example.com',
-      password: 'password123',
+      password: 'Password123',
     };
 
     // Register user
@@ -217,7 +217,7 @@ describe('Refresh Token Security Tests', () => {
     const user2Data = {
       username: 'testuser2',
       email: 'test2@example.com',
-      password: 'password123',
+      password: 'Password123',
     };
 
     const user2Res = await request(app)
@@ -269,7 +269,7 @@ describe('Refresh Token Security Tests', () => {
     const userData = {
       username: 'normaluser',
       email: 'normal@example.com',
-      password: 'password123',
+      password: 'Password123',
     };
 
     await request(app).post('/api/auth/register').send(userData);
