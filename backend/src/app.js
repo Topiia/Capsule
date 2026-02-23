@@ -82,9 +82,15 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // PRODUCTION: Support Vercel preview deployments safely
+    // PRODUCTION: Support Vercel preview deployments safely and Production Domain
     try {
       const { hostname, protocol } = new URL(origin);
+
+      // Explicitly allow production domain
+      if (protocol === 'https:' && hostname === 'capsule.topiiaa.site') {
+        return callback(null, true);
+      }
+
       const isValidVercelPreview = protocol === 'https:'
         && hostname.endsWith('.vercel.app')
         && (hostname === 'vlogspherefrontend.vercel.app'
