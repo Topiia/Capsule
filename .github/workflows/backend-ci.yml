@@ -41,8 +41,18 @@ jobs:
       JWT_REFRESH_EXPIRE: 30d
       FRONTEND_URL: http://localhost:3000
       PORT: 5000
+      # Redis
       REDIS_HOST: localhost
       REDIS_PORT: 6379
+      # Cloudinary (dummy values for testing)
+      CLOUDINARY_URL: cloudinary://123456789012345:abcdefghijklmnopqrstuvwxyz123456@test-cloud
+      CLOUDINARY_CLOUD_NAME: test-cloud
+      CLOUDINARY_API_KEY: 123456789012345
+      CLOUDINARY_API_SECRET: abcdefghijklmnopqrstuvwxyz123456
+      # Resend Email (dummy value for testing)
+      RESEND_API_KEY: re_test_key_for_ci_testing_only
+      FROM_EMAIL: test@example.com
+      FROM_NAME: Test Capsule
 
     steps:
       - name: Checkout repository

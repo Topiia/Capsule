@@ -57,8 +57,8 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
     test('Fetching vlog list does NOT increment views', async () => {
       const mockVlogs = [
-        { _id: '507f1f77bcf86cd799439014', views: 50 },
-        { _id: '507f1f77bcf86cd799439015', views: 75 },
+        { _id: 'vlog1', title: 'Vlog 1', views: 50 },
+        { _id: 'vlog2', title: 'Vlog 2', views: 75 },
       ];
 
       Vlog.find = jest.fn().mockReturnValue({
@@ -82,9 +82,10 @@ describe('View Count Logic - Bug Fix Verification', () => {
   describe('EDGE CASE: Prevent double increments', () => {
     test('Multiple fetches of same vlog do NOT increment views', async () => {
       const mockVlog = {
-        _id: '507f1f77bcf86cd799439012',
+        _id: 'vlog123',
+        title: 'Test Vlog',
         views: 100,
-        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
+        author: { _id: 'author123', username: 'testuser', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
@@ -107,9 +108,10 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
     test('React Query refetch does NOT trigger view increment', async () => {
       const mockVlog = {
-        _id: '507f1f77bcf86cd799439012',
+        _id: 'vlog123',
+        title: 'Test Vlog',
         views: 100,
-        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
+        author: { _id: 'author123', username: 'testuser', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
@@ -128,9 +130,10 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
     test('Anonymous user vlog fetch does NOT auto-increment', async () => {
       const mockVlog = {
-        _id: '507f1f77bcf86cd799439012',
+        _id: 'vlog123',
+        title: 'Test Vlog',
         views: 100,
-        author: { _id: '507f1f77bcf86cd799439013', followers: [] },
+        author: { _id: 'author123', username: 'testuser', followers: [] },
         toObject: jest.fn().mockReturnThis(),
       };
 
