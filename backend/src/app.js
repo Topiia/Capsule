@@ -56,9 +56,9 @@ app.use(
   }),
 );
 
-// DEBUG: Log cookies for auth debugging
+// DEBUG: Log cookies for auth debugging (disabled in test environment)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/auth')) {
+  if (req.path.startsWith('/api/auth') && process.env.NODE_ENV !== 'test') {
     console.log(`[DEBUG] ${req.method} ${req.path}`);
     console.log('[DEBUG] Cookies:', req.cookies);
   }
