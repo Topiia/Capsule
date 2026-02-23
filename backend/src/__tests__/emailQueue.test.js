@@ -1,18 +1,27 @@
 /* eslint-disable global-require, prefer-destructuring, no-shadow, no-unused-vars */
-const Queue = require('bull');
-const logger = require('../config/logger');
-
-// Mock Bull and logger
 jest.mock('bull');
 jest.mock('../config/logger');
+jest.mock('../utils/sendEmailSync', () => ({
+  sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+}));
+jest.mock('../config/email', () => ({
+  resend: {
+    apiKey: 'test-api-key',
+    fromEmail: 'noreply@testdomain.com',
+    fromName: 'Capsule',
+  },
+  redis: {
+    host: 'localhost',
+    port: 6379,
+    password: undefined,
+  },
+  validateEmailConfig: jest.fn().mockReturnValue(true),
+  isRedisConfigured: jest.fn().mockReturnValue(true),
+}));
 
-// Import after mocking
-const {
-  queueEmail,
-  queuePasswordResetEmail,
-  isQueueAvailable,
-  getQueueStats,
-} = require('../queues/emailQueue');
+const Queue = require('bull');
+const logger = require('../config/logger');
+const { sendEmailSync } = require('../utils/sendEmailSync');
 
 describe('Email Queue Producer', () => {
   let mockQueue;
@@ -20,8 +29,10 @@ describe('Email Queue Producer', () => {
   let mockIsReady;
 
   beforeEach(() => {
+    jest.clearAllMocks();
+
     mockAdd = jest.fn();
-    mockIsReady = jest.fn();
+    mockIsReady = jest.fn().mockResolvedValue(true);
 
     mockQueue = {
       add: mockAdd,
@@ -30,22 +41,41 @@ describe('Email Queue Producer', () => {
       getActiveCount: jest.fn().mockResolvedValue(0),
       getCompletedCount: jest.fn().mockResolvedValue(5),
       getFailedCount: jest.fn().mockResolvedValue(1),
+      getDelayedCount: jest.fn().mockResolvedValue(0),
     };
 
     Queue.mockImplementation(() => mockQueue);
-
-    jest.clearAllMocks();
   });
 
   describe('Queue Initialization', () => {
-    it('should initialize Bull queue with correct Redis config', () => {
-      const emailQueue = require('../queues/emailQueue');
+    it('should initialize Bull queue with correct Redis config and defaultJobOptions', () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
 
-      expect(Queue).toHaveBeenCalledWith('email', {
+      const QueueFresh = require('bull');
+      const freshMockQueue = {
+        add: jest.fn(),
+        isReady: jest.fn().mockResolvedValue(true),
+      };
+      QueueFresh.mockImplementation(() => freshMockQueue);
+
+      require('../queues/emailQueue');
+
+      expect(QueueFresh).toHaveBeenCalledWith('email', {
         redis: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-          password: process.env.REDIS_PASSWORD || undefined,
+          host: 'localhost',
+          port: 6379,
+          password: undefined,
         },
         defaultJobOptions: {
           attempts: 3,
@@ -59,21 +89,62 @@ describe('Email Queue Producer', () => {
       });
     });
 
-    it('should verify Redis connectivity on init', () => {
-      const emailQueue = require('../queues/emailQueue');
-
-      expect(mockQueue.isReady).toHaveBeenCalled();
-    });
-  });
-
-  describe('queueEmail() - Core Producer Logic', () => {
-    beforeEach(() => {
-      // Simulate queue ready
-      mockIsReady.mockResolvedValue(true);
-      // Re-require to trigger initialization
+    it('should call isReady to verify Redis connectivity on init', () => {
       jest.resetModules();
       jest.mock('bull');
       jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      const QueueFresh = require('bull');
+      const freshIsReady = jest.fn().mockResolvedValue(true);
+      QueueFresh.mockImplementation(() => ({ add: jest.fn(), isReady: freshIsReady }));
+
+      require('../queues/emailQueue');
+
+      expect(freshIsReady).toHaveBeenCalled();
+    });
+  });
+
+  describe('queueEmail() — Queue Ready Path', () => {
+    let queueEmail;
+
+    beforeEach(async () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      mockAdd = jest.fn().mockResolvedValue({ id: 'job-123' });
+      mockIsReady = jest.fn().mockResolvedValue(true);
+
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: mockAdd,
+        isReady: mockIsReady,
+      }));
+
+      // Load module — isReady resolves and sets queueReady = true
+      require('../queues/emailQueue');
+      // Wait for the async isReady() .then() to fire
+      await Promise.resolve();
+
+      ({ queueEmail } = require('../queues/emailQueue'));
     });
 
     it('should add job to queue with correct payload and priority', async () => {
@@ -86,14 +157,12 @@ describe('Email Queue Producer', () => {
 
       mockAdd.mockResolvedValue({ id: 'job-123' });
 
-      const { queueEmail } = require('../queues/emailQueue');
       const result = await queueEmail(emailData, 5);
 
       expect(mockAdd).toHaveBeenCalledWith(emailData, {
         priority: 5,
         attempts: 3,
       });
-
       expect(result).toEqual({ jobId: 'job-123', queued: true });
     });
 
@@ -108,22 +177,45 @@ describe('Email Queue Producer', () => {
 
       mockAdd.mockResolvedValue({ id: 'job-456' });
 
-      const { queueEmail } = require('../queues/emailQueue');
       await queueEmail(emailData, 10);
 
       expect(mockAdd).toHaveBeenCalledWith(emailData, {
         priority: 10,
-        attempts: 5, // Critical emails get more retries
+        attempts: 5,
       });
     });
+  });
 
-    it('should throw error when Redis unavailable (no synchronous fallback)', async () => {
-      // Simulate queue not ready
-      const { queueEmail } = require('../queues/emailQueue');
+  describe('queueEmail() — Fallback Path (Redis Unavailable)', () => {
+    it('should send synchronously via fallback when queue is not ready', async () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
 
-      // Manually set queueReady to false (simulating Redis down)
-      // Note: This requires the module to export queueReady state
-      // For now, we test the error path
+      const mockSendEmailSync = jest.fn().mockResolvedValue({ id: 'sync-fallback-id' });
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: mockSendEmailSync,
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      // Make isReady reject — queue will NOT be ready
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: jest.fn(),
+        isReady: jest.fn().mockRejectedValue(new Error('Redis down')),
+      }));
+
+      require('../queues/emailQueue');
+      // Wait for the async isReady() .catch() to fire
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const { queueEmail: queueEmailFallback } = require('../queues/emailQueue');
 
       const emailData = {
         to: 'user@example.com',
@@ -131,52 +223,85 @@ describe('Email Queue Producer', () => {
         html: '<h1>Test</h1>',
       };
 
-      // If queue is not ready, queueEmail should throw
-      await expect(queueEmail(emailData)).rejects.toThrow(
-        'Email queue unavailable - Redis connection required',
-      );
-    });
+      const result = await queueEmailFallback(emailData);
 
-    it('should NOT import or call sendEmail directly', () => {
-      const sendEmail = require('../utils/sendEmail');
-      jest.mock('../utils/sendEmail');
-
-      const { queueEmail } = require('../queues/emailQueue');
-
-      // Queue producer should NEVER call sendEmail
-      expect(sendEmail).not.toHaveBeenCalled();
+      expect(mockSendEmailSync).toHaveBeenCalledWith(emailData);
+      expect(result).toEqual({ emailId: 'sync-fallback-id', fallback: true });
     });
   });
 
-  describe('queuePasswordResetEmail() - Convenience Wrapper', () => {
-    it('should queue password reset email with correct template and priority', async () => {
-      mockAdd.mockResolvedValue({ id: 'job-789' });
+  describe('queuePasswordResetEmail() — Convenience Wrapper', () => {
+    it('should queue password reset email with correct subject, template, and priority', async () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      const freshAdd = jest.fn().mockResolvedValue({ id: 'job-789' });
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: freshAdd,
+        isReady: jest.fn().mockResolvedValue(true),
+      }));
+
+      require('../queues/emailQueue');
+      await Promise.resolve();
 
       const { queuePasswordResetEmail } = require('../queues/emailQueue');
       await queuePasswordResetEmail('user@example.com', 'https://example.com/reset/token');
 
-      expect(mockAdd).toHaveBeenCalledWith(
+      expect(freshAdd).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'user@example.com',
-          subject: 'Password Reset - VlogSphere',
+          subject: 'Password Reset - Capsule',
           html: expect.stringContaining('https://example.com/reset/token'),
           text: expect.stringContaining('https://example.com/reset/token'),
           critical: true,
         }),
         expect.objectContaining({
-          priority: 10, // High priority for password resets
-          attempts: 5, // Critical = 5 attempts
+          priority: 10,
+          attempts: 5,
         }),
       );
     });
   });
 
-  describe('getQueueStats() - Health Monitoring', () => {
-    it('should return queue statistics when available', async () => {
-      mockQueue.getWaitingCount.mockResolvedValue(2);
-      mockQueue.getActiveCount.mockResolvedValue(1);
-      mockQueue.getCompletedCount.mockResolvedValue(100);
-      mockQueue.getFailedCount.mockResolvedValue(3);
+  describe('getQueueStats() — Health Monitoring', () => {
+    it('should return queue statistics when queue is available', async () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: jest.fn(),
+        isReady: jest.fn().mockResolvedValue(true),
+        getWaitingCount: jest.fn().mockResolvedValue(2),
+        getActiveCount: jest.fn().mockResolvedValue(1),
+        getCompletedCount: jest.fn().mockResolvedValue(100),
+        getFailedCount: jest.fn().mockResolvedValue(3),
+        getDelayedCount: jest.fn().mockResolvedValue(0),
+      }));
+
+      require('../queues/emailQueue');
+      await Promise.resolve();
 
       const { getQueueStats } = require('../queues/emailQueue');
       const stats = await getQueueStats();
@@ -187,29 +312,72 @@ describe('Email Queue Producer', () => {
         active: 1,
         completed: 100,
         failed: 3,
+        delayed: 0,
+        total: 106,
       });
     });
 
-    it('should return unavailable status when queue is down', async () => {
-      // Simulate queue unavailable
-      const { getQueueStats } = require('../queues/emailQueue');
+    it('should return unavailable status when queue is not ready', async () => {
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
 
-      // When queue is not ready, should return unavailable
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: jest.fn(),
+        isReady: jest.fn().mockRejectedValue(new Error('Redis down')),
+      }));
+
+      require('../queues/emailQueue');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const { getQueueStats } = require('../queues/emailQueue');
       const stats = await getQueueStats();
 
-      expect(stats.available).toBeDefined();
+      expect(stats.available).toBe(false);
     });
   });
 
   describe('Backoff Configuration', () => {
     it('should configure exponential backoff for retries', () => {
-      expect(Queue).toHaveBeenCalledWith(
+      jest.resetModules();
+      jest.mock('bull');
+      jest.mock('../config/logger');
+      jest.mock('../utils/sendEmailSync', () => ({
+        sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
+      }));
+      jest.mock('../config/email', () => ({
+        resend: { apiKey: 'test-api-key', fromEmail: 'noreply@testdomain.com', fromName: 'Capsule' },
+        redis: { host: 'localhost', port: 6379, password: undefined },
+        validateEmailConfig: jest.fn().mockReturnValue(true),
+        isRedisConfigured: jest.fn().mockReturnValue(true),
+      }));
+
+      const QueueFresh = require('bull');
+      QueueFresh.mockImplementation(() => ({
+        add: jest.fn(),
+        isReady: jest.fn().mockResolvedValue(true),
+      }));
+
+      require('../queues/emailQueue');
+
+      expect(QueueFresh).toHaveBeenCalledWith(
         'email',
         expect.objectContaining({
           defaultJobOptions: expect.objectContaining({
             backoff: {
               type: 'exponential',
-              delay: 2000, // 2s → 4s → 8s
+              delay: 2000,
             },
           }),
         }),

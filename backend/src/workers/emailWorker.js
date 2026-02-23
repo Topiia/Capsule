@@ -4,22 +4,14 @@ const { Resend } = require('resend');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 
-// Worker-specific Resend client (custom domain)
-const resend = new Resend(emailConfig.resend.apiKey);
-
-// Custom domain from environment
-const FROM_EMAIL = emailConfig.resend.fromEmail;
-const FROM_NAME = emailConfig.resend.fromName;
-
-// Initialize queue consumer
-const emailQueue = new Queue('email', {
-  redis: emailConfig.redis,
-});
-
 /**
- * Send email via Resend with timeout
+ * Send email via Resend with 10 s timeout
  */
 const sendEmail = async (options) => {
+  const resend = new Resend(emailConfig.resend.apiKey);
+  const FROM_EMAIL = emailConfig.resend.fromEmail;
+  const FROM_NAME = emailConfig.resend.fromName;
+
   const emailPromise = resend.emails.send({
     from: `${FROM_NAME} <${FROM_EMAIL}>`,
     to: options.to,
@@ -44,61 +36,80 @@ const sendEmail = async (options) => {
 };
 
 /**
- * Process email jobs
+ * Initialize the worker: registers queue consumer, event handlers,
+ * graceful shutdown signals, and startup log.
+ *
+ * Called automatically when run directly (node emailWorker.js).
+ * NOT called on import — safe for Jest.
  */
-emailQueue.process(async (job) => {
-  const {
-    to, subject, text, html,
-  } = job.data;
-
-  logger.info('Processing email job', {
-    jobId: job.id,
-    to,
-    subject,
-    attempt: job.attemptsMade + 1,
+const startWorker = () => {
+  const emailQueue = new Queue('email', {
+    redis: emailConfig.redis,
   });
 
-  try {
-    await sendEmail({
+  // Process email jobs
+  emailQueue.process(async (job) => {
+    const {
       to, subject, text, html,
-    });
-    return { success: true };
-  } catch (error) {
-    logger.error('Email send failed', {
+    } = job.data;
+
+    logger.info('Processing email job', {
       jobId: job.id,
       to,
-      error: error.message,
+      subject,
       attempt: job.attemptsMade + 1,
     });
-    throw error; // Trigger Bull retry
-  }
-});
 
-// Event handlers
-emailQueue.on('completed', (job) => {
-  logger.debug('Email delivered', { jobId: job.id });
-});
-
-emailQueue.on('failed', (job, err) => {
-  logger.error('Email failed permanently', {
-    jobId: job.id,
-    to: job.data.to,
-    error: err.message,
-    attempts: job.attemptsMade,
+    try {
+      await sendEmail({
+        to, subject, text, html,
+      });
+      return { success: true };
+    } catch (error) {
+      logger.error('Email send failed', {
+        jobId: job.id,
+        to,
+        error: error.message,
+        attempt: job.attemptsMade + 1,
+      });
+      throw error; // Trigger Bull retry
+    }
   });
-});
 
-// Graceful shutdown
-const shutdown = async () => {
-  logger.info('Shutting down email worker...');
-  await emailQueue.close();
-  process.exit(0);
+  // Event handlers
+  emailQueue.on('completed', (job) => {
+    logger.debug('Email delivered', { jobId: job.id });
+  });
+
+  emailQueue.on('failed', (job, err) => {
+    logger.error('Email failed permanently', {
+      jobId: job.id,
+      to: job.data.to,
+      error: err.message,
+      attempts: job.attemptsMade,
+    });
+  });
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    logger.info('Shutting down email worker...');
+    await emailQueue.close();
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
+  logger.info('Email worker started', {
+    redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
+    sender: emailConfig.resend.fromEmail,
+  });
+
+  return emailQueue;
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// Auto-run only when executed directly: node emailWorker.js
+if (require.main === module) {
+  startWorker();
+}
 
-logger.info('Email worker started', {
-  redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
-  sender: FROM_EMAIL,
-});
+module.exports = { startWorker, sendEmail };
