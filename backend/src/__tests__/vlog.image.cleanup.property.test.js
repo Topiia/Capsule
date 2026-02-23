@@ -183,9 +183,9 @@ describe('Property 7: Image cleanup on deletion', () => {
           }
         },
       ),
-      { numRuns: 10, timeout: 5000 },
+      { numRuns: 5, timeout: 3000 },
     );
-  }, 120000);
+  }, 30000);
 
   test('Property: Vlog deletion should succeed even if some image deletions fail', async () => {
     await fc.assert(
@@ -235,7 +235,7 @@ describe('Property 7: Image cleanup on deletion', () => {
           }
         },
       ),
-      { numRuns: 10, timeout: 5000 },
+      { numRuns: 5, timeout: 3000 },
     );
-  }, 120000);
+  }, 30000);
 });

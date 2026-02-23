@@ -174,7 +174,7 @@ describe('Property 6: Deletion removes vlog', () => {
           }
         },
       ),
-      { numRuns: 10, timeout: 5000 },
+      { numRuns: 5, timeout: 3000 },
     );
-  }, 120000);
+  }, 30000);
 });

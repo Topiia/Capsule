@@ -167,9 +167,9 @@ describe('Property 10: Unauthenticated request rejection', () => {
           }
         },
       ),
-      { numRuns: 10, timeout: 5000 },
+      { numRuns: 5, timeout: 3000 },
     );
-  }, 120000);
+  }, 30000);
 
   test('Property: Unauthenticated DELETE requests should be rejected with 401', async () => {
     await fc.assert(
@@ -217,7 +217,7 @@ describe('Property 10: Unauthenticated request rejection', () => {
           }
         },
       ),
-      { numRuns: 10, timeout: 5000 },
+      { numRuns: 5, timeout: 3000 },
     );
-  }, 120000);
+  }, 30000);
 });

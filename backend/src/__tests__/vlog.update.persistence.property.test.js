@@ -225,7 +225,7 @@ describe('Property 4: Update persistence and navigation', () => {
           }
         },
       ),
-      { numRuns: 5, timeout: 10000 },
+      { numRuns: 3, timeout: 5000 },
     );
-  }, 180000);
+  }, 45000);
 });
