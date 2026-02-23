@@ -12,29 +12,55 @@ const logger = require('./logger');
  */
 
 // Redis connection configuration
-const redisConfig = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-  db: parseInt(process.env.REDIS_DB, 10) || 0,
-  retryStrategy: (times) => {
-    // Cap retries at 10 attempts, then stop (return null = stop retrying)
-    if (times > 10) {
-      logger.warn(
-        'Redis retry limit reached (10 attempts), stopping reconnection attempts',
-      );
-      return null; // Stop retrying
-    }
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
-  lazyConnect: true,
-};
+let redisConfig;
 
-// Create Redis client
-const redis = new Redis(redisConfig);
+if (process.env.REDIS_URL) {
+  // Production mode (Upstash / Managed Redis)
+  logger.info('[Redis] Production mode (Upstash)');
+  redisConfig = {
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    retryStrategy: (times) => {
+      // Cap retries at 10 attempts
+      if (times > 10) {
+        logger.warn(
+          'Redis retry limit reached (10 attempts), stopping reconnection attempts',
+        );
+        return null;
+      }
+      return Math.min(times * 100, 2000); // Modified custom retry strategy
+    },
+    lazyConnect: true,
+  };
+} else {
+  // Development mode (Local Redis)
+  logger.info('[Redis] Development mode (Local Redis)');
+  redisConfig = {
+    host: '127.0.0.1', // Strict local fallback (overrides process.env vars for strict dev mode)
+    port: 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: parseInt(process.env.REDIS_DB, 10) || 0,
+    retryStrategy: (times) => {
+      if (times > 10) {
+        logger.warn(
+          'Redis retry limit reached (10 attempts), stopping reconnection attempts',
+        );
+        return null; // Stop retrying
+      }
+      return Math.min(times * 50, 2000);
+    },
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    lazyConnect: true,
+  };
+}
+
+// Single guaranteed instantiation
+const redisArgs = process.env.REDIS_URL
+  ? [process.env.REDIS_URL, redisConfig]
+  : [redisConfig];
+
+const redis = new Redis(...redisArgs);
 
 // Connection event handlers
 redis.on('connect', () => {

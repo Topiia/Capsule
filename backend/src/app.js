@@ -27,6 +27,7 @@ const { correlationMiddleware } = require('./middleware/correlation');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/database');
+const redis = require('./config/redis');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -220,15 +221,33 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   const env = process.env.NODE_ENV || 'unknown';
   const isProduction = env === 'production';
+  let redisStatus = 'disabled';
+
+  try {
+    if (redis && redis.isAvailable && redis.isAvailable()) {
+      await redis.ping();
+      redisStatus = 'connected';
+    } else if (redis && !redis.isAvailable) {
+      // Fallback if isAvailable is somehow not there but redis object is
+      await redis.ping();
+      redisStatus = 'connected';
+    } else if (redis && redis.isAvailable && !redis.isAvailable()) {
+      redisStatus = 'down';
+    }
+  } catch (err) {
+    redisStatus = 'down';
+    // Do not fail the health check or crash the server
+  }
 
   res.status(200).json({
     status: 'ok',
     service: 'capsule-backend',
     env,
     isProduction,
+    redis: redisStatus,
     timestamp: new Date().toISOString(),
     warning: !isProduction ? 'Not running in production mode!' : undefined,
   });

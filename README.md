@@ -301,7 +301,10 @@ npm run test:coverage  # explicit coverage report
 ### Infrastructure
 
 - Load balancing with NGINX
-- Redis for caching and sessions
+- **Redis**: 
+  - Managed via Upstash in production (`REDIS_URL`)
+  - Local Redis (`127.0.0.1:6379`) in development
+  - *Used for:* Caching, Atomic counters, and Queueing
 - CDN for static assets
 - Microservices architecture
 
