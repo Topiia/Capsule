@@ -12,7 +12,7 @@
     "worker:email": "node src/workers/emailWorker.js",
     "test:unit": "jest --config jest.unit.config.js",
     "test:integration": "jest --config jest.integration.config.js --runInBand",
-    "test:coverage": "jest --config jest.unit.config.js --coverage && jest --config jest.integration.config.js --runInBand --coverage",
+    "test:coverage": "jest --config jest.coverage.config.js --runInBand",
     "test": "npm run test:unit && npm run test:integration",
     "lint": "eslint src/ --max-warnings 0",
     "seed": "node src/utils/seedDatabase.js"
