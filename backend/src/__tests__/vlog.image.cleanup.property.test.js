@@ -37,8 +37,8 @@ describe('Property 7: Image cleanup on deletion', () => {
 
     // Connect to test database
     if (mongoose.connection.readyState === 0) {
-      const mongoUri = process.env.MONGO_URI_TEST
-        || 'mongodb://localhost:27017/vlogsphere-test';
+      const mongoUri = process.env.MONGODB_URI
+        || 'mongodb://localhost:27017/capsule-test';
       await mongoose.connect(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
