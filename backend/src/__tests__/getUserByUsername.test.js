@@ -1,5 +1,15 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
+
+// Mock Resend email services before importing app
+jest.mock('../utils/sendEmail', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ success: true }),
+}));
+
+jest.mock('../utils/sendEmailSync', () => ({
+  sendEmailSync: jest.fn().mockReturnValue({ success: true }),
+}));
+
 const app = require('../app');
 const User = require('../models/User');
 
