@@ -10,10 +10,10 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "worker:email": "node src/workers/emailWorker.js",
-    "test": "jest --runInBand --coverage",
-    "test:unit": "jest --config jest.unit.config.js --runInBand",
+    "test:unit": "jest --config jest.unit.config.js",
     "test:integration": "jest --config jest.integration.config.js --runInBand",
-    "test:watch": "jest --watch",
+    "test:coverage": "jest --config jest.unit.config.js --coverage && jest --config jest.integration.config.js --runInBand --coverage",
+    "test": "npm run test:unit && npm run test:integration",
     "lint": "eslint src/ --max-warnings 0",
     "seed": "node src/utils/seedDatabase.js"
   },

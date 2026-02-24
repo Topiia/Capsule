@@ -2,6 +2,7 @@ module.exports = {
   testEnvironment: 'node',
   testTimeout: 45000,
   verbose: true,
+  // TODO: Remove forceExit once open handles (supertest, app imports) are fixed
   forceExit: true,
   clearMocks: true,
   resetModules: true,
@@ -9,7 +10,7 @@ module.exports = {
   setupFiles: ['<rootDir>/tests/setup/cloudinary.enforce.js'],
 
   // Coverage configuration
-  collectCoverage: true,
+  collectCoverage: false,
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/server.js',
