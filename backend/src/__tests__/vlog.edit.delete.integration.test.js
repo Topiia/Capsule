@@ -15,6 +15,15 @@ jest.mock('../middleware/upload', () => ({
   getImageUrl: jest.fn((publicId) => `https://cloudinary.com/${publicId}`),
 }));
 
+// Mock Resend email services before importing app
+jest.mock('../utils/sendEmail', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ success: true }),
+}));
+
+jest.mock('../utils/sendEmailSync', () => ({
+  sendEmailSync: jest.fn().mockReturnValue({ success: true }),
+}));
+
 // Import app after mocking
 const app = require('../app');
 
