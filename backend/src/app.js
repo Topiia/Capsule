@@ -46,8 +46,10 @@ const adminModerationRoutes = require('./routes/admin.moderation.routes');
 // Initialize express app
 const app = express();
 
-// Connect to database (mocked in tests via jest.mock('../config/database'))
-connectDB();
+// Connect to database (skip in test — integration.setup.js handles DB lifecycle)
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
+}
 
 // Trust proxy for rate limiting behind reverse proxy
 app.set('trust proxy', 1);

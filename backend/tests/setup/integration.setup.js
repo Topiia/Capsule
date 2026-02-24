@@ -16,6 +16,10 @@ if (!fs.existsSync(uriPath)) {
 
 const { uri } = JSON.parse(fs.readFileSync(uriPath, 'utf8'));
 
+// CI diagnostic logging
+console.log('[Integration Setup] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Integration Setup] Memory Server URI:', uri);
+
 // Environment Safety Guard: Ensure no production or Atlas DB is used
 const isProductionLike = (dbUri) => {
   const lowerUri = dbUri.toLowerCase();
