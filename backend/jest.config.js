@@ -1,15 +1,8 @@
 module.exports = {
-  testEnvironment: 'node',
-  testTimeout: 45000,
-  verbose: true,
-  // TODO: Remove forceExit once open handles (supertest, app imports) are fixed
-  forceExit: true,
-  clearMocks: true,
-  resetModules: true,
-  restoreMocks: true,
-  setupFiles: ['<rootDir>/tests/setup/cloudinary.enforce.js'],
-
-  // Coverage configuration
+  projects: [
+    '<rootDir>/jest.unit.config.js',
+    '<rootDir>/jest.integration.config.js',
+  ],
   collectCoverage: false,
   collectCoverageFrom: [
     'src/**/*.js',
