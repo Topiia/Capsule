@@ -7,6 +7,15 @@ const User = require('../models/User');
 // Mock the database connection function
 jest.mock('../config/database', () => jest.fn());
 
+// Mock Resend email services before importing app
+jest.mock('../utils/sendEmail', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ success: true }),
+}));
+
+jest.mock('../utils/sendEmailSync', () => ({
+  sendEmailSync: jest.fn().mockReturnValue({ success: true }),
+}));
+
 // Import app after mocking
 const app = require('../app');
 

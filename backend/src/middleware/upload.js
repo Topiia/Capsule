@@ -169,7 +169,15 @@ exports.uploadMultiple = (field = 'images', max = 10) => (req, res, next) => {
 /* -------------------- Delete Image (Cloudinary Only) -------------------- */
 exports.deleteImage = async (publicId) => {
   try {
-    return await cloudinary.uploader.destroy(publicId);
+    // Sanitize publicId to alphanumeric, underscores, and hyphens only
+    // Cloudinary signature validation fails with special characters
+    const sanitizedId = publicId.replace(/[^a-zA-Z0-9_\-\/]/g, '');
+
+    if (!sanitizedId) {
+      throw new Error(`Invalid public_id after sanitization: ${publicId}`);
+    }
+
+    return await cloudinary.uploader.destroy(sanitizedId);
   } catch (err) {
     console.error('Delete image error:', err);
     throw err;
