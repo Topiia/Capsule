@@ -83,7 +83,10 @@ const { connectRedis } = require('./config/redis');
 const PORT = process.env.PORT || 5000;
 
 // Connect to database and Redis before starting the server
-connectDB();
+connectDB().catch((_err) => {
+  console.error('[FATAL] Database connection failed during startup.');
+  process.exit(1);
+});
 connectRedis();
 
 // Start HTTP server

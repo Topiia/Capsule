@@ -18,7 +18,7 @@ const connectDB = async () => {
         stack: error.stack,
       },
     });
-    process.exit(1);
+    throw error;
   }
 };
 
