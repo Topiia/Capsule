@@ -65,6 +65,7 @@ temp/
 test-results/
 playwright-report/
 blob-report/
+tmpclaude-*-cwd
 
 # --- VlogSphere Specific ---
 backend/uploads/
