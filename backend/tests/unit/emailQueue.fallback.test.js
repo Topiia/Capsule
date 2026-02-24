@@ -2,8 +2,8 @@
 
 // ─── All mocks must be declared BEFORE any require of production code ───────
 jest.mock('bull');
-jest.mock('../config/logger');
-jest.mock('../config/email', () => ({
+jest.mock('../../src/config/logger');
+jest.mock('../../src/config/email', () => ({
   redis: { host: 'localhost', port: 6379 },
   resend: {
     apiKey: 'test-key',
@@ -12,15 +12,15 @@ jest.mock('../config/email', () => ({
   },
   validateEmailConfig: jest.fn().mockReturnValue(true),
 }));
-jest.mock('../utils/sendEmailSync', () => ({
+jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-email-id' }),
 }));
 
 // ─── Require mocked modules AFTER jest.mock() calls ─────────────────────────
 const Queue = require('bull');
-const logger = require('../config/logger');
-const { sendEmailSync } = require('../utils/sendEmailSync');
-const { createEmailQueue, queueEmail } = require('../queues/emailQueue');
+const logger = require('../../src/config/logger');
+const { sendEmailSync } = require('../../src/utils/sendEmailSync');
+const { createEmailQueue, queueEmail } = require('../../src/queues/emailQueue');
 
 describe('Email Queue - Graceful Degradation', () => {
   let mockQueue;
@@ -29,6 +29,7 @@ describe('Email Queue - Graceful Degradation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.NODE_ENV = 'development';
 
     mockAdd = jest.fn();
     mockIsReady = jest.fn();
@@ -77,13 +78,13 @@ describe('Email Queue - Graceful Degradation', () => {
 
       // Re-apply mocks internally for the isolated require
       jest.mock('bull');
-      jest.mock('../config/logger');
-      jest.mock('../config/email', () => ({
+      jest.mock('../../src/config/logger');
+      jest.mock('../../src/config/email', () => ({
         redis: { host: 'localhost', port: 6379 },
         resend: { apiKey: 'test-key', fromEmail: 'test@test.com', fromName: 'Test' },
         validateEmailConfig: jest.fn().mockReturnValue(true),
       }));
-      jest.mock('../utils/sendEmailSync', () => ({
+      jest.mock('../../src/utils/sendEmailSync', () => ({
         sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-email-id' }),
       }));
 
@@ -93,16 +94,16 @@ describe('Email Queue - Graceful Degradation', () => {
         isReady: jest.fn().mockRejectedValue(new Error('Redis unavailable')),
       }));
 
-      const { createEmailQueue: freshCreate } = require('../queues/emailQueue');
+      const { createEmailQueue: freshCreate } = require('../../src/queues/emailQueue');
       freshCreate();
       // Wait for rejected promise microtask to flush
       await Promise.resolve();
     });
 
     it('should fallback to synchronous email sending', async () => {
-      const { queueEmail: freshQueueEmail } = require('../queues/emailQueue');
-      const freshLogger = require('../config/logger');
-      const { sendEmailSync: freshSendSync } = require('../utils/sendEmailSync');
+      const { queueEmail: freshQueueEmail } = require('../../src/queues/emailQueue');
+      const freshLogger = require('../../src/config/logger');
+      const { sendEmailSync: freshSendSync } = require('../../src/utils/sendEmailSync');
 
       const emailData = {
         to: 'user@example.com',
@@ -125,7 +126,7 @@ describe('Email Queue - Graceful Degradation', () => {
     });
 
     it('should NOT crash the application', async () => {
-      const { queueEmail: freshQueueEmail } = require('../queues/emailQueue');
+      const { queueEmail: freshQueueEmail } = require('../../src/queues/emailQueue');
 
       // Should not throw
       await expect(freshQueueEmail({

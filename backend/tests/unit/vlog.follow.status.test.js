@@ -1,9 +1,14 @@
-const Vlog = require('../models/Vlog');
-const User = require('../models/User');
-const { getVlog } = require('../controllers/vlogController');
+const Vlog = require('../../src/models/Vlog');
+const User = require('../../src/models/User');
+const Like = require('../../src/models/Like');
+const Comment = require('../../src/models/Comment');
+const { getVlog } = require('../../src/controllers/vlogController');
 
-jest.mock('../models/Vlog');
-jest.mock('../models/User');
+jest.mock('../../src/models/Vlog');
+jest.mock('../../src/models/User');
+jest.mock('../../src/models/Like');
+jest.mock('../../src/models/Comment');
+jest.mock('../../src/config/redis');
 
 describe('VlogDetail Follow Status', () => {
   let req;
@@ -21,6 +26,13 @@ describe('VlogDetail Follow Status', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+
+    Like.findOne = jest.fn().mockResolvedValue(null);
+    Comment.find = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockResolvedValue([]),
+    });
   });
 
   it('should include isFollowedByCurrentUser when user is following author', async () => {
@@ -39,29 +51,18 @@ describe('VlogDetail Follow Status', () => {
       userViews: [],
       comments: [],
       recordUniqueView: jest.fn(),
-      toObject: jest.fn().mockReturnValue({
-        _id: 'vlog1',
-        title: 'Test Vlog',
-        author: {
-          _id: 'author1',
-          username: 'author',
-          followerCount: 1,
-          followers: ['user1'],
-        },
-      }),
     };
-
-    const mockPopulate = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
+    mockVlog.toObject = jest.fn().mockReturnValue({
+      ...mockVlog,
+      author: { ...mockVlog.author },
     });
 
     Vlog.findById = jest.fn().mockReturnValue({
-      populate: mockPopulate,
+      populate: jest.fn().mockResolvedValue(mockVlog),
     });
 
-    User.findById = jest.fn().mockResolvedValue({
-      _id: 'user1',
-      bookmarks: [],
+    User.findById = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ bookmarks: [] }),
     });
 
     await getVlog(req, res, next);
@@ -92,29 +93,18 @@ describe('VlogDetail Follow Status', () => {
       userViews: [],
       comments: [],
       recordUniqueView: jest.fn(),
-      toObject: jest.fn().mockReturnValue({
-        _id: 'vlog1',
-        title: 'Test Vlog',
-        author: {
-          _id: 'author1',
-          username: 'author',
-          followerCount: 0,
-          followers: [],
-        },
-      }),
     };
-
-    const mockPopulate = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
+    mockVlog.toObject = jest.fn().mockReturnValue({
+      ...mockVlog,
+      author: { ...mockVlog.author },
     });
 
     Vlog.findById = jest.fn().mockReturnValue({
-      populate: mockPopulate,
+      populate: jest.fn().mockResolvedValue(mockVlog),
     });
 
-    User.findById = jest.fn().mockResolvedValue({
-      _id: 'user1',
-      bookmarks: [],
+    User.findById = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ bookmarks: [] }),
     });
 
     await getVlog(req, res, next);
@@ -147,24 +137,14 @@ describe('VlogDetail Follow Status', () => {
       userViews: [],
       comments: [],
       incrementViews: jest.fn(),
-      toObject: jest.fn().mockReturnValue({
-        _id: 'vlog1',
-        title: 'Test Vlog',
-        author: {
-          _id: 'author1',
-          username: 'author',
-          followerCount: 1,
-          followers: ['user2'],
-        },
-      }),
     };
-
-    const mockPopulate = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
+    mockVlog.toObject = jest.fn().mockReturnValue({
+      ...mockVlog,
+      author: { ...mockVlog.author },
     });
 
     Vlog.findById = jest.fn().mockReturnValue({
-      populate: mockPopulate,
+      populate: jest.fn().mockResolvedValue(mockVlog),
     });
 
     await getVlog(req, res, next);
@@ -195,29 +175,18 @@ describe('VlogDetail Follow Status', () => {
       userViews: [],
       comments: [],
       recordUniqueView: jest.fn(),
-      toObject: jest.fn().mockReturnValue({
-        _id: 'vlog1',
-        title: 'Test Vlog',
-        author: {
-          _id: 'author1',
-          username: 'author',
-          followerCount: 5,
-          followers: ['user1', 'user2'],
-        },
-      }),
     };
-
-    const mockPopulate = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
+    mockVlog.toObject = jest.fn().mockReturnValue({
+      ...mockVlog,
+      author: { ...mockVlog.author },
     });
 
     Vlog.findById = jest.fn().mockReturnValue({
-      populate: mockPopulate,
+      populate: jest.fn().mockResolvedValue(mockVlog),
     });
 
-    User.findById = jest.fn().mockResolvedValue({
-      _id: 'user1',
-      bookmarks: [],
+    User.findById = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ bookmarks: [] }),
     });
 
     await getVlog(req, res, next);

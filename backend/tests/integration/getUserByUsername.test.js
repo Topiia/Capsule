@@ -1,17 +1,16 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 
 // Mock Resend email services before importing app
-jest.mock('../utils/sendEmail', () => ({
+jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
 
-jest.mock('../utils/sendEmailSync', () => ({
+jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockReturnValue({ success: true }),
 }));
 
-const app = require('../app');
-const User = require('../models/User');
+const app = require('../../src/app');
+const User = require('../../src/models/User');
 
 describe('GET /api/users/profile/:username', () => {
   let testUser;
@@ -30,7 +29,6 @@ describe('GET /api/users/profile/:username', () => {
   afterAll(async () => {
     // Clean up
     await User.deleteMany({ username: 'testuser123' });
-    await mongoose.connection.close();
   });
 
   it('should return user data when username exists', async () => {

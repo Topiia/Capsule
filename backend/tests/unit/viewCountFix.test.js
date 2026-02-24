@@ -1,10 +1,15 @@
-const VlogService = require('../services/vlogService');
-const Vlog = require('../models/Vlog');
-const Like = require('../models/Like');
+const VlogService = require('../../src/services/vlogService');
+const Vlog = require('../../src/models/Vlog');
+const Like = require('../../src/models/Like');
+const Comment = require('../../src/models/Comment');
 
-jest.mock('../models/Vlog');
-jest.mock('../models/Like');
-jest.mock('../models/Comment');
+const User = require('../../src/models/User');
+
+jest.mock('../../src/models/Vlog');
+jest.mock('../../src/models/Like');
+jest.mock('../../src/models/Comment');
+jest.mock('../../src/models/User');
+jest.mock('../../src/config/redis');
 
 describe('View Count Logic - Bug Fix Verification', () => {
   let vlogService;
@@ -12,6 +17,16 @@ describe('View Count Logic - Bug Fix Verification', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     vlogService = VlogService;
+
+    Comment.find = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockResolvedValue([]),
+    });
+
+    User.findById = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ bookmarks: [] }),
+    });
   });
 
   describe('SUCCESS: Views increment only when intended', () => {
@@ -50,9 +65,11 @@ describe('View Count Logic - Bug Fix Verification', () => {
 
       // Assert: Incremented exactly once
       expect(Vlog.findByIdAndUpdate).toHaveBeenCalledTimes(1);
-      expect(Vlog.findByIdAndUpdate).toHaveBeenCalledWith('507f1f77bcf86cd799439012', {
-        $inc: { views: 1 },
-      });
+      expect(Vlog.findByIdAndUpdate).toHaveBeenCalledWith(
+        '507f1f77bcf86cd799439012',
+        { $inc: { views: 1 } },
+        { new: true },
+      );
     });
 
     test('Fetching vlog list does NOT increment views', async () => {

@@ -12,8 +12,8 @@
 
 const dotenv = require('dotenv');
 
-// Load .env in non-production environments
-if (process.env.NODE_ENV !== 'production') {
+// Load .env in non-production environments (strictly exclude tests)
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   dotenv.config();
 }
 
@@ -77,8 +77,14 @@ process.on('unhandledRejection', (err) => {
 // Import the configured Express app (no side-effects beyond Express setup)
 const app = require('./app');
 const logger = require('./config/logger');
+const connectDB = require('./config/database');
+const { connectRedis } = require('./config/redis');
 
 const PORT = process.env.PORT || 5000;
+
+// Connect to database and Redis before starting the server
+connectDB();
+connectRedis();
 
 // Start HTTP server
 const server = app.listen(PORT, () => {
@@ -93,6 +99,10 @@ const server = app.listen(PORT, () => {
     // eslint-disable-next-line global-require
     const { createEmailQueue } = require('./queues/emailQueue');
     createEmailQueue();
+
+    // eslint-disable-next-line global-require
+    const { startAccountDeletionWorker } = require('./queues/accountDeletionQueue');
+    startAccountDeletionWorker();
 
     // eslint-disable-next-line global-require
     const moderationWorker = require('./workers/moderation.worker');

@@ -1,9 +1,21 @@
 /* eslint-disable global-require */
-const { queuePasswordResetEmail } = require('../queues/emailQueue');
-const User = require('../models/User');
-const { forgotPassword } = require('../controllers/authController');
+process.env.RESEND_API_KEY = 're_test-key'; // MUST be set before any 'requires' execute
+
+// Mock config BEFORE any imports that might use it synchronously
+jest.mock('../../src/config/email', () => ({
+  resend: { apiKey: 'test-key', fromEmail: 'test@example.com', fromName: 'Test' },
+  validateEmailConfig: jest.fn().mockReturnValue(true),
+}));
+
+const { queuePasswordResetEmail } = require('../../src/queues/emailQueue');
+const User = require('../../src/models/User');
+const { forgotPassword } = require('../../src/controllers/authController');
 
 // Mock dependencies
+jest.mock('../../src/utils/sendEmail', () => ({
+  sendEmail: jest.fn(),
+}));
+jest.mock('../../src/utils/sendEmailSync', () => jest.fn());
 jest.mock('../../src/queues/emailQueue');
 jest.mock('../../src/models/User');
 

@@ -9,7 +9,7 @@ const { generateTags } = require('../services/aiService');
 const VlogService = require('../services/vlogService');
 const { invalidateVlogCache } = require('../middleware/cache');
 const logger = require('../config/logger');
-const moderationQueue = require('../queues/moderationQueue');
+const { createModerationQueue } = require('../queues/moderationQueue');
 
 /* ----------------------------------------------------------
    GET ALL VLOGS (Public)
@@ -138,15 +138,18 @@ exports.createVlog = asyncHandler(async (req, res) => {
 
   // Trigger Async Moderation
   try {
-    moderationQueue.add(
-      { vlogId: vlog._id },
-      {
-        priority: 1, // High priority for new uploads
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: true,
-      },
-    );
+    const q = createModerationQueue();
+    if (q) {
+      q.add(
+        { vlogId: vlog._id.toString() },
+        {
+          priority: 1, // High priority for new vlogs
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+        },
+      );
+    }
     logger.info(`Queued moderation for vlog ${vlog._id}`);
   } catch (error) {
     logger.error('Failed to queue moderation job', error);

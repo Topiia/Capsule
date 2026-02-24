@@ -27,7 +27,14 @@ const { correlationMiddleware } = require('./middleware/correlation');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/database');
-const redis = require('./config/redis');
+const { createRedisClient } = require('./config/redis');
+
+const redis = new Proxy({}, {
+  get: (target, prop) => {
+    const client = createRedisClient();
+    return typeof client[prop] === 'function' ? client[prop].bind(client) : client[prop];
+  },
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');

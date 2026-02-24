@@ -3,8 +3,8 @@
 // ─── All mocks must be declared BEFORE any require of production code ───────
 jest.mock('bull');
 jest.mock('resend');
-jest.mock('../config/logger');
-jest.mock('../config/email', () => ({
+jest.mock('../../src/config/logger');
+jest.mock('../../src/config/email', () => ({
   resend: {
     apiKey: 'test-api-key',
     fromEmail: 'noreply@testdomain.com',
@@ -20,8 +20,8 @@ jest.mock('../config/email', () => ({
 // ─── Require mocked modules AFTER jest.mock() calls ─────────────────────────
 const Queue = require('bull');
 const { Resend } = require('resend');
-const logger = require('../config/logger');
-const { startWorker } = require('../workers/emailWorker');
+const logger = require('../../src/config/logger');
+const { startWorker } = require('../../src/workers/emailWorker');
 
 // ─── Shared mock instances set up in beforeEach ──────────────────────────────
 let mockQueue;

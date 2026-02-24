@@ -1,14 +1,15 @@
-const VlogService = require('../services/vlogService');
-const Vlog = require('../models/Vlog');
-const redis = require('../config/redis');
-const vlogController = require('../controllers/vlogController'); // Chaos testing import
+const VlogService = require('../../src/services/vlogService');
+const Vlog = require('../../src/models/Vlog');
+const redis = require('../../src/config/redis');
+const vlogController = require('../../src/controllers/vlogController'); // Chaos testing import
 
-jest.mock('../models/Vlog');
-jest.mock('../config/redis');
+jest.mock('../../src/models/Vlog');
+jest.mock('../../src/config/redis');
 
 describe('Redis TTL-Based Unique View Counting', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    redis.createRedisClient.mockReturnValue(redis);
   });
 
   describe('SUCCESS: First view increments', () => {

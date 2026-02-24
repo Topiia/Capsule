@@ -14,49 +14,99 @@ const logger = require('../config/logger');
 
 // Create account deletion queue (graceful fallback if Redis unavailable)
 let accountDeletionQueue = null;
-let isQueueAvailable = false;
+let queueReady = false;
 
-try {
-  accountDeletionQueue = new Queue('accountDeletion', {
-    redis: {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-      password: process.env.REDIS_PASSWORD || undefined,
-    },
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000, // Start with 2s, then 4s, then 8s
+/**
+ * Initialize the account deletion queue producer.
+ * Must be called explicitly during server startup.
+ * Prevents auto-connection during module import (useful for test isolation).
+ */
+exports.createAccountDeletionQueue = () => {
+  if (process.env.NODE_ENV === 'test') {
+    return null; // Never connect in test environment
+  }
+
+  if (accountDeletionQueue) return accountDeletionQueue;
+
+  try {
+    accountDeletionQueue = new Queue('accountDeletion', {
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+        password: process.env.REDIS_PASSWORD || undefined,
       },
-      removeOnComplete: true, // Clean up completed jobs
-      removeOnFail: false, // Keep failed jobs for debugging
-      timeout: 60000, // 60 second timeout per job
-    },
-  });
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000, // Start with 2s, then 4s, then 8s
+        },
+        removeOnComplete: true, // Clean up completed jobs
+        removeOnFail: false, // Keep failed jobs for debugging
+        timeout: 60000, // 60 second timeout per job
+      },
+    });
 
-  isQueueAvailable = true;
-  logger.info('Bull account deletion queue initialized successfully');
-  if (process.env.NODE_ENV !== 'test') {
-    console.log('[INFO] Bull account deletion queue ready');
-  }
-} catch (error) {
-  isQueueAvailable = false;
-  accountDeletionQueue = null;
-  logger.warn(
-    'Bull account deletion queue unavailable - assets may not be cleaned up',
-    {
-      error: error.message,
-    },
-  );
-  if (process.env.NODE_ENV !== 'test') {
-    console.warn('[WARN] Bull account deletion queue unavailable');
-  }
-}
+    // Verify connectivity on init (async)
+    accountDeletionQueue.isReady().then(() => {
+      queueReady = true;
+      logger.info('Bull account deletion queue initialized successfully');
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('[INFO] Bull account deletion queue ready');
+      }
+    }).catch((err) => {
+      queueReady = false;
+      logger.warn('Bull account deletion queue unavailable - assets may not be cleaned up', {
+        error: err.message,
+      });
+    });
 
-// Process asset cleanup jobs (only if queue is available)
-if (isQueueAvailable && accountDeletionQueue) {
-  accountDeletionQueue.process(async (job) => {
+    // Queue event handlers
+    accountDeletionQueue.on('completed', (job, result) => {
+      logger.info('Asset cleanup job completed', {
+        jobId: job.id,
+        userId: job.data.userId,
+        result,
+      });
+    });
+
+    accountDeletionQueue.on('failed', (job, err) => {
+      logger.error('Asset cleanup job failed (all retries exhausted)', {
+        jobId: job.id,
+        userId: job.data.userId,
+        assetCount: job.data.publicIds.length,
+        error: err.message,
+        attempts: job.attemptsMade,
+      });
+    });
+
+    accountDeletionQueue.on('stalled', (job) => {
+      logger.warn('Asset cleanup job stalled', {
+        jobId: job.id,
+        userId: job.data.userId,
+      });
+    });
+  } catch (error) {
+    queueReady = false;
+    accountDeletionQueue = null;
+    logger.warn(
+      'Bull account deletion queue unavailable - assets may not be cleaned up',
+      { error: error.message },
+    );
+  }
+
+  return accountDeletionQueue;
+};
+
+/**
+ * Initialize the account deletion queue worker to process jobs.
+ * Must be called explicitly during server startup.
+ */
+exports.startAccountDeletionWorker = () => {
+  const queue = exports.createAccountDeletionQueue();
+  if (!queue) return;
+
+  queue.process(async (job) => {
     const { userId, publicIds } = job.data;
 
     logger.info('Processing Cloudinary asset cleanup job', {
@@ -72,14 +122,10 @@ if (isQueueAvailable && accountDeletionQueue) {
     }
 
     try {
-      // Batch delete assets from Cloudinary
-      // Note: Cloudinary allows up to 100 assets per request
       const batchSize = 100;
       let totalDeleted = 0;
       const errors = [];
 
-      // Process batches sequentially to avoid rate limiting
-      // eslint-disable-next-line no-plusplus
       for (let i = 0; i < publicIds.length; i += batchSize) {
         const batch = publicIds.slice(i, i + batchSize);
 
@@ -89,7 +135,6 @@ if (isQueueAvailable && accountDeletionQueue) {
             resource_type: 'image',
           });
 
-          // Count successful deletions
           const deleted = Object.values(result.deleted || {}).filter(
             (status) => status === 'deleted',
           ).length;
@@ -103,7 +148,6 @@ if (isQueueAvailable && accountDeletionQueue) {
             deleted,
           });
         } catch (batchError) {
-          // Log batch error but continue with next batch
           logger.error('Cloudinary batch deletion failed', {
             jobId: job.id,
             userId,
@@ -139,39 +183,10 @@ if (isQueueAvailable && accountDeletionQueue) {
         error: error.message,
         attempt: job.attemptsMade + 1,
       });
-
-      throw error; // Re-throw to trigger retry
+      throw error;
     }
   });
-}
-
-// Queue event handlers (only attach if queue is available)
-if (isQueueAvailable && accountDeletionQueue) {
-  accountDeletionQueue.on('completed', (job, result) => {
-    logger.info('Asset cleanup job completed', {
-      jobId: job.id,
-      userId: job.data.userId,
-      result,
-    });
-  });
-
-  accountDeletionQueue.on('failed', (job, err) => {
-    logger.error('Asset cleanup job failed (all retries exhausted)', {
-      jobId: job.id,
-      userId: job.data.userId,
-      assetCount: job.data.publicIds.length,
-      error: err.message,
-      attempts: job.attemptsMade,
-    });
-  });
-
-  accountDeletionQueue.on('stalled', (job) => {
-    logger.warn('Asset cleanup job stalled', {
-      jobId: job.id,
-      userId: job.data.userId,
-    });
-  });
-}
+};
 
 /**
  * Queue Cloudinary asset cleanup for deleted user
@@ -182,20 +197,19 @@ if (isQueueAvailable && accountDeletionQueue) {
  * @returns {Promise<object>} - Job object or direct result
  */
 exports.queueAssetCleanup = async (userId, publicIds, priority = 5) => {
+  const queue = accountDeletionQueue;
+
   // Fallback to direct deletion if queue unavailable
-  if (!isQueueAvailable || !accountDeletionQueue) {
+  if (!queueReady || !queue) {
     logger.warn('Queue unavailable - attempting direct Cloudinary cleanup', {
       userId,
       assetCount: publicIds.length,
     });
 
     try {
-      // Direct cleanup without queue
       const batchSize = 100;
       let totalDeleted = 0;
 
-      // Process batches sequentially
-      // eslint-disable-next-line no-plusplus
       for (let i = 0; i < publicIds.length; i += batchSize) {
         const batch = publicIds.slice(i, i + batchSize);
         // eslint-disable-next-line no-await-in-loop
@@ -228,7 +242,7 @@ exports.queueAssetCleanup = async (userId, publicIds, priority = 5) => {
 
   // Queue cleanup normally
   try {
-    const job = await accountDeletionQueue.add(
+    const job = await queue.add(
       { userId, publicIds },
       { priority },
     );
@@ -255,7 +269,8 @@ exports.queueAssetCleanup = async (userId, publicIds, priority = 5) => {
  * Get queue statistics
  */
 exports.getQueueStats = async () => {
-  if (!isQueueAvailable || !accountDeletionQueue) {
+  const queue = accountDeletionQueue;
+  if (!queueReady || !queue) {
     return {
       waiting: 0,
       active: 0,
@@ -268,11 +283,11 @@ exports.getQueueStats = async () => {
   }
 
   const [waiting, active, completed, failed, delayed] = await Promise.all([
-    accountDeletionQueue.getWaitingCount(),
-    accountDeletionQueue.getActiveCount(),
-    accountDeletionQueue.getCompletedCount(),
-    accountDeletionQueue.getFailedCount(),
-    accountDeletionQueue.getDelayedCount(),
+    queue.getWaitingCount(),
+    queue.getActiveCount(),
+    queue.getCompletedCount(),
+    queue.getFailedCount(),
+    queue.getDelayedCount(),
   ]);
 
   return {
@@ -290,19 +305,20 @@ exports.getQueueStats = async () => {
  * Clean old jobs (run periodically)
  */
 exports.cleanOldJobs = async () => {
-  if (!isQueueAvailable || !accountDeletionQueue) {
+  const queue = accountDeletionQueue;
+  if (!queueReady || !queue) {
     logger.debug('Account deletion queue cleanup skipped - queue unavailable');
     return;
   }
 
-  await accountDeletionQueue.clean(24 * 60 * 60 * 1000, 'completed'); // 1 day
-  await accountDeletionQueue.clean(7 * 24 * 60 * 60 * 1000, 'failed'); // 7 days
+  await queue.clean(24 * 60 * 60 * 1000, 'completed'); // 1 day
+  await queue.clean(7 * 24 * 60 * 60 * 1000, 'failed'); // 7 days
   logger.info('Account deletion queue cleaned');
 };
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  if (isQueueAvailable && accountDeletionQueue) {
+  if (queueReady && accountDeletionQueue) {
     await accountDeletionQueue.close();
     logger.info('Account deletion queue closed on SIGTERM');
   }

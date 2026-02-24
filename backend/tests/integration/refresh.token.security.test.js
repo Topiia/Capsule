@@ -1,23 +1,21 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const User = require('../../src/models/User');
 
 // Mock the database connection function
-jest.mock('../config/database', () => jest.fn());
 
 // Mock Resend email services before importing app
-jest.mock('../utils/sendEmail', () => ({
+jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
 
-jest.mock('../utils/sendEmailSync', () => ({
+jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockReturnValue({ success: true }),
 }));
 
 // Import app after mocking
-const app = require('../app');
+const app = require('../../src/app');
 
 /**
  * SECURITY TEST SUITE: Refresh Token Rotation & Secure Storage
@@ -38,22 +36,11 @@ describe('Refresh Token Security Tests', () => {
     process.env.JWT_EXPIRE = '30m';
     process.env.JWT_REFRESH_EXPIRE = '30d';
     process.env.NODE_ENV = 'test';
-
-    // Connect to test database
-    if (mongoose.connection.readyState === 0) {
-      const mongoUri = process.env.MONGODB_URI
-        || 'mongodb://localhost:27017/capsule-test';
-      await mongoose.connect(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    }
   });
 
   afterAll(async () => {
     // Clean up and close connection
     await User.deleteMany({});
-    await mongoose.connection.close();
   });
 
   beforeEach(async () => {

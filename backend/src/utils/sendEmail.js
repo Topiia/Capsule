@@ -1,8 +1,14 @@
 const { Resend } = require('resend');
 const emailConfig = require('../config/email');
 
-// Initialize Resend with API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendInstance;
+
+function getResendClient() {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 /**
  * Send email using Resend API
@@ -19,6 +25,8 @@ const sendEmail = async (options) => {
     if (!process.env.RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
     }
+
+    const resend = getResendClient();
 
     // Send email via Resend API
     const data = await resend.emails.send({
@@ -59,4 +67,7 @@ const sendEmail = async (options) => {
   }
 };
 
-module.exports = sendEmail;
+module.exports = {
+  sendEmail,
+  getResendClient,
+};

@@ -9,6 +9,7 @@ describe('Email Queue Producer', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    process.env.NODE_ENV = 'development';
 
     mockAdd = jest.fn();
     mockIsReady = jest.fn().mockResolvedValue(true);
@@ -26,21 +27,21 @@ describe('Email Queue Producer', () => {
     };
 
     jest.mock('bull', () => jest.fn(() => mockQueue));
-    jest.mock('../config/logger', () => ({
+    jest.mock('../../src/config/logger', () => ({
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
     }));
-    jest.mock('../utils/sendEmailSync', () => ({
+    jest.mock('../../src/utils/sendEmailSync', () => ({
       sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
     }));
-    jest.mock('../config/email', () => ({
+    jest.mock('../../src/config/email', () => ({
       resend: { apiKey: 'test', fromEmail: 'test', fromName: 'Capsule' },
       redis: { host: 'localhost', port: 6379, password: undefined },
     }));
 
-    emailQueueModule = require('../queues/emailQueue');
+    emailQueueModule = require('../../src/queues/emailQueue');
   });
 
   describe('Queue Initialization', () => {
@@ -91,7 +92,7 @@ describe('Email Queue Producer', () => {
       mockAdd.mockRejectedValue(new Error('Queue memory full'));
 
       const result = await emailQueueModule.queueEmail(emailData);
-      const { sendEmailSync } = require('../utils/sendEmailSync');
+      const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
       expect(result).toEqual({ emailId: 'sync-msg-id', fallback: true });
@@ -109,7 +110,7 @@ describe('Email Queue Producer', () => {
     it('should send email synchronously if queue is not ready', async () => {
       const emailData = { to: 'user@example.com', subject: 'Fallback' };
       const result = await emailQueueModule.queueEmail(emailData);
-      const { sendEmailSync } = require('../utils/sendEmailSync');
+      const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
       expect(result).toEqual({ emailId: 'sync-msg-id', fallback: true });

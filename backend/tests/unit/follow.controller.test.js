@@ -1,8 +1,17 @@
-const User = require('../models/User');
-const { followUser, unfollowUser } = require('../controllers/userController');
+const mongoose = require('mongoose');
+const User = require('../../src/models/User');
+const { followUser, unfollowUser } = require('../../src/controllers/userController');
 
 // Mock the User model
-jest.mock('../models/User');
+jest.mock('../../src/models/User');
+
+// Mock mongoose transactions
+mongoose.startSession = jest.fn().mockResolvedValue({
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  abortTransaction: jest.fn(),
+  endSession: jest.fn(),
+});
 
 describe('Follow/Unfollow Controller', () => {
   let req;
@@ -42,15 +51,30 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToFollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToFollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({
+            followingCount: 1,
+            following: ['user2'],
+          }),
+        }) // updatedFollower
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({ followerCount: 1 }),
+        }); // updatedUserToFollow
 
       await followUser(req, res, next);
 
-      expect(mockFollower.following).toContain('user2');
-      expect(mockUserToFollow.followers).toContain('user1');
-      expect(mockFollower.save).toHaveBeenCalled();
-      expect(mockUserToFollow.save).toHaveBeenCalled();
+      expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+        'user1',
+        { $addToSet: { following: 'user2' } },
+        { session: expect.any(Object) },
+      );
+      expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+        'user2',
+        { $addToSet: { followers: 'user1' } },
+        { session: expect.any(Object) },
+      );
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
@@ -90,8 +114,8 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToFollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToFollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) });
 
       await followUser(req, res, next);
 
@@ -122,8 +146,10 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToFollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToFollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followingCount: 1, following: ['user2'] }) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followerCount: 1 }) });
 
       await followUser(req, res, next);
 
@@ -157,8 +183,10 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToFollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToFollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followingCount: 3, following: ['user2', 'user3'] }) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followerCount: 1 }) });
 
       await followUser(req, res, next);
 
@@ -191,15 +219,27 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToUnfollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToUnfollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({ followingCount: 0, following: [] }),
+        })
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({ followerCount: 0 }),
+        });
 
       await unfollowUser(req, res, next);
 
-      expect(mockFollower.following).not.toContain('user2');
-      expect(mockUserToUnfollow.followers).not.toContain('user1');
-      expect(mockFollower.save).toHaveBeenCalled();
-      expect(mockUserToUnfollow.save).toHaveBeenCalled();
+      expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+        'user1',
+        { $pull: { following: 'user2' } },
+        { session: expect.any(Object) },
+      );
+      expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
+        'user2',
+        { $pull: { followers: 'user1' } },
+        { session: expect.any(Object) },
+      );
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
@@ -228,8 +268,14 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToUnfollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToUnfollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({ followingCount: 0, following: [] }),
+        })
+        .mockReturnValueOnce({
+          select: jest.fn().mockResolvedValue({ followerCount: 0 }),
+        });
 
       await unfollowUser(req, res, next);
 
@@ -263,8 +309,10 @@ describe('Follow/Unfollow Controller', () => {
 
       User.findById = jest
         .fn()
-        .mockResolvedValueOnce(mockUserToUnfollow)
-        .mockResolvedValueOnce(mockFollower);
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockUserToUnfollow) })
+        .mockReturnValueOnce({ session: jest.fn().mockResolvedValue(mockFollower) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followingCount: 1, following: ['user3'] }) })
+        .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ followerCount: 0 }) });
 
       await unfollowUser(req, res, next);
 

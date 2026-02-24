@@ -1,19 +1,18 @@
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.js', '**/?(*.)+(spec|test).js'],
   testTimeout: 45000,
   verbose: true,
   forceExit: true,
   clearMocks: true,
-  resetMocks: true,
+  resetModules: true,
   restoreMocks: true,
+  setupFiles: ['<rootDir>/tests/setup/cloudinary.enforce.js'],
 
   // Coverage configuration
   collectCoverage: true,
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/server.js',
-    '!src/**/__tests__/**',
     '!src/utils/seedDatabase.js',
     '!src/config/logger.js',
   ],

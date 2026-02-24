@@ -3,7 +3,14 @@ const User = require('../models/User');
 const Vlog = require('../models/Vlog');
 const Comment = require('../models/Comment');
 const Like = require('../models/Like');
-const redis = require('../config/redis');
+const { createRedisClient } = require('../config/redis');
+
+const redis = new Proxy({}, {
+  get: (target, prop) => {
+    const client = createRedisClient();
+    return typeof client[prop] === 'function' ? client[prop].bind(client) : client[prop];
+  },
+});
 const logger = require('../config/logger');
 const { queueAssetCleanup } = require('../queues/accountDeletionQueue');
 

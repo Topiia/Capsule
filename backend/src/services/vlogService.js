@@ -4,7 +4,14 @@ const Like = require('../models/Like');
 const Comment = require('../models/Comment');
 const User = require('../models/User');
 const ErrorResponse = require('../utils/errorResponse');
-const redis = require('../config/redis');
+const { createRedisClient } = require('../config/redis');
+
+const redis = new Proxy({}, {
+  get: (target, prop) => {
+    const client = createRedisClient();
+    return typeof client[prop] === 'function' ? client[prop].bind(client) : client[prop];
+  },
+});
 const logger = require('../config/logger');
 
 class VlogService {

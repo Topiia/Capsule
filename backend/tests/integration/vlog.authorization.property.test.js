@@ -1,55 +1,43 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const fc = require('fast-check');
-const User = require('../models/User');
-const Vlog = require('../models/Vlog');
+const jwt = require('jsonwebtoken');
+const User = require('../../src/models/User');
+const Vlog = require('../../src/models/Vlog');
 
 // Mock the database connection function
-jest.mock('../config/database', () => jest.fn());
 
 // Mock Resend email services before importing app
-jest.mock('../utils/sendEmail', () => ({
+jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
 
-jest.mock('../utils/sendEmailSync', () => ({
+jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockReturnValue({ success: true }),
 }));
 
 // Import app after mocking
-const app = require('../app');
+const app = require('../../src/app');
 
 /**
- * Feature: vlog-edit-delete, Property 10: Unauthenticated request rejection
+ * Feature: vlog-edit-delete, Property 9: Non-author authorization rejection
  *
- * Property: For any vlog, both edit and delete requests without a valid
- * authentication token should be rejected with a 401 unauthorized error
+ * Property: For any vlog and any authenticated user who is not the author,
+ * both edit and delete requests should be rejected with a 403 forbidden error
  *
- * Validates: Requirements 3.3, 3.4
+ * Validates: Requirements 3.1, 3.2
  */
 
-describe('Property 10: Unauthenticated request rejection', () => {
+describe('Property 9: Non-author authorization rejection', () => {
   beforeAll(async () => {
     // Set test environment variables
     process.env.JWT_SECRET = 'test-secret-key-for-testing';
     process.env.NODE_ENV = 'test';
-
-    // Connect to test database
-    if (mongoose.connection.readyState === 0) {
-      const mongoUri = process.env.MONGODB_URI
-        || 'mongodb://localhost:27017/capsule-test';
-      await mongoose.connect(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    }
   });
 
   afterAll(async () => {
     // Clean up and close connection
     await User.deleteMany({});
     await Vlog.deleteMany({});
-    await mongoose.connection.close();
   });
 
   beforeEach(async () => {
@@ -58,8 +46,18 @@ describe('Property 10: Unauthenticated request rejection', () => {
     await Vlog.deleteMany({});
   });
 
-  // Helper function to create a user
-  const createUser = async (userData) => User.create(userData);
+  // Helper function to create a user and get JWT token
+  const createUserWithToken = async (userData) => {
+    const user = await User.create(userData);
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || 'test-secret',
+      {
+        expiresIn: '1h',
+      },
+    );
+    return { user, token };
+  };
 
   // Helper function to create a vlog
   const createVlog = async (authorId, vlogData) => Vlog.create({
@@ -115,55 +113,44 @@ describe('Property 10: Unauthenticated request rejection', () => {
     ),
   });
 
-  // Arbitrary for generating invalid/missing tokens
-  const invalidTokenArbitrary = fc.oneof(
-    fc.constant(null), // No token
-    fc.constant(''), // Empty token
-    fc.constant('invalid-token'), // Invalid format
-    fc.string({ minLength: 10, maxLength: 50 }), // Random string
-    fc.constant('Bearer '), // Bearer with no token
-    fc.constant('Bearer invalid-jwt-token'), // Bearer with invalid token
-  );
-
-  test('Property: Unauthenticated UPDATE requests should be rejected with 401', async () => {
+  test('Property: Non-author UPDATE requests should be rejected with 403', async () => {
     await fc.assert(
       fc.asyncProperty(
         userArbitrary,
+        userArbitrary,
         vlogArbitrary,
-        invalidTokenArbitrary,
-        async (authorData, vlogData, invalidToken) => {
+        async (authorData, nonAuthorData, vlogData) => {
+          // Ensure different users
+          fc.pre(authorData.email !== nonAuthorData.email);
+          fc.pre(authorData.username !== nonAuthorData.username);
+
           try {
             // Clean up before each property test run
             await User.deleteMany({});
             await Vlog.deleteMany({});
 
             // Create author and their vlog
-            const author = await createUser(authorData);
+            const { user: author } = await createUserWithToken(authorData);
             const vlog = await createVlog(author._id, vlogData);
 
-            // Attempt to update vlog without authentication or with invalid token
+            // Create non-author user
+            const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
+
+            // Attempt to update vlog as non-author
             const updateData = {
               title: 'Updated Title',
               description: 'Updated description that is long enough',
             };
 
-            const requestBuilder = request(app)
+            const response = await request(app)
               .put(`/api/vlogs/${vlog._id}`)
+              .set('Authorization', `Bearer ${nonAuthorToken}`)
               .send(updateData);
 
-            // Add authorization header only if token is not null
-            if (invalidToken !== null && invalidToken !== '') {
-              requestBuilder.set('Authorization', invalidToken);
-            }
-
-            const response = await requestBuilder;
-
-            // Assert 401 Unauthorized
-            expect(response.status).toBe(401);
+            // Assert 403 Forbidden
+            expect(response.status).toBe(403);
             expect(response.body.success).toBe(false);
-            expect(response.body.error.message).toMatch(
-              /not authorized|unauthorized|no token|invalid token/i,
-            );
+            expect(response.body.error).toMatch(/not authorized/i);
 
             // Verify vlog was not modified
             const unchangedVlog = await Vlog.findById(vlog._id);
@@ -180,40 +167,38 @@ describe('Property 10: Unauthenticated request rejection', () => {
     );
   }, 30000);
 
-  test('Property: Unauthenticated DELETE requests should be rejected with 401', async () => {
+  test('Property: Non-author DELETE requests should be rejected with 403', async () => {
     await fc.assert(
       fc.asyncProperty(
         userArbitrary,
+        userArbitrary,
         vlogArbitrary,
-        invalidTokenArbitrary,
-        async (authorData, vlogData, invalidToken) => {
+        async (authorData, nonAuthorData, vlogData) => {
+          // Ensure different users
+          fc.pre(authorData.email !== nonAuthorData.email);
+          fc.pre(authorData.username !== nonAuthorData.username);
+
           try {
             // Clean up before each property test run
             await User.deleteMany({});
             await Vlog.deleteMany({});
 
             // Create author and their vlog
-            const author = await createUser(authorData);
+            const { user: author } = await createUserWithToken(authorData);
             const vlog = await createVlog(author._id, vlogData);
 
-            // Attempt to delete vlog without authentication or with invalid token
-            const requestBuilder = request(app).delete(
-              `/api/vlogs/${vlog._id}`,
-            );
+            // Create non-author user
+            const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
 
-            // Add authorization header only if token is not null
-            if (invalidToken !== null && invalidToken !== '') {
-              requestBuilder.set('Authorization', invalidToken);
-            }
+            // Attempt to delete vlog as non-author
+            const response = await request(app)
+              .delete(`/api/vlogs/${vlog._id}`)
+              .set('Authorization', `Bearer ${nonAuthorToken}`);
 
-            const response = await requestBuilder;
-
-            // Assert 401 Unauthorized
-            expect(response.status).toBe(401);
+            // Assert 403 Forbidden
+            expect(response.status).toBe(403);
             expect(response.body.success).toBe(false);
-            expect(response.body.error.message).toMatch(
-              /not authorized|unauthorized|no token|invalid token/i,
-            );
+            expect(response.body.error).toMatch(/not authorized/i);
 
             // Verify vlog still exists
             const stillExistingVlog = await Vlog.findById(vlog._id);

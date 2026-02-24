@@ -1,27 +1,28 @@
 /* eslint-disable no-underscore-dangle */
 const mongoose = require('mongoose');
-const userDeletionService = require('../services/userDeletionService');
-const User = require('../models/User');
-const Vlog = require('../models/Vlog');
-const Comment = require('../models/Comment');
-const Like = require('../models/Like');
-const redis = require('../config/redis');
-const logger = require('../config/logger');
-const { queueAssetCleanup } = require('../queues/accountDeletionQueue');
+const userDeletionService = require('../../src/services/userDeletionService');
+const User = require('../../src/models/User');
+const Vlog = require('../../src/models/Vlog');
+const Comment = require('../../src/models/Comment');
+const Like = require('../../src/models/Like');
+const redis = require('../../src/config/redis');
+const logger = require('../../src/config/logger');
+const { queueAssetCleanup } = require('../../src/queues/accountDeletionQueue');
 
 // Mock all external dependencies
-jest.mock('../models/User');
-jest.mock('../models/Vlog');
-jest.mock('../models/Comment');
-jest.mock('../models/Like');
-jest.mock('../config/redis');
-jest.mock('../config/logger');
-jest.mock('../queues/accountDeletionQueue');
+jest.mock('../../src/models/User');
+jest.mock('../../src/models/Vlog');
+jest.mock('../../src/models/Comment');
+jest.mock('../../src/models/Like');
+jest.mock('../../src/config/redis');
+jest.mock('../../src/config/logger');
+jest.mock('../../src/queues/accountDeletionQueue');
 
 describe('userDeletionService.deleteUser() - Unit Tests', () => {
   let mockSession;
   let mockUser;
   let mockVlogs;
+  let mockRedisClient;
 
   beforeEach(() => {
     // Reset all mocks
@@ -73,7 +74,10 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
     logger.error.mockImplementation(() => {});
 
     // Mock Redis
-    redis.delPattern.mockResolvedValue(3);
+    mockRedisClient = {
+      delPattern: jest.fn().mockResolvedValue(3),
+    };
+    redis.createRedisClient.mockReturnValue(mockRedisClient);
 
     // Mock queue
     queueAssetCleanup.mockResolvedValue({ id: 'job-123' });
@@ -199,16 +203,16 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
       await userDeletionService.deleteUser(mockUser._id);
 
       // Assert
-      expect(redis.delPattern).toHaveBeenCalledWith(`user:${mockUser._id}:*`);
-      expect(redis.delPattern).toHaveBeenCalledWith(`session:${mockUser._id}`);
-      expect(redis.delPattern).toHaveBeenCalledWith(`socket:${mockUser._id}`);
-      expect(redis.delPattern).toHaveBeenCalledWith(
+      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`user:${mockUser._id}:*`);
+      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`session:${mockUser._id}`);
+      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`socket:${mockUser._id}`);
+      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(
         `cache:vlogs:author:${mockUser._id}`,
       );
 
       // Verify Redis cleanup happens after commit
       const commitCallOrder = mockSession.commitTransaction.mock.invocationCallOrder[0];
-      const redisCallOrder = redis.delPattern.mock.invocationCallOrder[0];
+      const redisCallOrder = mockRedisClient.delPattern.mock.invocationCallOrder[0];
 
       expect(redisCallOrder).toBeGreaterThan(commitCallOrder);
     });
@@ -371,7 +375,7 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
         userDeletionService.deleteUser(mockUser._id),
       ).rejects.toThrow('Query timeout');
 
-      expect(redis.delPattern).not.toHaveBeenCalled();
+      expect(mockRedisClient.delPattern).not.toHaveBeenCalled();
       expect(queueAssetCleanup).not.toHaveBeenCalled();
     });
   });
@@ -474,7 +478,7 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
       Vlog.deleteMany.mockResolvedValue({ deletedCount: 0 });
       User.findByIdAndDelete.mockResolvedValue(mockUser);
 
-      redis.delPattern.mockRejectedValue(new Error('Redis connection lost'));
+      mockRedisClient.delPattern.mockRejectedValue(new Error('Redis connection lost'));
 
       // Act
       const result = await userDeletionService.deleteUser(mockUser._id);

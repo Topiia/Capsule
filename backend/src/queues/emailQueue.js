@@ -24,6 +24,7 @@ let queueReady = false;
  * Prevents auto-connection during module import (useful for test isolation).
  */
 exports.createEmailQueue = () => {
+  if (process.env.NODE_ENV === 'test') { return null; }
   if (emailQueue) return emailQueue;
 
   try {

@@ -4,7 +4,7 @@ const router = express.Router();
 const Vlog = require('../models/Vlog');
 const metricsService = require('../modules/moderation/metrics.service');
 const trustScoreService = require('../modules/moderation/trust.score.service');
-const sendEmail = require('../utils/sendEmail');
+const { sendEmail } = require('../utils/sendEmail');
 
 // PROTECT ALL ROUTES (Admin only)
 const { protect, authorize } = require('../middleware/auth');

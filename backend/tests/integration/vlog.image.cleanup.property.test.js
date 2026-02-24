@@ -1,16 +1,14 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const fc = require('fast-check');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Vlog = require('../models/Vlog');
+const User = require('../../src/models/User');
+const Vlog = require('../../src/models/Vlog');
 
 // Mock the database connection function
-jest.mock('../config/database', () => jest.fn());
 
 // Mock the upload middleware to track deleteImage calls
 const mockDeleteImage = jest.fn();
-jest.mock('../middleware/upload', () => ({
+jest.mock('../../src/middleware/upload', () => ({
   uploadSingle: jest.fn(() => (req, res, next) => next()),
   uploadMultiple: jest.fn(() => (req, res, next) => next()),
   deleteImage: mockDeleteImage,
@@ -18,16 +16,16 @@ jest.mock('../middleware/upload', () => ({
 }));
 
 // Mock Resend email services before importing app
-jest.mock('../utils/sendEmail', () => ({
+jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
 
-jest.mock('../utils/sendEmailSync', () => ({
+jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockReturnValue({ success: true }),
 }));
 
 // Import app after mocking
-const app = require('../app');
+const app = require('../../src/app');
 
 /**
  * Feature: vlog-edit-delete, Property 7: Image cleanup on deletion
@@ -43,23 +41,12 @@ describe('Property 7: Image cleanup on deletion', () => {
     // Set test environment variables
     process.env.JWT_SECRET = 'test-secret-key-for-testing';
     process.env.NODE_ENV = 'test';
-
-    // Connect to test database
-    if (mongoose.connection.readyState === 0) {
-      const mongoUri = process.env.MONGODB_URI
-        || 'mongodb://localhost:27017/capsule-test';
-      await mongoose.connect(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    }
   });
 
   afterAll(async () => {
     // Clean up and close connection
     await User.deleteMany({});
     await Vlog.deleteMany({});
-    await mongoose.connection.close();
   });
 
   beforeEach(async () => {
