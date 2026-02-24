@@ -34,18 +34,6 @@ describe('Property 4: Update persistence and navigation', () => {
     process.env.NODE_ENV = 'test';
   });
 
-  afterAll(async () => {
-    // Clean up and close connection
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
-  beforeEach(async () => {
-    // Clear collections before each test
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
   // Helper function to create a user and get JWT token
   const createUserWithToken = async (userData) => {
     const user = await User.create(userData);
@@ -152,73 +140,67 @@ describe('Property 4: Update persistence and navigation', () => {
         vlogArbitrary,
         updateDataArbitrary,
         async (authorData, originalVlogData, updateData) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const { user: author, token } = await createUserWithToken(authorData);
-            const originalVlog = await createVlog(author._id, originalVlogData);
+          // Create author and their vlog
+          const { user: author, token } = await createUserWithToken(authorData);
+          const originalVlog = await createVlog(author._id, originalVlogData);
 
-            // Prepare update data with images (keep original images)
-            const updatePayload = {
-              ...updateData,
-              images: originalVlogData.images, // Keep original images
-            };
+          // Prepare update data with images (keep original images)
+          const updatePayload = {
+            ...updateData,
+            images: originalVlogData.images, // Keep original images
+          };
 
-            // Submit update request
-            const response = await request(app)
-              .put(`/api/vlogs/${originalVlog._id}`)
-              .set('Authorization', `Bearer ${token}`)
-              .send(updatePayload);
+          // Submit update request
+          const response = await request(app)
+            .put(`/api/vlogs/${originalVlog._id}`)
+            .set('Authorization', `Bearer ${token}`)
+            .send(updatePayload);
 
-            // Assert successful update (200 OK)
-            expect(response.status).toBe(200);
-            expect(response.body.success).toBe(true);
-            expect(response.body.data).toBeDefined();
+          // Assert successful update (200 OK)
+          expect(response.status).toBe(200);
+          expect(response.body.success).toBe(true);
+          expect(response.body.data).toBeDefined();
 
-            // Verify all changes persisted to the database
-            const updatedVlog = await Vlog.findById(originalVlog._id);
-            expect(updatedVlog).not.toBeNull();
+          // Verify all changes persisted to the database
+          const updatedVlog = await Vlog.findById(originalVlog._id);
+          expect(updatedVlog).not.toBeNull();
 
-            // Verify each field was updated correctly
-            // Note: title and description are trimmed by the Vlog model
-            expect(updatedVlog.title).toBe(updateData.title.trim());
-            expect(updatedVlog.description).toBe(updateData.description.trim());
-            expect(updatedVlog.category).toBe(updateData.category);
+          // Verify each field was updated correctly
+          // Note: title and description are trimmed by the Vlog model
+          expect(updatedVlog.title).toBe(updateData.title.trim());
+          expect(updatedVlog.description).toBe(updateData.description.trim());
+          expect(updatedVlog.category).toBe(updateData.category);
 
-            // Verify tags (may include AI-generated tags, so check that our tags are included)
-            // Note: tags are automatically converted to lowercase and trimmed by the Vlog model
-            updateData.tags.forEach((tag) => {
-              expect(updatedVlog.tags).toContain(tag.toLowerCase().trim());
-            });
+          // Verify tags (may include AI-generated tags, so check that our tags are included)
+          // Note: tags are automatically converted to lowercase and trimmed by the Vlog model
+          updateData.tags.forEach((tag) => {
+            expect(updatedVlog.tags).toContain(tag.toLowerCase().trim());
+          });
 
-            // Verify images were preserved
-            expect(updatedVlog.images.length).toBe(
-              originalVlogData.images.length,
-            );
+          // Verify images were preserved
+          expect(updatedVlog.images.length).toBe(
+            originalVlogData.images.length,
+          );
 
-            // Verify author remains unchanged
-            expect(updatedVlog.author.toString()).toBe(author._id.toString());
+          // Verify author remains unchanged
+          expect(updatedVlog.author.toString()).toBe(author._id.toString());
 
-            // Verify updatedAt timestamp was updated
-            expect(updatedVlog.updatedAt.getTime()).toBeGreaterThan(
-              originalVlog.updatedAt.getTime(),
-            );
+          // Verify updatedAt timestamp was updated
+          expect(updatedVlog.updatedAt.getTime()).toBeGreaterThan(
+            originalVlog.updatedAt.getTime(),
+          );
 
-            // Verify response contains updated data
-            // Note: title and description are trimmed by the Vlog model
-            expect(response.body.data.title).toBe(updateData.title.trim());
-            expect(response.body.data.description).toBe(
-              updateData.description.trim(),
-            );
-            expect(response.body.data.category).toBe(updateData.category);
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-          }
+          // Verify response contains updated data
+          // Note: title and description are trimmed by the Vlog model
+          expect(response.body.data.title).toBe(updateData.title.trim());
+          expect(response.body.data.description).toBe(
+            updateData.description.trim(),
+          );
+          expect(response.body.data.category).toBe(updateData.category);
         },
       ),
       { numRuns: 3, timeout: 5000 },

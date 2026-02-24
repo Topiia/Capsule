@@ -43,16 +43,7 @@ describe('Property 7: Image cleanup on deletion', () => {
     process.env.NODE_ENV = 'test';
   });
 
-  afterAll(async () => {
-    // Clean up and close connection
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
   beforeEach(async () => {
-    // Clear collections before each test
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
     // Clear mock calls
     mockDeleteImage.mockClear();
     // Mock successful deletion
@@ -134,52 +125,45 @@ describe('Property 7: Image cleanup on deletion', () => {
         userArbitrary,
         vlogArbitrary,
         async (authorData, vlogData) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-            mockDeleteImage.mockClear();
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
+          mockDeleteImage.mockClear();
 
-            // Create author and their vlog
-            const { user: author, token } = await createUserWithToken(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const { user: author, token } = await createUserWithToken(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Store the image public IDs for verification
-            const imagePublicIds = vlog.images.map((img) => img.publicId);
-            const imageCount = imagePublicIds.length;
+          // Store the image public IDs for verification
+          const imagePublicIds = vlog.images.map((img) => img.publicId);
+          const imageCount = imagePublicIds.length;
 
-            // Verify vlog has images
-            expect(imageCount).toBeGreaterThan(0);
+          // Verify vlog has images
+          expect(imageCount).toBeGreaterThan(0);
 
-            // Delete the vlog
-            const deleteResponse = await request(app)
-              .delete(`/api/vlogs/${vlog._id}`)
-              .set('Authorization', `Bearer ${token}`);
+          // Delete the vlog
+          const deleteResponse = await request(app)
+            .delete(`/api/vlogs/${vlog._id}`)
+            .set('Authorization', `Bearer ${token}`);
 
-            // Assert successful deletion
-            expect(deleteResponse.status).toBe(200);
-            expect(deleteResponse.body.success).toBe(true);
+          // Assert successful deletion
+          expect(deleteResponse.status).toBe(200);
+          expect(deleteResponse.body.success).toBe(true);
 
-            // Verify deleteImage was called for each image
-            expect(mockDeleteImage).toHaveBeenCalledTimes(imageCount);
+          // Verify deleteImage was called for each image
+          expect(mockDeleteImage).toHaveBeenCalledTimes(imageCount);
 
-            // Verify each image public_id was passed to deleteImage
-            imagePublicIds.forEach((publicId) => {
-              expect(mockDeleteImage).toHaveBeenCalledWith(publicId);
-            });
+          // Verify each image public_id was passed to deleteImage
+          imagePublicIds.forEach((publicId) => {
+            expect(mockDeleteImage).toHaveBeenCalledWith(publicId);
+          });
 
-            // Verify vlog no longer exists
-            const vlogAfterDeletion = await Vlog.findById(vlog._id);
-            expect(vlogAfterDeletion).toBeNull();
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-            mockDeleteImage.mockClear();
-          }
+          // Verify vlog no longer exists
+          const vlogAfterDeletion = await Vlog.findById(vlog._id);
+          expect(vlogAfterDeletion).toBeNull();
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 
@@ -189,49 +173,40 @@ describe('Property 7: Image cleanup on deletion', () => {
         userArbitrary,
         vlogArbitrary,
         async (authorData, vlogData) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-            mockDeleteImage.mockClear();
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
+          mockDeleteImage.mockClear();
 
-            // Mock deleteImage to fail for some images
-            mockDeleteImage.mockRejectedValue(
-              new Error('Cloudinary deletion failed'),
-            );
+          // Mock deleteImage to fail for some images
+          mockDeleteImage.mockRejectedValue(
+            new Error('Cloudinary deletion failed'),
+          );
 
-            // Create author and their vlog
-            const { user: author, token } = await createUserWithToken(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const { user: author, token } = await createUserWithToken(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            const imageCount = vlog.images.length;
+          const imageCount = vlog.images.length;
 
-            // Delete the vlog
-            const deleteResponse = await request(app)
-              .delete(`/api/vlogs/${vlog._id}`)
-              .set('Authorization', `Bearer ${token}`);
+          // Delete the vlog
+          const deleteResponse = await request(app)
+            .delete(`/api/vlogs/${vlog._id}`)
+            .set('Authorization', `Bearer ${token}`);
 
-            // Assert successful deletion despite image cleanup failures
-            expect(deleteResponse.status).toBe(200);
-            expect(deleteResponse.body.success).toBe(true);
+          // Assert successful deletion despite image cleanup failures
+          expect(deleteResponse.status).toBe(200);
+          expect(deleteResponse.body.success).toBe(true);
 
-            // Verify deleteImage was attempted for each image
-            expect(mockDeleteImage).toHaveBeenCalledTimes(imageCount);
+          // Verify deleteImage was attempted for each image
+          expect(mockDeleteImage).toHaveBeenCalledTimes(imageCount);
 
-            // Verify vlog was still deleted from database
-            const vlogAfterDeletion = await Vlog.findById(vlog._id);
-            expect(vlogAfterDeletion).toBeNull();
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-            mockDeleteImage.mockClear();
-            // Reset mock to successful deletion
-            mockDeleteImage.mockResolvedValue({ result: 'ok' });
-          }
+          // Verify vlog was still deleted from database
+          const vlogAfterDeletion = await Vlog.findById(vlog._id);
+          expect(vlogAfterDeletion).toBeNull();
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 });

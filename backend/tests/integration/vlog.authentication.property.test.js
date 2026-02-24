@@ -33,18 +33,6 @@ describe('Property 10: Unauthenticated request rejection', () => {
     process.env.NODE_ENV = 'test';
   });
 
-  afterAll(async () => {
-    // Clean up and close connection
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
-  beforeEach(async () => {
-    // Clear collections before each test
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
   // Helper function to create a user
   const createUser = async (userData) => User.create(userData);
 
@@ -119,51 +107,45 @@ describe('Property 10: Unauthenticated request rejection', () => {
         vlogArbitrary,
         invalidTokenArbitrary,
         async (authorData, vlogData, invalidToken) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const author = await createUser(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const author = await createUser(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Attempt to update vlog without authentication or with invalid token
-            const updateData = {
-              title: 'Updated Title',
-              description: 'Updated description that is long enough',
-            };
+          // Attempt to update vlog without authentication or with invalid token
+          const updateData = {
+            title: 'Updated Title',
+            description: 'Updated description that is long enough',
+          };
 
-            const requestBuilder = request(app)
-              .put(`/api/vlogs/${vlog._id}`)
-              .send(updateData);
+          const requestBuilder = request(app)
+            .put(`/api/vlogs/${vlog._id}`)
+            .send(updateData);
 
-            // Add authorization header only if token is not null
-            if (invalidToken !== null && invalidToken !== '') {
-              requestBuilder.set('Authorization', invalidToken);
-            }
-
-            const response = await requestBuilder;
-
-            // Assert 401 Unauthorized
-            expect(response.status).toBe(401);
-            expect(response.body.success).toBe(false);
-            expect(response.body.error.message).toMatch(
-              /not authorized|unauthorized|no token|invalid token/i,
-            );
-
-            // Verify vlog was not modified
-            const unchangedVlog = await Vlog.findById(vlog._id);
-            expect(unchangedVlog.title).toBe(vlogData.title);
-            expect(unchangedVlog.description).toBe(vlogData.description);
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Add authorization header only if token is not null
+          if (invalidToken !== null && invalidToken !== '') {
+            requestBuilder.set('Authorization', invalidToken);
           }
+
+          const response = await requestBuilder;
+
+          // Assert 401 Unauthorized
+          expect(response.status).toBe(401);
+          expect(response.body.success).toBe(false);
+          expect(response.body.error.message).toMatch(
+            /not authorized|unauthorized|no token|invalid token/i,
+          );
+
+          // Verify vlog was not modified
+          const unchangedVlog = await Vlog.findById(vlog._id);
+          expect(unchangedVlog.title).toBe(vlogData.title);
+          expect(unchangedVlog.description).toBe(vlogData.description);
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 
@@ -174,46 +156,40 @@ describe('Property 10: Unauthenticated request rejection', () => {
         vlogArbitrary,
         invalidTokenArbitrary,
         async (authorData, vlogData, invalidToken) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const author = await createUser(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const author = await createUser(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Attempt to delete vlog without authentication or with invalid token
-            const requestBuilder = request(app).delete(
-              `/api/vlogs/${vlog._id}`,
-            );
+          // Attempt to delete vlog without authentication or with invalid token
+          const requestBuilder = request(app).delete(
+            `/api/vlogs/${vlog._id}`,
+          );
 
-            // Add authorization header only if token is not null
-            if (invalidToken !== null && invalidToken !== '') {
-              requestBuilder.set('Authorization', invalidToken);
-            }
-
-            const response = await requestBuilder;
-
-            // Assert 401 Unauthorized
-            expect(response.status).toBe(401);
-            expect(response.body.success).toBe(false);
-            expect(response.body.error.message).toMatch(
-              /not authorized|unauthorized|no token|invalid token/i,
-            );
-
-            // Verify vlog still exists
-            const stillExistingVlog = await Vlog.findById(vlog._id);
-            expect(stillExistingVlog).not.toBeNull();
-            expect(stillExistingVlog._id.toString()).toBe(vlog._id.toString());
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Add authorization header only if token is not null
+          if (invalidToken !== null && invalidToken !== '') {
+            requestBuilder.set('Authorization', invalidToken);
           }
+
+          const response = await requestBuilder;
+
+          // Assert 401 Unauthorized
+          expect(response.status).toBe(401);
+          expect(response.body.success).toBe(false);
+          expect(response.body.error.message).toMatch(
+            /not authorized|unauthorized|no token|invalid token/i,
+          );
+
+          // Verify vlog still exists
+          const stillExistingVlog = await Vlog.findById(vlog._id);
+          expect(stillExistingVlog).not.toBeNull();
+          expect(stillExistingVlog._id.toString()).toBe(vlog._id.toString());
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 });

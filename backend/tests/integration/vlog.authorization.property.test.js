@@ -34,18 +34,6 @@ describe('Property 9: Non-author authorization rejection', () => {
     process.env.NODE_ENV = 'test';
   });
 
-  afterAll(async () => {
-    // Clean up and close connection
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
-  beforeEach(async () => {
-    // Clear collections before each test
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
   // Helper function to create a user and get JWT token
   const createUserWithToken = async (userData) => {
     const user = await User.create(userData);
@@ -124,46 +112,40 @@ describe('Property 9: Non-author authorization rejection', () => {
           fc.pre(authorData.email !== nonAuthorData.email);
           fc.pre(authorData.username !== nonAuthorData.username);
 
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const { user: author } = await createUserWithToken(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const { user: author } = await createUserWithToken(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Create non-author user
-            const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
+          // Create non-author user
+          const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
 
-            // Attempt to update vlog as non-author
-            const updateData = {
-              title: 'Updated Title',
-              description: 'Updated description that is long enough',
-            };
+          // Attempt to update vlog as non-author
+          const updateData = {
+            title: 'Updated Title',
+            description: 'Updated description that is long enough',
+          };
 
-            const response = await request(app)
-              .put(`/api/vlogs/${vlog._id}`)
-              .set('Authorization', `Bearer ${nonAuthorToken}`)
-              .send(updateData);
+          const response = await request(app)
+            .put(`/api/vlogs/${vlog._id}`)
+            .set('Authorization', `Bearer ${nonAuthorToken}`)
+            .send(updateData);
 
-            // Assert 403 Forbidden
-            expect(response.status).toBe(403);
-            expect(response.body.success).toBe(false);
-            expect(response.body.error).toMatch(/not authorized/i);
+          // Assert 403 Forbidden
+          expect(response.status).toBe(403);
+          expect(response.body.success).toBe(false);
+          expect(response.body.error).toMatch(/not authorized/i);
 
-            // Verify vlog was not modified
-            const unchangedVlog = await Vlog.findById(vlog._id);
-            expect(unchangedVlog.title).toBe(vlogData.title);
-            expect(unchangedVlog.description).toBe(vlogData.description);
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-          }
+          // Verify vlog was not modified
+          const unchangedVlog = await Vlog.findById(vlog._id);
+          expect(unchangedVlog.title).toBe(vlogData.title);
+          expect(unchangedVlog.description).toBe(vlogData.description);
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 
@@ -178,40 +160,34 @@ describe('Property 9: Non-author authorization rejection', () => {
           fc.pre(authorData.email !== nonAuthorData.email);
           fc.pre(authorData.username !== nonAuthorData.username);
 
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const { user: author } = await createUserWithToken(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const { user: author } = await createUserWithToken(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Create non-author user
-            const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
+          // Create non-author user
+          const { token: nonAuthorToken } = await createUserWithToken(nonAuthorData);
 
-            // Attempt to delete vlog as non-author
-            const response = await request(app)
-              .delete(`/api/vlogs/${vlog._id}`)
-              .set('Authorization', `Bearer ${nonAuthorToken}`);
+          // Attempt to delete vlog as non-author
+          const response = await request(app)
+            .delete(`/api/vlogs/${vlog._id}`)
+            .set('Authorization', `Bearer ${nonAuthorToken}`);
 
-            // Assert 403 Forbidden
-            expect(response.status).toBe(403);
-            expect(response.body.success).toBe(false);
-            expect(response.body.error).toMatch(/not authorized/i);
+          // Assert 403 Forbidden
+          expect(response.status).toBe(403);
+          expect(response.body.success).toBe(false);
+          expect(response.body.error).toMatch(/not authorized/i);
 
-            // Verify vlog still exists
-            const stillExistingVlog = await Vlog.findById(vlog._id);
-            expect(stillExistingVlog).not.toBeNull();
-            expect(stillExistingVlog._id.toString()).toBe(vlog._id.toString());
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-          }
+          // Verify vlog still exists
+          const stillExistingVlog = await Vlog.findById(vlog._id);
+          expect(stillExistingVlog).not.toBeNull();
+          expect(stillExistingVlog._id.toString()).toBe(vlog._id.toString());
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 });

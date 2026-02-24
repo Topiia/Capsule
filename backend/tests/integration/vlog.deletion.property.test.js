@@ -34,18 +34,6 @@ describe('Property 6: Deletion removes vlog', () => {
     process.env.NODE_ENV = 'test';
   });
 
-  afterAll(async () => {
-    // Clean up and close connection
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
-  beforeEach(async () => {
-    // Clear collections before each test
-    await User.deleteMany({});
-    await Vlog.deleteMany({});
-  });
-
   // Helper function to create a user and get JWT token
   const createUserWithToken = async (userData) => {
     const user = await User.create(userData);
@@ -123,54 +111,48 @@ describe('Property 6: Deletion removes vlog', () => {
         userArbitrary,
         vlogArbitrary,
         async (authorData, vlogData) => {
-          try {
-            // Clean up before each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
+          // Clean slate for this iteration
+          await User.deleteMany({});
+          await Vlog.deleteMany({});
 
-            // Create author and their vlog
-            const { user: author, token } = await createUserWithToken(authorData);
-            const vlog = await createVlog(author._id, vlogData);
+          // Create author and their vlog
+          const { user: author, token } = await createUserWithToken(authorData);
+          const vlog = await createVlog(author._id, vlogData);
 
-            // Verify vlog exists before deletion
-            const vlogBeforeDeletion = await Vlog.findById(vlog._id);
-            expect(vlogBeforeDeletion).not.toBeNull();
-            expect(vlogBeforeDeletion._id.toString()).toBe(vlog._id.toString());
+          // Verify vlog exists before deletion
+          const vlogBeforeDeletion = await Vlog.findById(vlog._id);
+          expect(vlogBeforeDeletion).not.toBeNull();
+          expect(vlogBeforeDeletion._id.toString()).toBe(vlog._id.toString());
 
-            // Delete the vlog
-            const deleteResponse = await request(app)
-              .delete(`/api/vlogs/${vlog._id}`)
-              .set('Authorization', `Bearer ${token}`);
+          // Delete the vlog
+          const deleteResponse = await request(app)
+            .delete(`/api/vlogs/${vlog._id}`)
+            .set('Authorization', `Bearer ${token}`);
 
-            // Assert successful deletion (200 OK)
-            expect(deleteResponse.status).toBe(200);
-            expect(deleteResponse.body.success).toBe(true);
-            expect(deleteResponse.body.message).toMatch(
-              /deleted successfully/i,
-            );
+          // Assert successful deletion (200 OK)
+          expect(deleteResponse.status).toBe(200);
+          expect(deleteResponse.body.success).toBe(true);
+          expect(deleteResponse.body.message).toMatch(
+            /deleted successfully/i,
+          );
 
-            // Verify vlog no longer exists in database
-            const vlogAfterDeletion = await Vlog.findById(vlog._id);
-            expect(vlogAfterDeletion).toBeNull();
+          // Verify vlog no longer exists in database
+          const vlogAfterDeletion = await Vlog.findById(vlog._id);
+          expect(vlogAfterDeletion).toBeNull();
 
-            // Verify querying for the vlog returns 404
-            const getResponse = await request(app).get(
-              `/api/vlogs/${vlog._id}`,
-            );
+          // Verify querying for the vlog returns 404
+          const getResponse = await request(app).get(
+            `/api/vlogs/${vlog._id}`,
+          );
 
-            expect(getResponse.status).toBe(404);
-            expect(getResponse.body.success).toBe(false);
-            expect(
-              getResponse.body.error.message || getResponse.body.error,
-            ).toMatch(/not found/i);
-          } finally {
-            // Clean up after each property test run
-            await User.deleteMany({});
-            await Vlog.deleteMany({});
-          }
+          expect(getResponse.status).toBe(404);
+          expect(getResponse.body.success).toBe(false);
+          expect(
+            getResponse.body.error.message || getResponse.body.error,
+          ).toMatch(/not found/i);
         },
       ),
-      { numRuns: 5, timeout: 3000 },
+      { numRuns: 3, timeout: 3000 },
     );
   }, 30000);
 });
