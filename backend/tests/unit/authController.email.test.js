@@ -7,6 +7,17 @@ jest.mock('../../src/config/email', () => ({
   validateEmailConfig: jest.fn().mockReturnValue(true),
 }));
 
+// Mock Redis to prevent real ioredis instantiation — without this createRedisClient()
+// spins up a real connection attempt (~383ms) which blows the timing assertions.
+jest.mock('../../src/config/redis', () => ({
+  createRedisClient: jest.fn(() => ({
+    status: 'ready',
+    isAvailable: jest.fn().mockReturnValue(true),
+    on: jest.fn(),
+  })),
+  connectRedis: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { queuePasswordResetEmail } = require('../../src/queues/emailQueue');
 const User = require('../../src/models/User');
 const { forgotPassword } = require('../../src/controllers/authController');
@@ -20,6 +31,7 @@ jest.mock('../../src/queues/emailQueue');
 jest.mock('../../src/models/User');
 
 describe('Auth Controller - Forgot Password (Async Email)', () => {
+  let consoleSpy;
   let req;
   let res;
   let next;
@@ -28,12 +40,20 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
     // Force non-test NODE_ENV so authController sends emails in these tests
     process.env.NODE_ENV = 'production';
 
+    // Silence [FP] forensic console.log calls — they add ~50ms overhead per test
+    // in the Jest environment, which breaks the `duration < 50ms` timing assertion.
+    // Instrumentation remains active in production.
+    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
     req = {
       body: { email: 'test@example.com' },
     };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
+      // Required by [FP] forensic instrumentation — res.on('finish'/'close'/'error')
+      // Without this, asyncHandler catches the TypeError and the controller exits early.
+      on: jest.fn(),
     };
     next = jest.fn();
 
@@ -43,6 +63,8 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
   afterEach(() => {
     // Restore test NODE_ENV after each test
     process.env.NODE_ENV = 'test';
+    // Restore console.log
+    consoleSpy.mockRestore();
   });
 
   describe('Email Queuing Behavior', () => {
