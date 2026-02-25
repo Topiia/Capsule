@@ -95,7 +95,8 @@ describe('Email Queue Producer', () => {
       const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      expect(result).toEqual({ emailId: 'sync-msg-id', fallback: true });
+      // Fire-and-forget: function returns immediately; email sends in background
+      expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
     });
   });
 
@@ -113,7 +114,8 @@ describe('Email Queue Producer', () => {
       const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      expect(result).toEqual({ emailId: 'sync-msg-id', fallback: true });
+      // Fire-and-forget: function returns immediately; email sends in background
+      expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
     });
   });
 

@@ -46,7 +46,9 @@ const getApiBaseURL = () => {
 // Create axios instance with validated base URL
 const api = axios.create({
   baseURL: getApiBaseURL(),
-  timeout: 10000,
+  // 30s global safety net — the backend should always respond well within this.
+  // The real fix is the backend fire-and-forget fallback (< 500ms response).
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -68,7 +70,10 @@ export const authAPI = {
   updateDetails: (userData) => api.put("/auth/updatedetails", userData),
   updatePassword: (passwordData) =>
     api.put("/auth/updatepassword", passwordData),
-  forgotPassword: (email) => api.post("/auth/forgotpassword", { email }),
+  // 60s override: extra safety net in case backend sync-fallback is temporarily
+  // still blocking (e.g. before the fire-and-forget fix is deployed).
+  forgotPassword: (email) =>
+    api.post("/auth/forgotpassword", { email }, { timeout: 60000 }),
   resetPassword: (token, password) =>
     api.put(`/auth/resetpassword/${token}`, { password }),
   // COOKIE-ONLY AUTH: No body needed, refreshToken cookie sent automatically

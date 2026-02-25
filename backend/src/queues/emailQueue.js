@@ -91,16 +91,25 @@ exports.queueEmail = async (emailData, priority = 5) => {
       subject: emailData.subject,
     });
 
-    // ─── [FP] Signal 3 — Email Mode/Provider/Duration (sync-fallback) ─────
-    console.log(`[FP] EMAIL_MODE  sync-fallback  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    // ─── [FP] Signal 3 — Email Mode/Provider (sync-fallback FIRE-AND-FORGET) ─
+    console.log(`[FP] EMAIL_MODE  sync-fallback-fire-and-forget  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
     console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    qlog('EMAIL_SEND_START', '(sync-fallback path — Redis unavailable)');
+    qlog('EMAIL_SEND_START', '(sync-fallback — FIRE AND FORGET — not blocking response)');
+    // CRITICAL FIX: Do NOT await. Fire-and-forget so HTTP response returns immediately.
+    // Email sends in background; failure is logged but does not block the user.
     const emailT0 = Date.now();
-    const result = await sendEmailSync(emailData);
-    const emailDuration = Date.now() - emailT0;
-    qlog('EMAIL_SEND_DONE', `(sync-fallback result.id=${result && result.id})`);
-    console.log(`[FP] EMAIL_DURATION  ${emailDuration}ms  (${new Date().toISOString()})`);
-    return { emailId: result.id, fallback: true };
+    sendEmailSync(emailData)
+      .then((result) => {
+        const emailDuration = Date.now() - emailT0;
+        qlog('EMAIL_SEND_DONE', `(sync-fallback background result.id=${result && result.id})`);
+        console.log(`[FP] EMAIL_DURATION  ${emailDuration}ms  (background sync send completed)  (${new Date().toISOString()})`);
+      })
+      .catch((err) => {
+        console.error(`[FP] EMAIL_SEND_ERROR  (sync-fallback background failed: ${err.message})  (${new Date().toISOString()})`);
+        logger.error('Background sync email send failed', { to: emailData.to, error: err.message });
+      });
+    console.log(`[FP] EMAIL_DURATION  0ms  (fire-and-forget — response not blocked)  (${new Date().toISOString()})`);
+    return { emailId: null, fallback: true, fireAndForget: true };
   }
 
   // ─── Queue email normally (preferred async path) ─────────────────────────
@@ -142,16 +151,24 @@ exports.queueEmail = async (emailData, priority = 5) => {
       error: error.message,
     });
 
-    // ─── [FP] Signal 3 — Email Mode/Provider/Duration (catch-fallback) ───
-    console.log(`[FP] EMAIL_MODE  catch-fallback  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    // ─── [FP] Signal 3 — Email Mode/Provider (catch-fallback FIRE-AND-FORGET) ─
+    console.log(`[FP] EMAIL_MODE  catch-fallback-fire-and-forget  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
     console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    qlog('EMAIL_SEND_START', '(catch-fallback path — sendEmailSync)');
+    qlog('EMAIL_SEND_START', '(catch-fallback — FIRE AND FORGET — not blocking response)');
+    // CRITICAL FIX: Do NOT await. Fire-and-forget so HTTP response returns immediately.
     const fallT0 = Date.now();
-    const result = await sendEmailSync(emailData);
-    const fallDuration = Date.now() - fallT0;
-    qlog('EMAIL_SEND_DONE', `(catch-fallback done result.id=${result && result.id})`);
-    console.log(`[FP] EMAIL_DURATION  ${fallDuration}ms  (catch-fallback sync send)  (${new Date().toISOString()})`);
-    return { emailId: result.id, fallback: true };
+    sendEmailSync(emailData)
+      .then((result) => {
+        const fallDuration = Date.now() - fallT0;
+        qlog('EMAIL_SEND_DONE', `(catch-fallback background result.id=${result && result.id})`);
+        console.log(`[FP] EMAIL_DURATION  ${fallDuration}ms  (background catch-fallback completed)  (${new Date().toISOString()})`);
+      })
+      .catch((err) => {
+        console.error(`[FP] EMAIL_SEND_ERROR  (catch-fallback background failed: ${err.message})  (${new Date().toISOString()})`);
+        logger.error('Background catch-fallback email send failed', { to: emailData.to, error: err.message });
+      });
+    console.log(`[FP] EMAIL_DURATION  0ms  (fire-and-forget — response not blocked)  (${new Date().toISOString()})`);
+    return { emailId: null, fallback: true, fireAndForget: true };
   }
 };
 

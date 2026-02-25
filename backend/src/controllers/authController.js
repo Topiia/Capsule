@@ -456,6 +456,8 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   // Create reset URL - point to frontend
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+  // ─── [FP] Part 5 — Reset Link Verification ───────────────────────────────
+  console.log(`[FP] RESET_URL: ${resetUrl}  +${Date.now() - FP_START}ms`);
 
   try {
     // Skip email in test environment

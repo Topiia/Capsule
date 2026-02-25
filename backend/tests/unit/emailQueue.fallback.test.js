@@ -114,7 +114,10 @@ describe('Email Queue - Graceful Degradation', () => {
 
       const result = await freshQueueEmail(emailData);
 
-      expect(result).toEqual({ emailId: 'sync-email-id', fallback: true });
+      // Fire-and-forget: returns immediately without awaiting sendEmailSync.
+      // emailId is null because we don't await the result; email sends in background.
+      expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
+
       expect(freshSendSync).toHaveBeenCalledWith(emailData);
       expect(freshLogger.warn).toHaveBeenCalledWith(
         'Redis unavailable - sending email synchronously (FALLBACK)',
