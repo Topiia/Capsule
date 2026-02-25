@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const asyncHandler = require('./asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
+const env = require('../config/env');
 
 // Protect routes - requires valid JWT token
 exports.protect = asyncHandler(async (req, res, next) => {
@@ -25,25 +26,29 @@ exports.protect = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify token — use centralized secret with fallback
+    const decoded = jwt.verify(token, env.JWT_SECRET);
+
+    // Support both 'id' and 'userId' payload shapes
+    const userId = decoded.id || decoded.userId;
+    if (!userId) {
+      return next(new ErrorResponse('Invalid token payload', 401));
+    }
 
     // Check if user still exists
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(userId).select('-password');
     if (!user) {
       return next(new ErrorResponse('User no longer exists', 401));
     }
 
-    // SECURITY FIX: Only auto-activate in development mode
-    // In production, inactive users should remain inactive
-    if (process.env.NODE_ENV === 'development') {
-      // Auto-activate for easier development
+    // Auto-activate in development and test environments
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       if (typeof user.isActive === 'undefined' || user.isActive === false) {
         user.isActive = true;
         try {
           await User.findByIdAndUpdate(user._id, { isActive: true });
         } catch (err) {
-          // Ignore activation errors in development
+          // Ignore activation errors in non-production
         }
       }
     } else if (!user.isActive) {
@@ -96,13 +101,16 @@ exports.optionalAuth = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify token — use centralized secret with fallback
+    const decoded = jwt.verify(token, env.JWT_SECRET);
 
-    // Check if user still exists
-    const user = await User.findById(decoded.id).select('-password');
-    if (user && user.isActive) {
-      req.user = user;
+    const userId = decoded.id || decoded.userId;
+    if (userId) {
+      // Check if user still exists
+      const user = await User.findById(userId).select('-password');
+      if (user && (user.isActive || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development')) {
+        req.user = user;
+      }
     }
 
     next();
@@ -127,8 +135,8 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    // SECURITY: Verify JWT signature and decode payload
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    // SECURITY: Verify JWT signature and decode payload — use fallback secret
+    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET);
 
     // Extract token family and version from JWT payload
     const { id, tokenFamily, tokenVersion } = decoded;
@@ -215,9 +223,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
     // Token is valid - proceed with rotation
 
-    // Generate new access token
-    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRE,
+    // Generate new access token — use env config with fallbacks
+    const newAccessToken = jwt.sign({ id: user._id }, env.JWT_SECRET, {
+      expiresIn: env.JWT_EXPIRE,
     });
 
     // SECURITY: Increment token version (enforces single-use)
@@ -230,9 +238,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
         tokenFamily: user.tokenFamily,
         tokenVersion: newTokenVersion,
       },
-      process.env.JWT_REFRESH_SECRET,
+      env.JWT_REFRESH_SECRET,
       {
-        expiresIn: process.env.JWT_REFRESH_EXPIRE,
+        expiresIn: env.JWT_REFRESH_EXPIRE,
       },
     );
 

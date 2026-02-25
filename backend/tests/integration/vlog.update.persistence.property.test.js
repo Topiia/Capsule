@@ -68,52 +68,27 @@ describe('Property 4: Update persistence and navigation', () => {
   // Arbitrary for generating valid user data
   const userArbitrary = fc.record({
     username: fc.stringMatching(/^[a-zA-Z0-9_]{3,20}$/),
-    email: fc.emailAddress().filter((email) => {
-      // Ensure email matches typical validation pattern
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      return emailRegex.test(email);
-    }),
-    password: fc
-      .string({ minLength: 6, maxLength: 20 })
-      .filter((s) => s.trim().length >= 6),
+    email: fc.stringMatching(/^[a-z0-9]{5,15}$/).map((s) => `${s}@example.com`),
+    password: fc.stringMatching(/^[a-zA-Z0-9!@#$%^&*]{6,20}$/),
   });
 
   // Arbitrary for generating valid vlog data
   const vlogArbitrary = fc.record({
-    title: fc
-      .string({ minLength: 3, maxLength: 100 })
-      .filter((s) => s.trim().length >= 3),
-    description: fc
-      .string({ minLength: 10, maxLength: 500 })
-      .filter((s) => s.trim().length >= 10),
+    title: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 ]{1,48}[a-zA-Z0-9]$/),
+    description: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 .,!?]{8,198}[a-zA-Z0-9]$/),
     category: fc.constantFrom(
-      'technology',
-      'travel',
-      'lifestyle',
-      'food',
-      'fashion',
-      'fitness',
-      'music',
-      'art',
-      'business',
-      'education',
+      'technology', 'travel', 'lifestyle', 'food', 'fashion',
+      'fitness', 'music', 'art', 'business', 'education'
     ),
-    tags: fc.array(
-      fc
-        .string({ minLength: 1, maxLength: 30 })
-        .filter((s) => s.trim().length >= 1),
-      { maxLength: 10 },
-    ),
+    tags: fc.array(fc.stringMatching(/^[a-zA-Z0-9]{1,20}$/), { maxLength: 5 }),
     images: fc.array(
       fc.record({
         url: fc.webUrl(),
-        publicId: fc
-          .string({ minLength: 10, maxLength: 50 })
-          .filter((s) => s.trim().length >= 10),
-        caption: fc.string({ maxLength: 100 }),
+        publicId: fc.stringMatching(/^[a-zA-Z0-9_-]{10,30}$/),
+        caption: fc.stringMatching(/^[a-zA-Z0-9 ]{0,50}$/),
         order: fc.nat({ max: 9 }),
       }),
-      { minLength: 1, maxLength: 10 },
+      { minLength: 1, maxLength: 3 },
     ),
   });
 

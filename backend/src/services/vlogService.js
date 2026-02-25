@@ -47,8 +47,12 @@ class VlogService {
       isDisliked = !!dislike;
       isBookmarked = user ? user.bookmarks.includes(vlogId) : false;
 
-      if (vlog.author) {
-        isFollowedByCurrentUser = vlog.author.followers.includes(userId);
+      // Ensure author and followers exist before checking
+      if (vlog.author && vlog.author.followers) {
+        // Handle case where id is ObjectId vs string
+        isFollowedByCurrentUser = vlog.author.followers.some(
+          (followerId) => followerId.toString() === userId.toString()
+        );
       }
 
       // DO NOT auto-increment views here - let explicit recordView endpoint handle it

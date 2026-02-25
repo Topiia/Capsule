@@ -15,7 +15,7 @@ const User = require('../../src/models/User');
 describe('GET /api/users/profile/:username', () => {
   let testUser;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // Create a test user
     testUser = await User.create({
       username: 'testuser123',
@@ -26,7 +26,7 @@ describe('GET /api/users/profile/:username', () => {
     });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     // Clean up
     await User.deleteMany({ username: 'testuser123' });
   });

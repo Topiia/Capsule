@@ -5,10 +5,11 @@ const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const { sendEmail } = require('../utils/sendEmail');
 const { queuePasswordResetEmail } = require('../queues/emailQueue');
+const env = require('../config/env');
 
-// Generate JWT Token
-const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, {
-  expiresIn: process.env.JWT_EXPIRE,
+// Generate JWT Token — uses fallback so undefined JWT_EXPIRE never crashes jwt.sign
+const generateToken = (id) => jwt.sign({ id }, env.JWT_SECRET, {
+  expiresIn: env.JWT_EXPIRE,
 });
 
 // SECURITY: Generate Refresh Token with rotation tracking
@@ -19,9 +20,9 @@ const generateRefreshToken = (id, tokenFamily, tokenVersion) => jwt.sign(
     tokenFamily,
     tokenVersion,
   },
-  process.env.JWT_REFRESH_SECRET,
+  env.JWT_REFRESH_SECRET,
   {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE,
+    expiresIn: env.JWT_REFRESH_EXPIRE,
   },
 );
 
@@ -103,8 +104,8 @@ exports.register = asyncHandler(async (req, res, next) => {
   // Single save operation to prevent double-hashing password
   await user.save();
 
-  // Send verification email
-  if (process.env.EMAIL_HOST || process.env.NODE_ENV === 'development') {
+  // Send verification email — skip entirely in test env to avoid external calls
+  if (process.env.NODE_ENV !== 'test' && (process.env.EMAIL_HOST || process.env.NODE_ENV === 'development')) {
     try {
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${verificationToken}`;
 
@@ -222,8 +223,8 @@ exports.login = asyncHandler(async (req, res, next) => {
   user.revokedAt = null;
   await user.save();
 
-  // Send welcome email on first login
-  if (isFirstLogin && process.env.EMAIL_HOST) {
+  // Send welcome email on first login — skip in test env
+  if (isFirstLogin && env.EMAIL_ENABLED && process.env.EMAIL_HOST) {
     try {
       await sendEmail({
         to: user.email,
@@ -405,6 +406,14 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
   try {
+    // Skip email in test environment
+    if (!env.EMAIL_ENABLED) {
+      return res.status(200).json({
+        success: true,
+        message: 'Password reset email sent',
+      });
+    }
+
     await queuePasswordResetEmail(user.email, resetUrl);
 
     // Email queued successfully

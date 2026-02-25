@@ -3,12 +3,13 @@ const User = require('../../src/models/User');
 const Like = require('../../src/models/Like');
 const Comment = require('../../src/models/Comment');
 const { getVlog } = require('../../src/controllers/vlogController');
-
+const VlogService = require('../../src/services/vlogService');
 jest.mock('../../src/models/Vlog');
 jest.mock('../../src/models/User');
 jest.mock('../../src/models/Like');
 jest.mock('../../src/models/Comment');
 jest.mock('../../src/config/redis');
+jest.mock('../../src/services/vlogService', () => ({ getVlog: jest.fn() }));
 
 describe('VlogDetail Follow Status', () => {
   let req;
@@ -17,7 +18,7 @@ describe('VlogDetail Follow Status', () => {
 
   beforeEach(() => {
     req = {
-      params: { id: 'vlog1' },
+      params: { id: '507f1f77bcf86cd799439011' },
       user: { id: 'user1', _id: 'user1' },
     };
     res = {
@@ -26,6 +27,9 @@ describe('VlogDetail Follow Status', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+
+    // Vlog.findById is mocked via VlogService.getVlog per test
+    // getVlog will be set in each test case
 
     Like.findOne = jest.fn().mockResolvedValue(null);
     Comment.find = jest.fn().mockReturnValue({
@@ -37,7 +41,7 @@ describe('VlogDetail Follow Status', () => {
 
   it('should include isFollowedByCurrentUser when user is following author', async () => {
     const mockVlog = {
-      _id: 'vlog1',
+      _id: '507f1f77bcf86cd799439011',
       title: 'Test Vlog',
       isPublic: true,
       author: {
@@ -54,13 +58,13 @@ describe('VlogDetail Follow Status', () => {
     };
     mockVlog.toObject = jest.fn().mockReturnValue({
       ...mockVlog,
-      author: { ...mockVlog.author },
+      author: { ...mockVlog.author, followers: ['user1'] },
     });
-
-    Vlog.findById = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
-    });
-
+    const serviceReturn = {
+      ...mockVlog,
+      author: { ...mockVlog.author, isFollowedByCurrentUser: true }
+    };
+    VlogService.getVlog.mockResolvedValue(serviceReturn);
     User.findById = jest.fn().mockReturnValue({
       select: jest.fn().mockResolvedValue({ bookmarks: [] }),
     });
@@ -79,7 +83,7 @@ describe('VlogDetail Follow Status', () => {
 
   it('should set isFollowedByCurrentUser to false when not following', async () => {
     const mockVlog = {
-      _id: 'vlog1',
+      _id: '507f1f77bcf86cd799439011',
       title: 'Test Vlog',
       isPublic: true,
       author: {
@@ -96,13 +100,13 @@ describe('VlogDetail Follow Status', () => {
     };
     mockVlog.toObject = jest.fn().mockReturnValue({
       ...mockVlog,
-      author: { ...mockVlog.author },
+      author: { ...mockVlog.author, followers: [] },
     });
-
-    Vlog.findById = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
-    });
-
+    const serviceReturn = {
+      ...mockVlog,
+      author: { ...mockVlog.author, isFollowedByCurrentUser: false }
+    };
+    VlogService.getVlog.mockResolvedValue(serviceReturn);
     User.findById = jest.fn().mockReturnValue({
       select: jest.fn().mockResolvedValue({ bookmarks: [] }),
     });
@@ -123,7 +127,7 @@ describe('VlogDetail Follow Status', () => {
     req.user = null;
 
     const mockVlog = {
-      _id: 'vlog1',
+      _id: '507f1f77bcf86cd799439011',
       title: 'Test Vlog',
       isPublic: true,
       author: {
@@ -138,15 +142,11 @@ describe('VlogDetail Follow Status', () => {
       comments: [],
       incrementViews: jest.fn(),
     };
-    mockVlog.toObject = jest.fn().mockReturnValue({
+    const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author },
-    });
-
-    Vlog.findById = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
-    });
-
+      author: { ...mockVlog.author, isFollowedByCurrentUser: false }
+    };
+    VlogService.getVlog.mockResolvedValue(serviceReturn);
     await getVlog(req, res, next);
 
     expect(res.json).toHaveBeenCalledWith({
@@ -161,7 +161,7 @@ describe('VlogDetail Follow Status', () => {
 
   it('should not have undefined values in author section', async () => {
     const mockVlog = {
-      _id: 'vlog1',
+      _id: '507f1f77bcf86cd799439011',
       title: 'Test Vlog',
       isPublic: true,
       author: {
@@ -176,14 +176,11 @@ describe('VlogDetail Follow Status', () => {
       comments: [],
       recordUniqueView: jest.fn(),
     };
-    mockVlog.toObject = jest.fn().mockReturnValue({
+    const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author },
-    });
-
-    Vlog.findById = jest.fn().mockReturnValue({
-      populate: jest.fn().mockResolvedValue(mockVlog),
-    });
+      author: { ...mockVlog.author, isFollowedByCurrentUser: true }
+    };
+    VlogService.getVlog.mockResolvedValue(serviceReturn);
 
     User.findById = jest.fn().mockReturnValue({
       select: jest.fn().mockResolvedValue({ bookmarks: [] }),

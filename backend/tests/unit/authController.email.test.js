@@ -19,6 +19,11 @@ jest.mock('../../src/utils/sendEmailSync', () => jest.fn());
 jest.mock('../../src/queues/emailQueue');
 jest.mock('../../src/models/User');
 
+jest.mock('../../src/config/env', () => ({
+  ...jest.requireActual('../../src/config/env'),
+  EMAIL_ENABLED: true,
+}));
+
 describe('Auth Controller - Forgot Password (Async Email)', () => {
   let req;
   let res;

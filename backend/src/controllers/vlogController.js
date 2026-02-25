@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Vlog = require('../models/Vlog');
 const Like = require('../models/Like');
 const Comment = require('../models/Comment');
@@ -83,6 +84,11 @@ exports.getVlogs = asyncHandler(async (req, res) => {
    GET SINGLE VLOG
 ---------------------------------------------------------- */
 exports.getVlog = asyncHandler(async (req, res, next) => {
+  // Validate ObjectId format early — prevents Mongoose CastError 500
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return next(new ErrorResponse('Vlog not found', 404));
+  }
+
   const userId = req.user ? req.user.id : null;
   const vlogData = await VlogService.getVlog(req.params.id, userId);
 

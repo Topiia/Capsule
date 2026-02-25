@@ -1,3 +1,6 @@
+// Fix MaxListenersExceededWarning from multiple SIGTERM handlers across test files
+process.setMaxListeners(30);
+
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
@@ -16,9 +19,17 @@ if (!fs.existsSync(uriPath)) {
 
 const { uri } = JSON.parse(fs.readFileSync(uriPath, 'utf8'));
 
+// Worker isolation logic: Each Jest worker gets its own isolated database name
+const workerId = process.env.JEST_WORKER_ID || '1';
+const dbName = `test_db_worker_${workerId}`;
+
+const parsedUri = new URL(uri);
+parsedUri.pathname = `/${dbName}`;
+const isolatedUri = parsedUri.toString();
+
 // CI diagnostic logging
+console.log(`[Integration Setup] Worker ${workerId} connecting to ${dbName}`);
 console.log('[Integration Setup] NODE_ENV:', process.env.NODE_ENV);
-console.log('[Integration Setup] Memory Server URI:', uri);
 
 // Environment Safety Guard: Ensure no production or Atlas DB is used
 const isProductionLike = (dbUri) => {
@@ -30,16 +41,16 @@ const isProductionLike = (dbUri) => {
          || lowerUri.includes('render');
 };
 
-if (isProductionLike(uri) || isProductionLike(process.env.MONGODB_URI || '')) {
+if (isProductionLike(isolatedUri) || isProductionLike(process.env.MONGODB_URI || '')) {
   throw new Error('Production or Atlas database detected in test environment. Aborting to prevent data corruption.');
 }
 
 // Pass URI down via process env just in case any application code reads it indirectly
-process.env.MONGODB_URI = uri;
+process.env.MONGODB_URI = isolatedUri;
 
 beforeAll(async () => {
   if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(uri, {
+    await mongoose.connect(isolatedUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -58,6 +69,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   if (mongoose.connection.readyState !== 0) {
+    // Drop the isolated database to clean up completely when worker finishes test file
+    await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
   }
 });

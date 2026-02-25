@@ -6,11 +6,14 @@ const Vlog = require('../../src/models/Vlog');
 
 // Mock the database connection function
 
+// Define mock explicitly so we can safely assert on it across scopes
+const mockDeleteImage = jest.fn().mockResolvedValue({ result: 'ok' });
+
 // Mock Cloudinary operations
 jest.mock('../../src/middleware/upload', () => ({
   uploadSingle: jest.fn(() => (req, res, next) => next()),
   uploadMultiple: jest.fn(() => (req, res, next) => next()),
-  deleteImage: jest.fn().mockResolvedValue({ result: 'ok' }),
+  deleteImage: (...args) => mockDeleteImage(...args),
   getImageUrl: jest.fn((publicId) => `https://cloudinary.com/${publicId}`),
 }));
 
@@ -244,9 +247,6 @@ describe('Vlog Edit & Delete Integration Tests', () => {
 
   describe('Complete Delete Flow', () => {
     test('should successfully delete vlog and clean up images', async () => {
-      // eslint-disable-next-line global-require
-      const { deleteImage } = require('../../src/middleware/upload');
-
       // Delete the vlog
       const response = await request(app)
         .delete(`/api/vlogs/${testVlog._id}`)
@@ -261,10 +261,13 @@ describe('Vlog Edit & Delete Integration Tests', () => {
       const deletedVlog = await Vlog.findById(testVlog._id);
       expect(deletedVlog).toBeNull();
 
-      // Verify image cleanup was attempted
-      expect(deleteImage).toHaveBeenCalledWith('test_image_1');
-      expect(deleteImage).toHaveBeenCalledWith('test_image_2');
-      expect(deleteImage).toHaveBeenCalledTimes(2);
+      // Ensure asynchronous deleteImage calls have flushed from the event loop
+      await new Promise((resolve) => { setImmediate(resolve); });
+
+      // Verify image cleanup was attempted via the explicitly defined mock wrapper
+      expect(mockDeleteImage).toHaveBeenCalledWith('test_image_1');
+      expect(mockDeleteImage).toHaveBeenCalledWith('test_image_2');
+      expect(mockDeleteImage).toHaveBeenCalledTimes(2);
     });
 
     test('should return 404 when querying deleted vlog', async () => {
@@ -284,11 +287,8 @@ describe('Vlog Edit & Delete Integration Tests', () => {
     });
 
     test('should continue deletion even if image cleanup fails', async () => {
-      // eslint-disable-next-line global-require
-      const { deleteImage } = require('../../src/middleware/upload');
-
       // Mock image deletion to fail
-      deleteImage.mockRejectedValueOnce(new Error('Cloudinary error'));
+      mockDeleteImage.mockRejectedValueOnce(new Error('Cloudinary error'));
 
       // Delete should still succeed
       const response = await request(app)

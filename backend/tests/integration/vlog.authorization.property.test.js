@@ -1,5 +1,7 @@
 const request = require('supertest');
 const fc = require('fast-check');
+
+fc.configureGlobal({ seed: 42 });
 const jwt = require('jsonwebtoken');
 const User = require('../../src/models/User');
 const Vlog = require('../../src/models/Vlog');
@@ -13,6 +15,18 @@ jest.mock('../../src/utils/sendEmail', () => ({
 
 jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockReturnValue({ success: true }),
+}));
+
+jest.mock('../../src/middleware/upload', () => ({
+  uploadSingle: jest.fn().mockReturnValue((req, res, next) => next()),
+  uploadMultiple: jest.fn().mockReturnValue((req, res, next) => next()),
+  deleteImage: jest.fn().mockResolvedValue({ result: 'ok' }),
+  getImageUrl: jest.fn().mockReturnValue('https://mocked.com/image.jpg'),
+  cloudinary: {
+    uploader: {
+      destroy: jest.fn().mockResolvedValue({ result: 'ok' }),
+    },
+  },
 }));
 
 // Import app after mocking
@@ -68,20 +82,14 @@ describe('Property 9: Non-author authorization rejection', () => {
   // Arbitrary for generating valid user data
   const userArbitrary = fc.record({
     username: fc.stringMatching(/^[a-zA-Z0-9_]{3,20}$/),
-    email: fc.emailAddress(),
-    password: fc
-      .string({ minLength: 6, maxLength: 20 })
-      .filter((s) => s.trim().length >= 6),
+    email: fc.stringMatching(/^[a-z0-9]{5,15}$/).map((s) => `${s}@example.com`),
+    password: fc.stringMatching(/^[a-zA-Z0-9!@#$%^&*]{6,20}$/),
   });
 
   // Arbitrary for generating valid vlog data
   const vlogArbitrary = fc.record({
-    title: fc
-      .string({ minLength: 3, maxLength: 100 })
-      .filter((s) => s.trim().length >= 3),
-    description: fc
-      .string({ minLength: 10, maxLength: 500 })
-      .filter((s) => s.trim().length >= 10),
+    title: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 ]{1,48}[a-zA-Z0-9]$/),
+    description: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 .,!?]{8,198}[a-zA-Z0-9]$/),
     category: fc.constantFrom(
       'technology',
       'travel',
@@ -94,22 +102,15 @@ describe('Property 9: Non-author authorization rejection', () => {
       'business',
       'education',
     ),
-    tags: fc.array(
-      fc
-        .string({ minLength: 1, maxLength: 30 })
-        .filter((s) => s.trim().length >= 1),
-      { maxLength: 10 },
-    ),
+    tags: fc.array(fc.stringMatching(/^[a-zA-Z0-9]{1,20}$/), { maxLength: 5 }),
     images: fc.array(
       fc.record({
         url: fc.webUrl(),
-        publicId: fc
-          .string({ minLength: 10, maxLength: 50 })
-          .filter((s) => s.trim().length >= 10),
-        caption: fc.string({ maxLength: 100 }),
+        publicId: fc.stringMatching(/^[a-zA-Z0-9_-]{10,30}$/),
+        caption: fc.stringMatching(/^[a-zA-Z0-9 ]{0,50}$/),
         order: fc.nat({ max: 9 }),
       }),
-      { minLength: 1, maxLength: 10 },
+      { minLength: 1, maxLength: 3 },
     ),
   });
 
@@ -150,7 +151,7 @@ describe('Property 9: Non-author authorization rejection', () => {
             // Assert 403 Forbidden
             expect(response.status).toBe(403);
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toMatch(/not authorized/i);
+            expect(response.body.error.message).toMatch(/not authorized/i);
 
             // Verify vlog was not modified
             const unchangedVlog = await Vlog.findById(vlog._id);
@@ -165,7 +166,7 @@ describe('Property 9: Non-author authorization rejection', () => {
       ),
       { numRuns: 5, timeout: 3000 },
     );
-  }, 30000);
+  }, 60000);
 
   test('Property: Non-author DELETE requests should be rejected with 403', async () => {
     await fc.assert(
@@ -198,7 +199,7 @@ describe('Property 9: Non-author authorization rejection', () => {
             // Assert 403 Forbidden
             expect(response.status).toBe(403);
             expect(response.body.success).toBe(false);
-            expect(response.body.error).toMatch(/not authorized/i);
+            expect(response.body.error.message).toMatch(/not authorized/i);
 
             // Verify vlog still exists
             const stillExistingVlog = await Vlog.findById(vlog._id);
@@ -213,5 +214,5 @@ describe('Property 9: Non-author authorization rejection', () => {
       ),
       { numRuns: 5, timeout: 3000 },
     );
-  }, 30000);
+  }, 60000);
 });

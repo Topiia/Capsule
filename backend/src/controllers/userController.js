@@ -334,7 +334,10 @@ exports.getFollowing = asyncHandler(async (req, res, next) => {
 exports.getUserByUsername = asyncHandler(async (req, res, next) => {
   const { username } = req.params;
 
-  const user = await User.findOne({ username }).select(
+  // Case-insensitive lookup so 'TestUser' matches 'testuser'
+  const user = await User.findOne({
+    username: new RegExp(`^${username}$`, 'i'),
+  }).select(
     '_id username avatar bio followerCount followingCount createdAt',
   );
 
