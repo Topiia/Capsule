@@ -459,8 +459,6 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   // ─── [FP] Part 5 — Reset Link Verification ───────────────────────────────
   console.log(`[FP] RESET_URL: ${resetUrl}  +${Date.now() - FP_START}ms`);
 
-
-
   // ─── [FP] PHASE 3c — Queue Operations (FIRE AND FORGET) ─────────────────
   // eslint-disable-next-line global-require
   const { isQueueAvailable } = require('../queues/emailQueue');
