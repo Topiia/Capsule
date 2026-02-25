@@ -233,14 +233,34 @@ api.interceptors.response.use(
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
 
-        // Store current location for redirect after login (but only if not already on auth pages)
+        // Only hard-redirect to /login when the user is on a PROTECTED route.
+        // Public routes (/reset-password, /forgot-password, /, /explore, etc.)
+        // must NOT be redirected — the /me call on those pages legitimately
+        // returns 401 because the user is unauthenticated.
+        //
+        // Strategy: explicit protected-route prefix list.
+        // If current path starts with a protected prefix → redirect.
+        // Otherwise → stay (React Router / ProtectedRoute handles it).
         const currentPath = window.location.pathname;
-        if (currentPath !== "/login" && currentPath !== "/register") {
+        const protectedPrefixes = [
+          "/dashboard",
+          "/settings",
+          "/create",
+          "/edit",
+          "/bookmarks",
+          "/liked",
+          "/admin",
+        ];
+        const isOnProtectedRoute = protectedPrefixes.some((prefix) =>
+          currentPath.startsWith(prefix)
+        );
+        if (isOnProtectedRoute) {
           localStorage.setItem("redirectAfterLogin", currentPath);
           window.location.href = "/login";
         }
 
         break;
+
       }
 
       case 403:
