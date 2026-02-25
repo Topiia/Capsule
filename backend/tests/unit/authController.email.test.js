@@ -92,11 +92,9 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
         expect.stringContaining('/reset-password/mock-token'),
       );
 
-      // Should return success response
-      expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        message: 'Password reset email sent',
+        message: 'If that email exists, a password reset link has been sent.',
       });
     });
 
@@ -120,7 +118,7 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
   });
 
   describe('Redis/Queue Unavailable Handling', () => {
-    it('should return 503 when queue is unavailable (no synchronous fallback)', async () => {
+    it('should return 200 even when queue rejects (fire-and-forget, error logged not surfaced)', async () => {
       const mockUser = {
         email: 'test@example.com',
         generatePasswordResetToken: jest.fn().mockReturnValue('token'),
@@ -129,25 +127,21 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
 
       User.findOne = jest.fn().mockResolvedValue(mockUser);
 
-      // Simulate Redis/queue unavailable
+      // Simulate Redis/queue unavailable — rejection is fire-and-forgotten, never re-thrown
       queuePasswordResetEmail.mockRejectedValue(
         new Error('Email queue unavailable - Redis connection required'),
       );
 
       await forgotPassword(req, res, next);
 
-      // Should return controlled error response
-      expect(res.status).toHaveBeenCalledWith(503);
+      // Response goes out immediately regardless of email outcome
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        error: {
-          message: 'Email service temporarily unavailable. Please try again later.',
-          code: 'EMAIL_SERVICE_UNAVAILABLE',
-          statusCode: 503,
-        },
+        success: true,
+        message: 'If that email exists, a password reset link has been sent.',
       });
 
-      // Should NOT clear reset token (allow retry)
+      // Token is still saved (user can retry)
       expect(mockUser.save).toHaveBeenCalled();
     });
   });

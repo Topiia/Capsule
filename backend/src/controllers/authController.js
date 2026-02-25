@@ -459,84 +459,50 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   // ─── [FP] Part 5 — Reset Link Verification ───────────────────────────────
   console.log(`[FP] RESET_URL: ${resetUrl}  +${Date.now() - FP_START}ms`);
 
-  try {
-    // Skip email in test environment
-    if (process.env.NODE_ENV === 'test') {
-      fp('RESPONSE_SENDING');
-      console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
-      const testRes = res.status(200).json({
-        success: true,
-        message: 'Password reset email sent',
-      });
-      console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
-      fp('RESPONSE_SENT');
-      return testRes;
-    }
 
-    // ─── [FP] PHASE 3c — Queue Operations ───────────────────────────────
-    // eslint-disable-next-line global-require
-    const { isQueueAvailable } = require('../queues/emailQueue');
-    const _qReady = isQueueAvailable();
-    // Access the module-level emailQueue reference via the exported getter
-    console.log(`[FP] QUEUE_STATE  queueReady=${_qReady}  emailQueue=${_qReady ? 'exists' : 'null'}  queue=email  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
+
+  // ─── [FP] PHASE 3c — Queue Operations (FIRE AND FORGET) ─────────────────
+  // eslint-disable-next-line global-require
+  const { isQueueAvailable } = require('../queues/emailQueue');
+  const _qReady = isQueueAvailable();
+  console.log(`[FP] QUEUE_STATE  queueReady=${_qReady}  emailQueue=${_qReady ? 'exists' : 'null'}  queue=email  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
+
+  // CRITICAL: Do NOT await email sending.
+  // Email is a side-effect — it must NEVER block the HTTP response.
+  // Token is already saved; response goes out now regardless of email outcome.
+  if (process.env.NODE_ENV !== 'test') {
     fp('QUEUE_ADD_START');
-    await queuePasswordResetEmail(user.email, resetUrl);
-    fp('QUEUE_ADD_DONE');
-
-    // ─── [FP] PHASE 2 — HTTP Response Verification ──────────────────────
-    fp('RESPONSE_SENDING');
-    console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
-    // Email queued successfully
-    res.status(200).json({
-      success: true,
-      message: 'Password reset email sent',
-    });
-    console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
-    fp('RESPONSE_SENT');
-  } catch (err) {
-    fp('QUEUE_ADD_DONE'); // Queue threw — still mark completion with error
-
-    if (err.message.includes('Email queue unavailable')) {
-      fp('RESPONSE_SENDING');
-      console.log(`[FP] BEFORE_RES_JSON (503)  +${Date.now() - FP_START}ms`);
-      const r = res.status(503).json({
-        success: false,
-        error: {
-          message: 'Email service temporarily unavailable. Please try again later.',
-          code: 'EMAIL_SERVICE_UNAVAILABLE',
-          statusCode: 503,
-        },
+    queuePasswordResetEmail(user.email, resetUrl)
+      .then(() => {
+        fp('QUEUE_ADD_DONE');
+      })
+      .catch((err) => {
+        fp('QUEUE_ADD_DONE'); // Mark done even on failure
+        // SECURITY: log internally, never expose to user
+        console.error({
+          level: 'error',
+          service: 'email',
+          event: 'password_reset_send_failed',
+          user_id: user._id,
+          username: user.username,
+          error: err.message,
+          timestamp: new Date().toISOString(),
+        });
+        // Token remains valid — user can retry forgot-password
       });
-      console.log(`[FP] AFTER_RES_JSON (503)  +${Date.now() - FP_START}ms`);
-      fp('RESPONSE_SENT');
-      return r;
-    }
-
-    // SECURITY: Log error internally but don't expose to user
-    console.error({
-      level: 'error',
-      service: 'email',
-      event: 'password_reset_send_failed',
-      user_id: user._id,
-      username: user.username,
-      error: err.message,
-      timestamp: new Date().toISOString(),
-    });
-
-    // DO NOT clear reset token - allow user to retry
-    // Token will expire naturally in 15 minutes
-
-    // SECURITY: Return same success message even if email fails
-    // This prevents email enumeration attacks
-    fp('RESPONSE_SENDING');
-    console.log(`[FP] BEFORE_RES_JSON (catch-200)  +${Date.now() - FP_START}ms`);
-    res.status(200).json({
-      success: true,
-      message: 'If that email exists, a password reset link has been sent.',
-    });
-    console.log(`[FP] AFTER_RES_JSON (catch-200)  +${Date.now() - FP_START}ms`);
-    fp('RESPONSE_SENT');
   }
+
+  // ─── [FP] PHASE 2 — HTTP Response (sent immediately, before email) ────────
+  fp('RESPONSE_SENDING');
+  console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
+  // SECURITY: Always return same message regardless of email outcome or whether
+  // account exists — prevents email enumeration attacks
+  res.status(200).json({
+    success: true,
+    message: 'If that email exists, a password reset link has been sent.',
+  });
+  console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
+  fp('RESPONSE_SENT');
 });
 
 // @desc    Reset password
