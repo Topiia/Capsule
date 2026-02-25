@@ -19,17 +19,15 @@ jest.mock('../../src/utils/sendEmailSync', () => jest.fn());
 jest.mock('../../src/queues/emailQueue');
 jest.mock('../../src/models/User');
 
-jest.mock('../../src/config/env', () => ({
-  ...jest.requireActual('../../src/config/env'),
-  EMAIL_ENABLED: true,
-}));
-
 describe('Auth Controller - Forgot Password (Async Email)', () => {
   let req;
   let res;
   let next;
 
   beforeEach(() => {
+    // Force non-test NODE_ENV so authController sends emails in these tests
+    process.env.NODE_ENV = 'production';
+
     req = {
       body: { email: 'test@example.com' },
     };
@@ -40,6 +38,11 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
     next = jest.fn();
 
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    // Restore test NODE_ENV after each test
+    process.env.NODE_ENV = 'test';
   });
 
   describe('Email Queuing Behavior', () => {
