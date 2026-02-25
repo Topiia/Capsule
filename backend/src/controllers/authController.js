@@ -5,11 +5,10 @@ const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const { sendEmail } = require('../utils/sendEmail');
 const { queuePasswordResetEmail } = require('../queues/emailQueue');
-const env = require('../config/env');
 
 // Generate JWT Token — uses fallback so undefined JWT_EXPIRE never crashes jwt.sign
-const generateToken = (id) => jwt.sign({ id }, env.JWT_SECRET, {
-  expiresIn: env.JWT_EXPIRE,
+const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET || 'testsecret', {
+  expiresIn: process.env.JWT_EXPIRE || '7d',
 });
 
 // SECURITY: Generate Refresh Token with rotation tracking
@@ -20,9 +19,9 @@ const generateRefreshToken = (id, tokenFamily, tokenVersion) => jwt.sign(
     tokenFamily,
     tokenVersion,
   },
-  env.JWT_REFRESH_SECRET,
+  process.env.JWT_REFRESH_SECRET || 'refreshsecret',
   {
-    expiresIn: env.JWT_REFRESH_EXPIRE,
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
   },
 );
 
@@ -224,7 +223,7 @@ exports.login = asyncHandler(async (req, res, next) => {
   await user.save();
 
   // Send welcome email on first login — skip in test env
-  if (isFirstLogin && env.EMAIL_ENABLED && process.env.EMAIL_HOST) {
+  if (isFirstLogin && process.env.NODE_ENV !== 'test' && process.env.EMAIL_HOST) {
     try {
       await sendEmail({
         to: user.email,
@@ -407,7 +406,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
   try {
     // Skip email in test environment
-    if (!env.EMAIL_ENABLED) {
+    if (process.env.NODE_ENV === 'test') {
       return res.status(200).json({
         success: true,
         message: 'Password reset email sent',

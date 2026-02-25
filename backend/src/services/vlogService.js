@@ -51,7 +51,7 @@ class VlogService {
       if (vlog.author && vlog.author.followers) {
         // Handle case where id is ObjectId vs string
         isFollowedByCurrentUser = vlog.author.followers.some(
-          (followerId) => followerId.toString() === userId.toString()
+          (followerId) => followerId.toString() === userId.toString(),
         );
       }
 

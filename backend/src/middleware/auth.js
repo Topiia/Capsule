@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const asyncHandler = require('./asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
-const env = require('../config/env');
 
 // Protect routes - requires valid JWT token
 exports.protect = asyncHandler(async (req, res, next) => {
@@ -27,7 +26,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
   try {
     // Verify token — use centralized secret with fallback
-    const decoded = jwt.verify(token, env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'testsecret');
 
     // Support both 'id' and 'userId' payload shapes
     const userId = decoded.id || decoded.userId;
@@ -102,7 +101,7 @@ exports.optionalAuth = asyncHandler(async (req, res, next) => {
 
   try {
     // Verify token — use centralized secret with fallback
-    const decoded = jwt.verify(token, env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'testsecret');
 
     const userId = decoded.id || decoded.userId;
     if (userId) {
@@ -136,7 +135,7 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
   try {
     // SECURITY: Verify JWT signature and decode payload — use fallback secret
-    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET);
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refreshsecret');
 
     // Extract token family and version from JWT payload
     const { id, tokenFamily, tokenVersion } = decoded;
@@ -224,8 +223,8 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     // Token is valid - proceed with rotation
 
     // Generate new access token — use env config with fallbacks
-    const newAccessToken = jwt.sign({ id: user._id }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRE,
+    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'testsecret', {
+      expiresIn: process.env.JWT_EXPIRE || '7d',
     });
 
     // SECURITY: Increment token version (enforces single-use)
@@ -238,9 +237,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
         tokenFamily: user.tokenFamily,
         tokenVersion: newTokenVersion,
       },
-      env.JWT_REFRESH_SECRET,
+      process.env.JWT_REFRESH_SECRET || 'refreshsecret',
       {
-        expiresIn: env.JWT_REFRESH_EXPIRE,
+        expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
       },
     );
 
