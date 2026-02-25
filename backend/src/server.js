@@ -89,6 +89,9 @@ connectDB().catch((_err) => {
 });
 connectRedis();
 
+// ─── [FP] Signal 5 — Cold Start Detection ─────────────────────────────────
+console.log(`[FP] SERVER_START  ${new Date().toISOString()}  pid=${process.pid}`);
+
 // Start HTTP server
 const server = app.listen(PORT, () => {
   logger.info('Server started', {
@@ -101,7 +104,12 @@ const server = app.listen(PORT, () => {
   try {
     // eslint-disable-next-line global-require
     const { createEmailQueue } = require('./queues/emailQueue');
+    // ─── [FP] Signal 5 — Queue Init Timing ──────────────────────────────
+    console.log(`[FP] QUEUE_INIT_START  ${new Date().toISOString()}`);
     createEmailQueue();
+    // NOTE: createEmailQueue() sets queueReady async via emailQueue.isReady().then()
+    // QUEUE_INIT_DONE marks the sync setup completion; queueReady becomes true later.
+    console.log(`[FP] QUEUE_INIT_DONE  ${new Date().toISOString()}  (queueReady will be set asynchronously)`);
 
     // eslint-disable-next-line global-require
     const { startAccountDeletionWorker } = require('./queues/accountDeletionQueue');

@@ -386,19 +386,72 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
 // @route   POST /api/auth/forgotpassword
 // @access  Public
 exports.forgotPassword = asyncHandler(async (req, res) => {
+  // ─── [FP] PHASE 1 — Request Lifecycle Timing ────────────────────────────
+  const FP_START = Date.now();
+  const fp = (label) => {
+    const elapsed = Date.now() - FP_START;
+    console.log(`[FP] ${label} +${elapsed}ms  (${new Date().toISOString()})`);
+  };
+
+  fp('REQUEST_START');
+  fp('BODY_PARSED'); // Body already parsed by Express middleware before controller runs
+
+  // ─── [FP] MISSING SIGNAL 1 — HTTP Socket Completion Listeners ───────────
+  // Attach immediately so they fire on EVERY exit path (success, error, timeout)
+  res.on('finish', () => {
+    console.log(`[FP] RES_FINISH  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  statusCode=${res.statusCode}`);
+  });
+  res.on('close', () => {
+    console.log(`[FP] RES_CLOSE  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  finished=${res.writableFinished}`);
+  });
+  res.on('error', (socketErr) => {
+    console.log(`[FP] RES_ERROR  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  err=${socketErr.message}`);
+  });
+
+  // ─── [FP] PHASE 4 — Redis Health Snapshot ───────────────────────────────
+  // Capture Redis state at the moment the request executes
+  try {
+    // eslint-disable-next-line global-require
+    const { createRedisClient } = require('../config/redis');
+    const redisSnap = createRedisClient();
+    const redisStatus = redisSnap ? redisSnap.status : 'not-created';
+    const redisAvailable = redisSnap && typeof redisSnap.isAvailable === 'function'
+      ? redisSnap.isAvailable()
+      : 'unknown';
+    console.log(`[FP] REDIS_STATUS  status=${redisStatus}  available=${redisAvailable}  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
+  } catch (redisErr) {
+    console.log(`[FP] REDIS_STATUS  ERROR: ${redisErr.message}  +${Date.now() - FP_START}ms`);
+  }
+
+  // ─── [FP] PHASE 3a — DB: User Lookup ────────────────────────────────────
+  fp('USER_LOOKUP_START');
   const user = await User.findOne({ email: req.body.email });
+  fp('USER_LOOKUP_DONE');
 
   if (!user) {
+    fp('RESPONSE_SENDING'); // Early exit — no user found
+    console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
     // Security: Don't reveal if email exists
-    return res.status(200).json({
+    const earlyRes = res.status(200).json({
       success: true,
       message: 'If that email exists, a password reset link has been sent.',
     });
+    console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
+    fp('RESPONSE_SENT');
+    return earlyRes;
   }
+
+  // ─── [FP] Token Generation ───────────────────────────────────────────────
+  fp('TOKEN_GENERATED'); // generatePasswordResetToken is synchronous
 
   // Get reset token
   const resetToken = user.generatePasswordResetToken();
+
+  // ─── [FP] PHASE 3b — DB: Token Save ─────────────────────────────────────
+  fp('TOKEN_SAVE_START');
   await user.save({ validateBeforeSave: false });
+  fp('TOKEN_SAVE_DONE');
+  fp('TOKEN_SAVED');
 
   // Create reset URL - point to frontend
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -407,22 +460,44 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   try {
     // Skip email in test environment
     if (process.env.NODE_ENV === 'test') {
-      return res.status(200).json({
+      fp('RESPONSE_SENDING');
+      console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
+      const testRes = res.status(200).json({
         success: true,
         message: 'Password reset email sent',
       });
+      console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
+      fp('RESPONSE_SENT');
+      return testRes;
     }
 
+    // ─── [FP] PHASE 3c — Queue Operations ───────────────────────────────
+    // eslint-disable-next-line global-require
+    const { isQueueAvailable } = require('../queues/emailQueue');
+    const _qReady = isQueueAvailable();
+    // Access the module-level emailQueue reference via the exported getter
+    console.log(`[FP] QUEUE_STATE  queueReady=${_qReady}  emailQueue=${_qReady ? 'exists' : 'null'}  queue=email  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
+    fp('QUEUE_ADD_START');
     await queuePasswordResetEmail(user.email, resetUrl);
+    fp('QUEUE_ADD_DONE');
 
+    // ─── [FP] PHASE 2 — HTTP Response Verification ──────────────────────
+    fp('RESPONSE_SENDING');
+    console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
     // Email queued successfully
     res.status(200).json({
       success: true,
       message: 'Password reset email sent',
     });
+    console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
+    fp('RESPONSE_SENT');
   } catch (err) {
+    fp('QUEUE_ADD_DONE'); // Queue threw — still mark completion with error
+
     if (err.message.includes('Email queue unavailable')) {
-      return res.status(503).json({
+      fp('RESPONSE_SENDING');
+      console.log(`[FP] BEFORE_RES_JSON (503)  +${Date.now() - FP_START}ms`);
+      const r = res.status(503).json({
         success: false,
         error: {
           message: 'Email service temporarily unavailable. Please try again later.',
@@ -430,6 +505,9 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
           statusCode: 503,
         },
       });
+      console.log(`[FP] AFTER_RES_JSON (503)  +${Date.now() - FP_START}ms`);
+      fp('RESPONSE_SENT');
+      return r;
     }
 
     // SECURITY: Log error internally but don't expose to user
@@ -448,10 +526,14 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
     // SECURITY: Return same success message even if email fails
     // This prevents email enumeration attacks
+    fp('RESPONSE_SENDING');
+    console.log(`[FP] BEFORE_RES_JSON (catch-200)  +${Date.now() - FP_START}ms`);
     res.status(200).json({
       success: true,
       message: 'If that email exists, a password reset link has been sent.',
     });
+    console.log(`[FP] AFTER_RES_JSON (catch-200)  +${Date.now() - FP_START}ms`);
+    fp('RESPONSE_SENT');
   }
 });
 

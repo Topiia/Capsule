@@ -79,24 +79,51 @@ exports.createEmailQueue = () => {
  * @returns {Promise<object>} - Job object or fallback result
  */
 exports.queueEmail = async (emailData, priority = 5) => {
-  // GRACEFUL DEGRADATION: Use sync fallback if queue is not ready
+  const Q_START = Date.now();
+  const qlog = (label, extra = '') => {
+    console.log(`[FP] ${label} +${Date.now() - Q_START}ms${extra ? `  ${extra}` : ''}  (${new Date().toISOString()})`);
+  };
+
+  // ─── GRACEFUL DEGRADATION: Use sync fallback if queue is not ready ────────
   if (!queueReady || !emailQueue) {
     logger.warn('Redis unavailable - sending email synchronously (FALLBACK)', {
       to: emailData.to,
       subject: emailData.subject,
     });
 
-    // Send synchronously as fallback
+    // ─── [FP] Signal 3 — Email Mode/Provider/Duration (sync-fallback) ─────
+    console.log(`[FP] EMAIL_MODE  sync-fallback  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    qlog('EMAIL_SEND_START', '(sync-fallback path — Redis unavailable)');
+    const emailT0 = Date.now();
     const result = await sendEmailSync(emailData);
+    const emailDuration = Date.now() - emailT0;
+    qlog('EMAIL_SEND_DONE', `(sync-fallback result.id=${result && result.id})`);
+    console.log(`[FP] EMAIL_DURATION  ${emailDuration}ms  (${new Date().toISOString()})`);
     return { emailId: result.id, fallback: true };
   }
 
-  // Queue email normally (preferred path)
+  // ─── Queue email normally (preferred async path) ─────────────────────────
   try {
+    // ─── [FP] Signal 3 — Email Mode/Provider (async queue) ───────────────
+    console.log(`[FP] EMAIL_MODE  async-queue  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    console.log(`[FP] EMAIL_PROVIDER  resend-via-worker  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+
+    // ─── [FP] Signal 4 — QUEUE_ADD_ATTEMPT ───────────────────────────────
+    qlog('QUEUE_ADD_ATTEMPT', `(priority=${priority}  critical=${!!emailData.critical})`);
+    qlog('EMAIL_SEND_START', '(async queue path — calling emailQueue.add)');
+    const addT0 = Date.now();
     const job = await emailQueue.add(emailData, {
       priority,
       attempts: emailData.critical ? 5 : 3, // More retries for critical emails
     });
+    const addDuration = Date.now() - addT0;
+
+    // ─── [FP] Signal 4 — QUEUE_ADD_SUCCESS ───────────────────────────────
+    qlog('QUEUE_ADD_SUCCESS', `(jobId=${job && job.id}  addDuration=${addDuration}ms)`);
+    qlog('EMAIL_SEND_DONE', `(async queue path — jobId=${job && job.id})`);
+    // NOTE: EMAIL_DURATION for async path = cost of queue.add only (worker sends it later)
+    console.log(`[FP] EMAIL_DURATION  ${addDuration}ms  (queue.add cost only — worker delivers async)  (${new Date().toISOString()})`);
 
     logger.info('Email queued (async)', {
       jobId: job.id,
@@ -106,14 +133,24 @@ exports.queueEmail = async (emailData, priority = 5) => {
     });
     return { jobId: job.id, queued: true };
   } catch (error) {
+    // ─── [FP] Signal 4 — QUEUE_ADD_ERROR ─────────────────────────────────
+    qlog('QUEUE_ADD_ERROR', `(queue.add threw: ${error.message})`);
+    qlog('EMAIL_SEND_DONE', `(queue.add threw: ${error.message} — falling back to sync)`);
     logger.error('Failed to queue email - attempting synchronous fallback', {
       to: emailData.to,
       subject: emailData.subject,
       error: error.message,
     });
 
-    // Fallback to synchronous send if queue fails
+    // ─── [FP] Signal 3 — Email Mode/Provider/Duration (catch-fallback) ───
+    console.log(`[FP] EMAIL_MODE  catch-fallback  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    qlog('EMAIL_SEND_START', '(catch-fallback path — sendEmailSync)');
+    const fallT0 = Date.now();
     const result = await sendEmailSync(emailData);
+    const fallDuration = Date.now() - fallT0;
+    qlog('EMAIL_SEND_DONE', `(catch-fallback done result.id=${result && result.id})`);
+    console.log(`[FP] EMAIL_DURATION  ${fallDuration}ms  (catch-fallback sync send)  (${new Date().toISOString()})`);
     return { emailId: result.id, fallback: true };
   }
 };
