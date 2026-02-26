@@ -107,19 +107,51 @@ exports.queueEmail = async (emailData, priority = 5) => {
     console.log(`[FP] ${label} +${Date.now() - Q_START}ms${extra ? `  ${extra}` : ''}  (${new Date().toISOString()})`);
   };
 
-  // ─── GRACEFUL DEGRADATION: Use sync fallback if queue is not ready ────────
-  if (!queueReady || !emailQueue) {
-    logger.warn('Redis unavailable - sending email synchronously (FALLBACK)', {
-      to: emailData.to,
-      subject: emailData.subject,
-    });
+  // ─── Proactive mode decision — check Redis + worker health BEFORE queue.add() ─
+  // This replaces the old reactive `if (!queueReady)` guard.
+  //
+  // Decision factors:
+  //   redisReady  — Bull's internal ioredis client is connected (synchronous check)
+  //   workerAlive — 'email:worker:heartbeat' key exists and is < 90s old
+  //
+  // If either is false → sync-fallback immediately (no queue.add() attempt).
+  // This prevents jobs piling up in Redis when the worker is dead.
 
-    // ─── [FP] Signal 3 — Email Mode/Provider (sync-fallback FIRE-AND-FORGET) ─
+  const WORKER_HEARTBEAT_KEY = 'email:worker:heartbeat';
+
+  const redisReady = emailQueue?.client?.status === 'ready';
+
+  let workerAlive = false;
+  if (redisReady && emailQueue.client?.get) {
+    try {
+      const ts = await emailQueue.client.get(WORKER_HEARTBEAT_KEY);
+      workerAlive = !!ts && (Date.now() - Number(ts)) < 90000;
+    } catch (_hbErr) {
+      workerAlive = false;
+    }
+  }
+
+  const selectedMode = (redisReady && workerAlive) ? 'async-queue' : 'sync-fallback';
+  let reason;
+  if (!redisReady) {
+    reason = 'redis_down';
+  } else if (!workerAlive) {
+    reason = 'worker_dead';
+  } else {
+    reason = 'healthy';
+  }
+
+  console.log(
+    `[EMAIL_MODE_DECISION]  workerAlive=${workerAlive}  redisReady=${redisReady}`
+    + `  selectedMode=${selectedMode}  reason=${reason}  (${new Date().toISOString()})`,
+  );
+
+  if (selectedMode === 'sync-fallback') {
+    logger.warn('Email sync-fallback selected', { reason, to: emailData.to, subject: emailData.subject });
+
     console.log(`[FP] EMAIL_MODE  sync-fallback-fire-and-forget  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
     console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
     qlog('EMAIL_SEND_START', '(sync-fallback — FIRE AND FORGET — not blocking response)');
-    // CRITICAL FIX: Do NOT await. Fire-and-forget so HTTP response returns immediately.
-    // Email sends in background; failure is logged but does not block the user.
     const emailT0 = Date.now();
     sendEmailSync(emailData)
       .then((result) => {

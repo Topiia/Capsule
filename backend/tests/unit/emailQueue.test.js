@@ -24,6 +24,13 @@ describe('Email Queue Producer', () => {
       getDelayedCount: jest.fn().mockResolvedValue(0),
       clean: jest.fn().mockResolvedValue([]),
       close: jest.fn().mockResolvedValue(true),
+      // Required by queueEmail(): proactive Redis + worker health check
+      client: {
+        status: 'ready',
+        get: jest.fn().mockResolvedValue(String(Date.now())), // fresh heartbeat
+        set: jest.fn(),
+        on: jest.fn(),
+      },
     };
 
     jest.mock('bull', () => jest.fn(() => mockQueue));

@@ -37,6 +37,13 @@ describe('Email Queue - Graceful Degradation', () => {
     mockQueue = {
       add: mockAdd,
       isReady: mockIsReady,
+      // Required by queueEmail(): proactive Redis + worker health check
+      client: {
+        status: 'ready',
+        get: jest.fn().mockResolvedValue(String(Date.now())), // fresh heartbeat
+        set: jest.fn(),
+        on: jest.fn(),
+      },
     };
 
     Queue.mockImplementation(() => mockQueue);
@@ -92,6 +99,13 @@ describe('Email Queue - Graceful Degradation', () => {
       QueueFresh.mockImplementation(() => ({
         add: jest.fn().mockRejectedValue(new Error('Redis connection failed')),
         isReady: jest.fn().mockRejectedValue(new Error('Redis unavailable')),
+        // client.status !== 'ready' → redisReady=false → sync-fallback immediately
+        client: {
+          status: 'connecting',
+          get: jest.fn(),
+          set: jest.fn(),
+          on: jest.fn(),
+        },
       }));
 
       const { createEmailQueue: freshCreate } = require('../../src/queues/emailQueue');
@@ -120,7 +134,7 @@ describe('Email Queue - Graceful Degradation', () => {
 
       expect(freshSendSync).toHaveBeenCalledWith(emailData);
       expect(freshLogger.warn).toHaveBeenCalledWith(
-        'Redis unavailable - sending email synchronously (FALLBACK)',
+        'Email sync-fallback selected',
         expect.objectContaining({
           to: emailData.to,
           subject: emailData.subject,

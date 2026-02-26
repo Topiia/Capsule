@@ -205,7 +205,15 @@ exports.updateVlog = asyncHandler(async (req, res, next) => {
 
   req.body.images = updatedImages;
 
-  vlog = await Vlog.findByIdAndUpdate(req.params.id, req.body, {
+  // Explicitly trim title and description because findByIdAndUpdate
+  // can bypass Mongoose schema string trimming depending on mongoose version/config
+  const sanitizedUpdate = {
+    ...req.body,
+    ...(req.body.title !== undefined && { title: req.body.title.trim() }),
+    ...(req.body.description !== undefined && { description: req.body.description.trim() }),
+  };
+
+  vlog = await Vlog.findByIdAndUpdate(req.params.id, sanitizedUpdate, {
     new: true,
     runValidators: true,
   }).populate('author', 'username avatar bio');
