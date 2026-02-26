@@ -40,6 +40,18 @@ beforeEach(() => {
     process: mockProcess,
     on: mockOn,
     close: jest.fn().mockResolvedValue(true),
+    // Required by instrumentation: startWorker() calls emailQueue.isReady()
+    // to attach the QUEUE_READY / REDIS_STATUS_START / QUEUE_STATS probes.
+    isReady: jest.fn().mockResolvedValue(true),
+    // Required by instrumentation: called inside isReady().then() for QUEUE_STATS,
+    // and at JOB_RECEIVED for QUEUE_DEPTH.
+    getWaitingCount: jest.fn().mockResolvedValue(0),
+    getActiveCount: jest.fn().mockResolvedValue(0),
+    getCompletedCount: jest.fn().mockResolvedValue(0),
+    getFailedCount: jest.fn().mockResolvedValue(0),
+    getDelayedCount: jest.fn().mockResolvedValue(0),
+    // Required by instrumentation: getRedisStatus() reads emailQueue.client.status
+    client: { status: 'ready' },
   };
   Queue.mockImplementation(() => mockQueue);
 
@@ -154,8 +166,17 @@ describe('Email Worker', () => {
     let jobProcessor;
 
     beforeEach(() => {
+      // Switch to real timers for this describe only — the QUEUE_DEPTH probe
+      // has multiple nested async awaits (Promise.all in a try block) that
+      // cannot be drained reliably under fake timers.
+      jest.useRealTimers();
       startWorker();
       [jobProcessor] = mockProcess.mock.calls[0];
+    });
+
+    afterEach(() => {
+      // Restore fake timers for other describe blocks
+      jest.useFakeTimers();
     });
 
     it('should timeout after 10 seconds if Resend API is slow', async () => {
@@ -170,17 +191,11 @@ describe('Email Worker', () => {
         attemptsMade: 1,
       };
 
-      mockEmailSend.mockImplementation(
-        () => new Promise((resolve) => {
-          setTimeout(() => resolve({ id: 'late-msg' }), 15000);
-        }),
-      );
+      // Never-resolving promise — forces the 10s Resend timeout to fire
+      mockEmailSend.mockImplementation(() => new Promise(() => {}));
 
-      const jobPromise = jobProcessor(mockJob);
-      jest.advanceTimersByTime(10000);
-
-      await expect(jobPromise).rejects.toThrow('Resend API timeout');
-    });
+      await expect(jobProcessor(mockJob)).rejects.toThrow('Resend API timeout');
+    }, 15000);
 
     it('should succeed if Resend responds within timeout', async () => {
       const mockJob = {
@@ -194,17 +209,11 @@ describe('Email Worker', () => {
         attemptsMade: 0,
       };
 
-      mockEmailSend.mockImplementation(
-        () => new Promise((resolve) => {
-          setTimeout(() => resolve({ id: 'fast-msg' }), 1000);
-        }),
-      );
+      // Resolves immediately — well within the 10s timeout
+      mockEmailSend.mockResolvedValue({ id: 'fast-msg' });
 
-      const jobPromise = jobProcessor(mockJob);
-      jest.advanceTimersByTime(1000);
-
-      await expect(jobPromise).resolves.toEqual({ success: true });
-    });
+      await expect(jobProcessor(mockJob)).resolves.toEqual({ success: true });
+    }, 15000);
   });
 
   describe('Error Handling and Retries', () => {
