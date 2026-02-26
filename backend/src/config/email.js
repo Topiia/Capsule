@@ -7,58 +7,67 @@ const logger = require('./logger');
 
 // ─── Redis configuration for Bull queues (fail-fast, production-hardened) ────
 //
-// CRITICAL: These settings prevent the 7-minute retry stall seen in production.
+// CRITICAL BUG FIX: ioredis does NOT accept { url: '...' } as an options key.
+// Passing { url: 'rediss://...' } to new Redis({ url: '...' }) causes ioredis
+// to silently fall back to localhost:6379 — that connection immediately closes
+// in Render, producing "Connection is closed" errors.
 //
-// Root cause of the stall:
-//   ioredis default maxRetriesPerRequest = 20.
-//   With default exponential backoff this can block for 400,000+ ms
-//   before Bull decides the connection is unavailable.
-//
-// Fix: maxRetriesPerRequest: 1 → fail within ~200ms, let Bull handle retries
-//      connectTimeout: 10000   → abort connection attempt after 10s
-//      retryStrategy           → fast backoff, capped at 2s, stops after 10 tries
-//
-// TLS note: Render Redis (and Upstash) require TLS. If REDIS_URL is set,
-// ioredis reads TLS from the URL scheme (rediss://). For host/port mode
-// TLS must be explicit — set REDIS_TLS=true in Render env vars.
+// Correct approach: parse REDIS_URL into host/port/password/tls components,
+// then merge fail-fast settings into the same options object.
+// Bull then passes this valid options object to new ioredis.Redis({ host, port, ... }).
+
+const parseRedisUrl = (rawUrl) => {
+  try {
+    const u = new URL(rawUrl);
+    const opts = {
+      host: u.hostname,
+      port: parseInt(u.port, 10) || 6379,
+      // URL-decode the password (special chars like @ are percent-encoded)
+      password: u.password ? decodeURIComponent(u.password) : undefined,
+      // Parse optional DB index from URL path: redis://host/1
+      ...(u.pathname && u.pathname.length > 1 && {
+        db: parseInt(u.pathname.slice(1), 10),
+      }),
+    };
+    // rediss:// → Render / Upstash / Fly.io require TLS
+    if (u.protocol === 'rediss:') {
+      opts.tls = {};
+    }
+    return opts;
+  } catch (parseErr) {
+    logger.warn('[email.js] Failed to parse REDIS_URL — falling back to localhost', {
+      error: parseErr.message,
+    });
+    return { host: 'localhost', port: 6379 };
+  }
+};
 
 const buildBullRedisConfig = () => {
-  // ── Production: use REDIS_URL (Render / Upstash / Fly.io) ─────────────────
-  if (process.env.REDIS_URL) {
-    return {
-      // Bull accepts a redis connection string directly
-      url: process.env.REDIS_URL,
-      // Fail-fast override — prevents multi-minute stall
-      maxRetriesPerRequest: 1,
-      enableReadyCheck: false,
-      connectTimeout: 10000,
-      retryStrategy: (times) => {
-        if (times > 10) {
-          logger.warn('[Bull-Redis] Retry limit reached — giving up', { times });
-          return null; // Stop retrying
-        }
-        const delay = Math.min(times * 200, 2000);
-        logger.info('[Bull-Redis] Retrying connection', { times, delayMs: delay });
-        return delay;
-      },
-      // TLS for Render / Upstash (rediss:// handles this via URL,
-      // but explicit tls:{} is required when host:port is used with TLS)
+  // Base connection: parse URL (production) or use host/port (local/dev)
+  const base = process.env.REDIS_URL
+    ? parseRedisUrl(process.env.REDIS_URL)
+    : {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+      password: process.env.REDIS_PASSWORD || undefined,
+      // Explicit TLS opt-in for host/port mode (when REDIS_URL is not set)
       ...(process.env.REDIS_TLS === 'true' && { tls: {} }),
     };
-  }
 
-  // ── Development: host/port mode (local Redis) ────────────────────────────
   return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
-    // Fail-fast: do not stall for minutes on connection issues
+    ...base,
+    // ── Fail-fast settings — prevent the ~7-minute ioredis retry stall ───────
+    // Default maxRetriesPerRequest: 20 caused +419622ms production delay.
+    // With 1 retry, Bull falls back to sync send within ~200ms instead.
     maxRetriesPerRequest: 1,
     enableReadyCheck: false,
     connectTimeout: 10000,
     retryStrategy: (times) => {
-      if (times > 10) return null;
-      return Math.min(times * 200, 2000);
+      if (times > 10) {
+        logger.warn('[Bull-Redis] Retry limit reached — giving up', { times });
+        return null; // Stop retrying, surface the error
+      }
+      return Math.min(times * 200, 2000); // Max 2s between retries
     },
   };
 };
@@ -82,10 +91,7 @@ const validateEmailConfig = () => {
 };
 
 // Check if Redis is configured (doesn't validate connectivity)
-const isRedisConfigured = () => !!(
-  process.env.REDIS_URL
-  || (redis.host && redis.port)
-);
+const isRedisConfigured = () => !!(process.env.REDIS_URL || (redis.host && redis.port));
 
 module.exports = {
   redis,
