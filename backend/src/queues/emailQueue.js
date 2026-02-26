@@ -116,6 +116,19 @@ exports.queueEmail = async (emailData, priority = 5) => {
   try {
     // ─── [FP] Signal 3 — Email Mode/Provider (async queue) ───────────────
     console.log(`[FP] EMAIL_MODE  async-queue  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+
+    // ─── [FP] Phase 6 — Redis Queue Health Snapshot ──────────────────────
+    // Capture queue depth at the exact moment the request lands
+    try {
+      const [_waiting, _active, _delayed] = await Promise.all([
+        emailQueue.getWaitingCount(),
+        emailQueue.getActiveCount(),
+        emailQueue.getDelayedCount(),
+      ]);
+      console.log(`[FP] QUEUE_STATS  waiting=${_waiting}  active=${_active}  delayed=${_delayed}  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
+    } catch (_statsErr) {
+      console.log(`[FP] QUEUE_STATS_ERROR  ${_statsErr.message}  +${Date.now() - Q_START}ms`);
+    }
     console.log(`[FP] EMAIL_PROVIDER  resend-via-worker  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
 
     // ─── [FP] Signal 4 — QUEUE_ADD_ATTEMPT ───────────────────────────────
