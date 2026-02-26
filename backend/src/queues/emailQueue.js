@@ -41,11 +41,34 @@ exports.createEmailQueue = () => {
       },
     });
 
+    // ─── [QUEUE] Redis connection event listeners ─────────────────────────────
+    // Bull exposes its ioredis client via .client after queue creation.
+    // These events prove whether Redis instability is the delay source.
+    // If you see RECONNECTING in logs → Redis dropped → delay is here.
+    const attachQueueRedisListeners = (client, label) => {
+      // Guard: mock clients in tests don't implement EventEmitter — skip safely
+      if (!client || typeof client.on !== 'function') {
+        console.log(`[QUEUE-REDIS] ${label} listeners skipped (no EventEmitter)`);
+        return;
+      }
+      const T0 = Date.now();
+      const ts = () => `  (${new Date().toISOString()})  +${Date.now() - T0}ms`;
+      client.on('connect', () => console.log(`[QUEUE-REDIS] ${label} CONNECT${ts()}`));
+      client.on('ready', () => console.log(`[QUEUE-REDIS] ${label} READY${ts()}`));
+      client.on('reconnecting', () => console.log(`[QUEUE-REDIS] ${label} RECONNECTING${ts()}`));
+      client.on('error', (err) => console.log(`[QUEUE-REDIS] ${label} ERROR  ${err.message}${ts()}`));
+      client.on('end', () => console.log(`[QUEUE-REDIS] ${label} END${ts()}`));
+    };
+
+    // Bull creates two internal Redis clients: client (commands) + subscriber (pub/sub)
+    if (emailQueue.client) attachQueueRedisListeners(emailQueue.client, 'client');
+    if (emailQueue.eclient) attachQueueRedisListeners(emailQueue.eclient, 'subscriber');
+
     // Verify connectivity on init (async)
     emailQueue.isReady().then(() => {
       queueReady = true;
       logger.info('Email queue ready (async mode enabled)', {
-        redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,
+        redis: emailConfig.redis.url || `${emailConfig.redis.host}:${emailConfig.redis.port}`,
       });
     }).catch((err) => {
       queueReady = false;

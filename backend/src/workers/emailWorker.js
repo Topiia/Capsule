@@ -72,9 +72,41 @@ const startWorker = () => {
     + `  pid=${process.pid}`,
   );
 
+  // ─── [WORKER] Heartbeat — proves worker is alive every 60s ────────────────
+  // On Render free tier: if HEARTBEAT stops → worker was put to sleep.
+  // That proves the delivery delay = worker downtime, NOT code or Resend.
+  const heartbeatInterval = setInterval(() => {
+    const uptimeSec = Math.round((Date.now() - WORKER_BOOT_TIME) / 1000);
+    console.log(
+      `[WORKER] HEARTBEAT  uptime=${uptimeSec}s  pid=${process.pid}`
+      + `  (${new Date().toISOString()})`,
+    );
+  }, 60000);
+
   const emailQueue = new Queue('email', {
     redis: emailConfig.redis,
   });
+
+  // ─── [WORKER] Redis connection event listeners ────────────────────────────
+  // Bull creates two ioredis clients internally: client + eclient (subscriber).
+  // Attach listeners to both to catch any Redis drop/reconnect in the worker.
+  // If RECONNECTING appears here → Redis was the delay source, not worker sleep.
+  const QUEUE_START = Date.now();
+  const redisTs = () => `  (${new Date().toISOString()})  +${Date.now() - QUEUE_START}ms`;
+  const attachWorkerRedisListeners = (client, label) => {
+    // Guard: mock clients in tests don't implement EventEmitter — skip safely
+    if (!client || typeof client.on !== 'function') {
+      console.log(`[WORKER-REDIS] ${label} listeners skipped (no EventEmitter)`);
+      return;
+    }
+    client.on('connect', () => console.log(`[WORKER-REDIS] ${label} CONNECT${redisTs()}`));
+    client.on('ready', () => console.log(`[WORKER-REDIS] ${label} READY${redisTs()}`));
+    client.on('reconnecting', () => console.log(`[WORKER-REDIS] ${label} RECONNECTING${redisTs()}`));
+    client.on('error', (err) => console.log(`[WORKER-REDIS] ${label} ERROR  ${err.message}${redisTs()}`));
+    client.on('end', () => console.log(`[WORKER-REDIS] ${label} END${redisTs()}`));
+  };
+  if (emailQueue.client) attachWorkerRedisListeners(emailQueue.client, 'client');
+  if (emailQueue.eclient) attachWorkerRedisListeners(emailQueue.eclient, 'subscriber');
 
   // ─── [WORKER] Gap 2 — REDIS_STATUS_START: Redis state immediately after Queue init ─
   // Bull exposes its internal ioredis client via emailQueue.client.
@@ -218,6 +250,7 @@ const startWorker = () => {
 
   // Graceful shutdown
   const shutdown = async () => {
+    clearInterval(heartbeatInterval); // stop heartbeat before closing
     logger.info('Shutting down email worker...');
     await emailQueue.close();
   };
