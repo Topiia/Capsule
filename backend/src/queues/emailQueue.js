@@ -46,6 +46,11 @@ exports.createEmailQueue = () => {
     // These events prove whether Redis instability is the delay source.
     // If you see RECONNECTING in logs → Redis dropped → delay is here.
     const attachQueueRedisListeners = (client, label) => {
+      // Guard: mock clients in tests don't implement EventEmitter — skip safely
+      if (!client || typeof client.on !== 'function') {
+        console.log(`[QUEUE-REDIS] ${label} listeners skipped (no EventEmitter)`);
+        return;
+      }
       const T0 = Date.now();
       const ts = () => `  (${new Date().toISOString()})  +${Date.now() - T0}ms`;
       client.on('connect', () => console.log(`[QUEUE-REDIS] ${label} CONNECT${ts()}`));

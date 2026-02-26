@@ -94,6 +94,11 @@ const startWorker = () => {
   const QUEUE_START = Date.now();
   const redisTs = () => `  (${new Date().toISOString()})  +${Date.now() - QUEUE_START}ms`;
   const attachWorkerRedisListeners = (client, label) => {
+    // Guard: mock clients in tests don't implement EventEmitter — skip safely
+    if (!client || typeof client.on !== 'function') {
+      console.log(`[WORKER-REDIS] ${label} listeners skipped (no EventEmitter)`);
+      return;
+    }
     client.on('connect', () => console.log(`[WORKER-REDIS] ${label} CONNECT${redisTs()}`));
     client.on('ready', () => console.log(`[WORKER-REDIS] ${label} READY${redisTs()}`));
     client.on('reconnecting', () => console.log(`[WORKER-REDIS] ${label} RECONNECTING${redisTs()}`));
