@@ -87,6 +87,22 @@ const startWorker = () => {
     redis: emailConfig.redis,
   });
 
+  // ─── [WORKER] Heartbeat key — written to Redis every 30s ────────────────────
+  // API reads this key before queue.add() to determine if worker is alive.
+  // Key has 90s TTL: if worker dies, key expires and API falls back to sync send.
+  const WORKER_HEARTBEAT_KEY = 'email:worker:heartbeat';
+
+  const writeHeartbeat = async () => {
+    try {
+      if (emailQueue?.client?.set) {
+        await emailQueue.client.set(WORKER_HEARTBEAT_KEY, Date.now(), 'EX', 90);
+        console.log(`[WORKER] HEARTBEAT_WRITTEN  (${new Date().toISOString()})`);
+      }
+    } catch (err) {
+      console.warn(`[WORKER] HEARTBEAT_FAILED  ${err.message}`);
+    }
+  };
+
   // ─── [WORKER] Redis connection event listeners ────────────────────────────
   // Bull creates two ioredis clients internally: client + eclient (subscriber).
   // Attach listeners to both to catch any Redis drop/reconnect in the worker.
@@ -147,6 +163,19 @@ const startWorker = () => {
     } catch (statsErr) {
       console.log(`[WORKER] QUEUE_STATS_ERROR  ${statsErr.message}`);
     }
+
+    // Write first heartbeat immediately, then every 30s
+    // API will not use async-queue until this key exists in Redis
+    await writeHeartbeat();
+    const heartbeatWriterInterval = setInterval(writeHeartbeat, 30000);
+
+    // Log WORKER_READY after first heartbeat is confirmed written
+    console.log(
+      `[WORKER_READY]  redis=${getRedisStatus()}  queue=email  (${new Date().toISOString()})`,
+    );
+
+    // Clean up heartbeat writer on shutdown (registered after queue is ready)
+    process.once('SIGTERM_HEARTBEAT_CLEANUP', () => clearInterval(heartbeatWriterInterval));
   }).catch((err) => {
     console.log(`[WORKER] QUEUE_READY_ERROR  ${err.message}  (${new Date().toISOString()})`);
   });
