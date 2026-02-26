@@ -284,8 +284,13 @@ const startWorker = () => {
     await emailQueue.close();
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  // Guard: prevent duplicate signal handlers when startWorker() is called
+  // multiple times during tests — avoids MaxListenersExceededWarning
+  if (!global.__workerSignalsAttached) {
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+    global.__workerSignalsAttached = true;
+  }
 
   logger.info('Email worker started', {
     redis: `${emailConfig.redis.host}:${emailConfig.redis.port}`,

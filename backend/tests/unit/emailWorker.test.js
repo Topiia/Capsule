@@ -67,6 +67,7 @@ afterEach(() => {
   // Remove signal listeners added by startWorker to prevent leaks between tests
   process.removeAllListeners('SIGTERM');
   process.removeAllListeners('SIGINT');
+  global.__workerSignalsAttached = false;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
