@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const asyncHandler = require('./asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
+const { setCookies, clearCookies } = require('../controllers/authController');
 
 // Protect routes - requires valid JWT token
 exports.protect = asyncHandler(async (req, res, next) => {
@@ -254,6 +255,9 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
       );
     }
 
+    // Set new tokens in cookies before responding with JSON
+    setCookies(res, newAccessToken, newRefreshToken);
+
     res.status(200).json({
       success: true,
       accessToken: newAccessToken,
@@ -303,20 +307,8 @@ exports.logout = asyncHandler(async (req, res, _next) => {
     console.log(`[AUTH] User logged out - Sessions revoked: ${user.username}`);
   }
 
-  // PRODUCTION FIX: Clear cookies with matching attributes
-  // Cookies must be cleared with same path/sameSite/secure settings or they won't delete
-  const isProduction = process.env.NODE_ENV === 'production';
-  const clearOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    path: '/', // CRITICAL: Must match path used when setting cookies
-    maxAge: 0, // Expire immediately
-    expires: new Date(0), // Belt and suspenders: also set explicit expiry date
-  };
-
-  res.cookie('token', '', clearOptions);
-  res.cookie('refreshToken', '', clearOptions);
+  // PRODUCTION FIX: Clear cookies safely using centralized helper
+  clearCookies(res);
 
   res.status(200).json({
     success: true,

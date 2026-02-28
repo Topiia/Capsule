@@ -174,6 +174,22 @@ api.interceptors.request.use(
   },
 );
 
+// State for preventing multiple refresh calls simultaneously
+let isRefreshing = false;
+let refreshQueue = [];
+
+// Helper to resolve queued requests after token refresh
+const processQueue = (error, token = null) => {
+  refreshQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  refreshQueue = [];
+};
+
 // Response interceptor for error handling and retry logic
 api.interceptors.response.use(
   (response) => {
@@ -218,29 +234,113 @@ api.interceptors.response.use(
     switch (status) {
       case 400:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Invalid request. Please check your input.";
         break;
 
       case 401: {
+        // Prevent refresh loops if the refresh call itself triggered 401
+        if (originalRequest.url === "/auth/refresh") {
+          error.message = "Your session has expired. Please log in again.";
+          localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
+          
+          const currentPath = window.location.pathname;
+          // Only redirect if on protected route to avoid looping on public routes
+          const protectedPrefixes = [
+            "/dashboard",
+            "/settings",
+            "/create",
+            "/edit",
+            "/bookmarks",
+            "/liked",
+            "/admin",
+          ];
+          const isOnProtectedRoute = protectedPrefixes.some((prefix) =>
+            currentPath.startsWith(prefix)
+          );
+          if (isOnProtectedRoute) {
+            localStorage.setItem("redirectAfterLogin", currentPath);
+            window.location.href = "/login";
+          }
+          break;
+        }
+
+        // Handle auto-refresh retry limit (only retry once per original request)
+        if (!originalRequest._retry) {
+          originalRequest._retry = true;
+
+          // If another request is currently refreshing the token
+          if (isRefreshing) {
+            try {
+              // Wait in queue until refresh is completed
+              await new Promise((resolve, reject) => {
+                refreshQueue.push({ resolve, reject });
+              });
+              // Refresh succeeded, replay this request
+              return api(originalRequest);
+            } catch (err) {
+              // Refresh failed, fail this request as well
+              return Promise.reject(err);
+            }
+          }
+
+          // We are the first request to hit 401: lock others and run refresh
+          isRefreshing = true;
+
+          try {
+            await authAPI.refreshToken();
+            // Cookies are explicitly set by response header
+            isRefreshing = false;
+            processQueue(null);
+            
+            // Replay the original failed request
+            return api(originalRequest);
+          } catch (refreshErr) {
+            isRefreshing = false;
+            processQueue(refreshErr, null);
+            
+            // Allow switch statement fallback if refresh outright fails
+            error.message =
+              error.response?.data?.error ||
+              error.response?.data?.message ||
+              "Token expired";
+            localStorage.removeItem("token");
+            localStorage.removeItem("refreshToken");
+            
+            const currentPath = window.location.pathname;
+            const protectedPrefixes = [
+              "/dashboard",
+              "/settings",
+              "/create",
+              "/edit",
+              "/bookmarks",
+              "/liked",
+              "/admin",
+            ];
+            const isOnProtectedRoute = protectedPrefixes.some((prefix) =>
+              currentPath.startsWith(prefix)
+            );
+            if (isOnProtectedRoute) {
+              localStorage.setItem("redirectAfterLogin", currentPath);
+              window.location.href = "/login";
+            }
+            return Promise.reject(error);
+          }
+        }
+
+        // Already retried and failed again, fallback to original error logic
         error.message =
-          data.error?.message ||
-          data.message ||
-          "Your session has expired. Please log in again.";
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Token expired";
 
         // Clear auth data from localStorage
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
 
         // Only hard-redirect to /login when the user is on a PROTECTED route.
-        // Public routes (/reset-password, /forgot-password, /, /explore, etc.)
-        // must NOT be redirected — the /me call on those pages legitimately
-        // returns 401 because the user is unauthenticated.
-        //
-        // Strategy: explicit protected-route prefix list.
-        // If current path starts with a protected prefix → redirect.
-        // Otherwise → stay (React Router / ProtectedRoute handles it).
         const currentPath = window.location.pathname;
         const protectedPrefixes = [
           "/dashboard",
@@ -260,32 +360,31 @@ api.interceptors.response.use(
         }
 
         break;
-
       }
 
       case 403:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "You don't have permission to perform this action.";
         break;
 
       case 404:
         error.message =
-          data.error?.message || data.message || "Content not found.";
+          data?.error?.message || data?.message || "Content not found.";
         break;
 
       case 429:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Too many requests. Please try again later.";
         break;
 
       case 500:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Server error. Please try again.";
         break;
 
@@ -303,8 +402,8 @@ api.interceptors.response.use(
 
       default:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "An unexpected error occurred. Please try again.";
     }
 

@@ -27,28 +27,46 @@ const generateRefreshToken = (id, tokenFamily, tokenVersion) => jwt.sign(
 
 // PRODUCTION FIX: Cookie options for cross-site authentication
 // Required for Vercel (frontend) + Render (backend) deployment
-const getCookieOptions = (maxAge) => {
+exports.getCookieOptions = (maxAge) => {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  return {
+  const options = {
     httpOnly: true, // Prevents XSS attacks (JS cannot access)
     secure: isProduction, // HTTPS only in production (required for SameSite=None)
     sameSite: isProduction ? 'none' : 'lax', // Cross-site in prod, same-site in dev
-    maxAge, // Expiry time in milliseconds
+    path: '/',
     // Note: No 'domain' attribute - browser automatically uses backend's domain
     // (capsule-backend.onrender.com). Setting domain='.vercel.app' would fail
     // because backend doesn't own that domain.
   };
+
+  if (maxAge !== undefined) {
+    options.maxAge = maxAge;
+  }
+
+  return options;
 };
 
 // Helper to set both auth cookies (DRY principle)
-const setCookies = (res, token, refreshToken) => {
-  res.cookie('token', token, getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
+exports.setCookies = (res, token, refreshToken) => {
+  res.cookie('token', token, exports.getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
   res.cookie(
     'refreshToken',
     refreshToken,
-    getCookieOptions(30 * 24 * 60 * 60 * 1000),
+    exports.getCookieOptions(30 * 24 * 60 * 60 * 1000),
   ); // 30 days
+};
+
+// Helper to clear both auth cookies safely
+exports.clearCookies = (res) => {
+  const clearOptions = {
+    ...exports.getCookieOptions(),
+    maxAge: 0,
+    expires: new Date(0),
+  };
+
+  res.cookie('token', '', clearOptions);
+  res.cookie('refreshToken', '', clearOptions);
 };
 
 // @desc    Register user
@@ -150,7 +168,7 @@ The Capsule Team`,
   }
 
   // Set auth cookies
-  setCookies(res, token, refreshToken);
+  exports.setCookies(res, token, refreshToken);
 
   res.status(201).json({
     success: true,
@@ -273,7 +291,7 @@ The Capsule Team`,
   }
 
   // Set auth cookies
-  setCookies(res, token, refreshToken);
+  exports.setCookies(res, token, refreshToken);
 
   res.status(200).json({
     success: true,
