@@ -234,8 +234,8 @@ api.interceptors.response.use(
     switch (status) {
       case 400:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Invalid request. Please check your input.";
         break;
 
@@ -302,7 +302,10 @@ api.interceptors.response.use(
             processQueue(refreshErr, null);
             
             // Allow switch statement fallback if refresh outright fails
-            error.message = "Your session has expired. Please log in again.";
+            error.message =
+              error.response?.data?.error ||
+              error.response?.data?.message ||
+              "Token expired";
             localStorage.removeItem("token");
             localStorage.removeItem("refreshToken");
             
@@ -323,15 +326,15 @@ api.interceptors.response.use(
               localStorage.setItem("redirectAfterLogin", currentPath);
               window.location.href = "/login";
             }
-            return Promise.reject(refreshErr);
+            return Promise.reject(error);
           }
         }
 
         // Already retried and failed again, fallback to original error logic
         error.message =
-          data.error?.message ||
-          data.message ||
-          "Your session has expired. Please log in again.";
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Token expired";
 
         // Clear auth data from localStorage
         localStorage.removeItem("token");
@@ -361,27 +364,27 @@ api.interceptors.response.use(
 
       case 403:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "You don't have permission to perform this action.";
         break;
 
       case 404:
         error.message =
-          data.error?.message || data.message || "Content not found.";
+          data?.error?.message || data?.message || "Content not found.";
         break;
 
       case 429:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Too many requests. Please try again later.";
         break;
 
       case 500:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "Server error. Please try again.";
         break;
 
@@ -399,8 +402,8 @@ api.interceptors.response.use(
 
       default:
         error.message =
-          data.error?.message ||
-          data.message ||
+          data?.error?.message ||
+          data?.message ||
           "An unexpected error occurred. Please try again.";
     }
 
