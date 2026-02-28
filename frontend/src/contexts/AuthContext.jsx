@@ -255,39 +255,18 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         console.log("[AuthContext] User authenticated via session cookie");
       } catch (error) {
-        // If 401, try to refresh token
-        if (error.response?.status === 401) {
-          try {
-            console.log("[AuthContext] Access token expired, attempting refresh...");
-            // No body needed - refreshToken cookie sent automatically
-            await authAPI.refreshToken();
-
-            // After refresh, fetch user again
-            const userResponse = await authAPI.getMe();
-            setUser(userResponse.data.user);
-            setIsAuthenticated(true);
-
-            console.log("[AuthContext] Session restored via refresh token");
-          } catch (refreshError) {
-            // Refresh failed, user not logged in
-            console.warn("[AuthContext] Session restoration failed:", refreshError.message);
-            setIsAuthenticated(false);
-            setUser(null);
-          }
-        } else if (error.response?.status === 429) {
-          // Rate limit on initial /me call
+        // Rate limit on initial /me call
+        if (error.response?.status === 429) {
           const retryAfter = error.response.data?.retryAfterSeconds || 60;
           console.warn(
             `[AuthContext] Rate limited on /me. Retry after ${retryAfter} seconds`
           );
-          setIsAuthenticated(false);
-          setUser(null);
         } else {
-          // Other error, assume not logged in
+          // Other error or 401, assume not logged in (interceptor handles active refresh if token available)
           console.log("[AuthContext] No active session");
-          setIsAuthenticated(false);
-          setUser(null);
         }
+        setIsAuthenticated(false);
+        setUser(null);
       } finally {
         setLoading(false);
         isInitialLoadRef.current = false;
