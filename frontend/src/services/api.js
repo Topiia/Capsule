@@ -145,12 +145,13 @@ export const userAPI = {
   deleteAccount: (password) => api.delete("/users/me", { data: { password } }),
 };
 
-// Admin API methods
 export const adminAPI = {
   getFlaggedVlogs: () => api.get("/admin/moderation/flagged"),
   overrideDecision: (id, status, reason) =>
     api.patch(`/admin/moderation/${id}/override`, { status, reason }),
   getMetrics: () => api.get("/admin/moderation/metrics"),
+  getAllUsers: () => api.get("/admin/users"),
+  getPlatformStats: () => api.get("/admin/stats"),
 };
 
 // Convenience: export deleteUserAccount for direct import

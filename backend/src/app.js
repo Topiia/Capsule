@@ -42,6 +42,7 @@ const vlogRoutes = require('./routes/vlogs');
 const uploadRoutes = require('./routes/upload');
 const userRoutes = require('./routes/users');
 const adminModerationRoutes = require('./routes/admin.moderation.routes');
+const adminUsersRoutes = require('./routes/admin.users.routes');
 
 // Initialize express app
 const app = express();
@@ -296,6 +297,7 @@ app.use('/api/vlogs', vlogRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin/moderation', adminModerationRoutes);
+app.use('/api/admin', adminUsersRoutes);
 
 // Default route
 app.get('/', (req, res) => {
