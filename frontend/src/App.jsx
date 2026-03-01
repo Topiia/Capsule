@@ -27,6 +27,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin Pages
 const ModerationDashboard = lazy(() => import("./pages/Admin/ModerationDashboard"));
+const AdminUserList = lazy(() => import("./pages/Admin/AdminUserList"));
+const AdminAnalytics = lazy(() => import("./pages/Admin/AdminAnalytics"));
 import AdminRoute from "./components/Auth/AdminRoute";
 
 function App() {
@@ -124,6 +126,22 @@ function App() {
               element={
                 <AdminRoute>
                   <ModerationDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/users"
+              element={
+                <AdminRoute>
+                  <AdminUserList />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/analytics"
+              element={
+                <AdminRoute>
+                  <AdminAnalytics />
                 </AdminRoute>
               }
             />
