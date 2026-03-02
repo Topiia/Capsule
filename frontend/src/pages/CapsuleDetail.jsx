@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +25,6 @@ import {
   TrashIcon,
   EllipsisVerticalIcon,
   HandThumbDownIcon,
-  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
   HeartIcon as HeartIconSolid,
@@ -42,6 +41,23 @@ const CapsuleDetail = () => {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [selectedImage]);
+
+  useEffect(() => {
+    if (selectedImage) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [selectedImage]);
 
   // Fetch vlog details
   const { data: vlog, isLoading } = useQuery({
@@ -189,7 +205,7 @@ const CapsuleDetail = () => {
   const isOwner = user && vlog.author && (user._id || user.id) === (vlog.author._id || vlog.author.id);
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Vlog Content */}
       <div className="w-full">
         <motion.div
@@ -385,32 +401,35 @@ const CapsuleDetail = () => {
           </div>
         </motion.div>
 
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-          {/* Left Column - Images */}
-          <div className="w-full lg:w-7/12">
+        {/* Vertical Layout Container */}
+        <div className="flex flex-col gap-8 lg:gap-12">
+          {/* Images Section */}
+          <div className="w-full">
             {vlog.images && vlog.images.length > 0 ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="space-y-6 flex flex-col items-center"
+                className="columns-1 sm:columns-2 lg:columns-3 w-full [column-gap:1rem]"
               >
                 {vlog.images.map((image, index) => (
                   <div
                     key={index}
-                    className="relative cursor-pointer group inline-flex justify-center"
-                    onClick={() => setSelectedImage(image.url)}
+                    className="mb-4 break-inside-avoid relative group"
+                    onClick={() => {
+                      setSelectedImage(image.url);
+                      setZoom(1);
+                    }}
                   >
+                    <button className="absolute top-2 right-2 bg-black/60 text-white w-8 h-8 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer">
+                      ⤢
+                    </button>
                     <img
                       src={image.url}
                       alt={image.caption || `Capsule image ${index + 1}`}
-                      className="block h-auto w-auto max-w-full max-h-[55vh] object-contain rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-[1.01]"
+                      className="w-full h-auto rounded-lg shadow-sm cursor-pointer"
                     />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none rounded-lg">
-                      <span className="bg-black/60 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md font-medium shadow-md transform scale-90 group-hover:scale-100 transition-all">
-                        Expand
-                      </span>
-                    </div>
+                    {/* Removed hover overlay per styling update */}
                     {image.caption && (
                       <p className="mt-2 text-sm text-[var(--theme-text-secondary)] italic text-center w-full">
                         {image.caption}
@@ -422,9 +441,9 @@ const CapsuleDetail = () => {
             ) : null}
           </div>
 
-          {/* Right Column - Content & Sidebar */}
-          <div className="w-full lg:w-5/12">
-            <div className="lg:sticky lg:top-24 space-y-8">
+          {/* Content Sections */}
+          <div className="w-full">
+            <div className="space-y-8">
               {/* Description */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -837,30 +856,35 @@ const CapsuleDetail = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSelectedImage(null)}
-            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 cursor-pointer"
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center"
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-[80vw] max-h-[80vh] w-auto h-auto flex flex-col items-center justify-center"
-              onClick={(e) => e.stopPropagation()}
+            {/* Top Left Close Button */}
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="fixed top-6 left-4 z-[120] text-white/70 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center text-3xl transition-colors leading-none pb-1"
+              title="Close"
             >
-              <button
-                onClick={() => setSelectedImage(null)}
-                className="absolute -top-4 -right-16 p-3 text-white/70 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all duration-200"
-                title="Close"
-              >
-                <XMarkIcon className="w-8 h-8" />
-              </button>
-              <img
-                src={selectedImage}
-                alt="Full screen view"
-                className="w-auto h-auto max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
-              />
-            </motion.div>
+              ×
+            </button>
+
+            {/* Top Right Zoom Controls */}
+            <div className="fixed top-4 right-4 z-[120] flex gap-2">
+              <button onClick={() => setZoom(z => Math.min(z + 0.25, 3))} className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-1.5 rounded transition-colors text-lg font-medium leading-none">+</button>
+              <button onClick={() => setZoom(z => Math.max(z - 0.25, 1))} className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-1.5 rounded transition-colors text-lg font-medium leading-none">-</button>
+              <button onClick={() => setZoom(1)} className="bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded transition-colors text-sm font-medium">Reset</button>
+            </div>
+
+            {/* Scroll Container */}
+            <div className="w-full h-full overflow-auto flex justify-center" onClick={() => setSelectedImage(null)}>
+              <div className="m-auto" onClick={(e) => e.stopPropagation()}>
+                <img
+                  src={selectedImage}
+                  alt="Full resolution view"
+                  className="max-w-full h-auto object-contain mx-auto transition-transform"
+                  style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+                />
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

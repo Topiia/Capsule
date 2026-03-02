@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   formatRelativeTime,
   formatNumber,
@@ -88,8 +88,38 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
   };
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const cardRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Vitest / Node environment does not support IntersectionObserver
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.3 }
+    );
+
+    const el = cardRef.current;
+    if (el) {
+      observer.observe(el);
+    }
+
+    return () => {
+      if (el) {
+        observer.unobserve(el);
+      }
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
     if (!vlog.images || vlog.images.length <= 1) return;
 
     const interval = setInterval(() => {
@@ -97,7 +127,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [vlog.images]);
+  }, [vlog.images, isVisible]);
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -120,40 +150,28 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
     },
   };
 
-  const imageVariants = {
-    hover: {
-      scale: 1.05,
-      transition: {
-        duration: 0.8,
-        ease: "easeOut",
-      },
-    },
-  };
+
 
   if (compact) {
     return (
-      <motion.div
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        whileHover="hover"
-        className="glass-card rounded-xl overflow-hidden group cursor-pointer w-full block"
-      >
+      <div ref={cardRef}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          whileHover="hover"
+          className="glass-card rounded-xl overflow-hidden group cursor-pointer w-full block"
+        >
         <Link to={`/vlog/${vlog._id}`} className="block w-full">
           {/* Image */}
-          <div className="relative w-full block">
-            <motion.img
-              variants={imageVariants}
-              key={currentImageIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
+          <div className="relative w-full block overflow-hidden rounded-t-2xl">
+            <img
               src={
                 vlog.images?.[currentImageIndex]?.url ||
                 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
               }
               alt={vlog.title}
-              className="w-full aspect-video object-cover block"
+              className="w-full h-[220px] object-cover block"
               loading="lazy"
               decoding="async"
             />
@@ -163,6 +181,8 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                 src={vlog.images[(currentImageIndex - 1 + vlog.images.length) % vlog.images.length]?.url}
                 alt=""
                 className="w-full h-full object-cover absolute inset-0 -z-10"
+                loading="lazy"
+                decoding="async"
               />
             )}
 
@@ -213,32 +233,29 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
           </div>
         </Link>
       </motion.div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
-    <motion.div
-      variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-      whileHover="hover"
-      className={`glass-card rounded-2xl overflow-hidden group cursor-pointer w-full block ${featured ? "mb-6" : ""}`}
-    >
+    <div ref={cardRef}>
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        className={`glass-card rounded-2xl overflow-hidden group cursor-pointer w-full block ${featured ? "mb-6" : ""}`}
+      >
       <Link to={`/vlog/${vlog._id}`} className="block w-full">
         {/* Image Section */}
-        <div className="relative w-full block">
-          <motion.img
-            variants={imageVariants}
-            key={currentImageIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
+        <div className="relative w-full block overflow-hidden rounded-t-2xl">
+          <img
             src={
               vlog.images?.[currentImageIndex]?.url ||
               'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect width="400" height="225" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" fill="%23d1d5db" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
             }
             alt={vlog.title}
-            className="w-full aspect-video object-cover block"
+            className="w-full h-[220px] object-cover block"
             loading="lazy"
             decoding="async"
           />
@@ -248,6 +265,8 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
               src={vlog.images[(currentImageIndex - 1 + vlog.images.length) % vlog.images.length]?.url}
               alt=""
               className="w-full h-full object-cover absolute inset-0 -z-10"
+              loading="lazy"
+              decoding="async"
             />
           )}
 
@@ -435,6 +454,8 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
                     src={vlog.author.avatar}
                     alt={vlog.author.username}
                     className="w-full h-full rounded-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <span className="text-white font-semibold text-sm">
@@ -646,6 +667,7 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
         </div>
       </Link>
     </motion.div>
+    </div>
   );
 };
 
