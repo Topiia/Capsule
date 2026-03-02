@@ -160,8 +160,10 @@ export const deleteUserAccount = userAPI.deleteAccount;
 // Request interceptor for error handling
 api.interceptors.request.use(
   (config) => {
-    // Add timestamp to prevent caching
-    if (config.method === "get") {
+    // Add timestamp to prevent caching for non-vlog endpoints.
+    // /vlogs is excluded so Redis caching works correctly for feed and search.
+    // Uses includes() to match regardless of URL form (/vlogs, /api/vlogs, absolute URL).
+    if (config.method === "get" && !config.url?.includes("/vlogs")) {
       config.params = { ...config.params, _t: Date.now() };
     }
 
