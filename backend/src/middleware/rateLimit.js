@@ -29,12 +29,12 @@ const viewCountLimiter = process.env.NODE_ENV !== 'test'
     keyGenerator: (req) => {
       // Generate key based on IP + userId (if authenticated)
       const userId = req.user?.id || 'anonymous';
-      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
       return `view:${ip}:${userId}`;
     },
     handler: (req, res) => {
       const userId = req.user?.id || 'anonymous';
-      const ip = req.ip || req.connection.remoteAddress;
+      const ip = req.ip || req.socket.remoteAddress;
 
       logger.warn('View count rate limit exceeded', {
         correlationId: req.correlationId,

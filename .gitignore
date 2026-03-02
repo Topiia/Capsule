@@ -104,3 +104,7 @@ docs/internal/lint_output*
 *.rdb
 token.txt
 cookies.txt
+
+# --- Phase 3 Hardening Scripts ---
+phase_*.md
+simulate_*.js

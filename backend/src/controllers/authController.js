@@ -5,10 +5,11 @@ const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const { sendEmail } = require('../utils/sendEmail');
 const { queuePasswordResetEmail } = require('../queues/emailQueue');
+const envConfig = require('../config/env');
 
 // Generate JWT Token — uses fallback so undefined JWT_EXPIRE never crashes jwt.sign
-const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET || 'testsecret', {
-  expiresIn: process.env.JWT_EXPIRE || '7d',
+const generateToken = (id) => jwt.sign({ id }, envConfig.JWT_SECRET, {
+  expiresIn: envConfig.JWT_EXPIRE,
 });
 
 // SECURITY: Generate Refresh Token with rotation tracking
@@ -19,9 +20,9 @@ const generateRefreshToken = (id, tokenFamily, tokenVersion) => jwt.sign(
     tokenFamily,
     tokenVersion,
   },
-  process.env.JWT_REFRESH_SECRET || 'refreshsecret',
+  envConfig.JWT_REFRESH_SECRET,
   {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
+    expiresIn: envConfig.JWT_REFRESH_EXPIRE,
   },
 );
 
