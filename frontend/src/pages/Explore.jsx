@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { vlogAPI } from "../services/api";
 import CapsuleCard from "../components/Vlog/CapsuleCard";
@@ -7,9 +8,17 @@ import Button from "../components/UI/Button";
 import MasonryGrid from "../components/UI/MasonryGrid";
 
 const Explore = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const urlSearch = searchParams.get("search") || "";
+
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+
+  // Sync navbar search → Explore state whenever the URL ?search= param changes
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
 
   const categories = [
     "all",

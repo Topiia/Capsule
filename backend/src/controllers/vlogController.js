@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Vlog = require('../models/Vlog');
+const User = require('../models/User');
 const Like = require('../models/Like');
 const Comment = require('../models/Comment');
 const { deleteImage } = require('../middleware/upload');
@@ -27,7 +28,42 @@ exports.getVlogs = asyncHandler(async (req, res) => {
   if (req.query.author) query.author = req.query.author;
 
   if (req.query.search && req.query.search.trim()) {
-    query.$text = { $search: req.query.search.trim() };
+    const rawSearch = req.query.search.trim();
+
+    // Escape regex special characters to prevent injection
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Split multi-word input — each term must match at least one field
+    const terms = rawSearch.split(/\s+/).filter(Boolean);
+
+    // Build per-term conditions including author username lookup
+    const termConditions = await Promise.all(
+      terms.map(async (term) => {
+        const pattern = escapeRegex(term);
+        const regex = { $regex: pattern, $options: 'i' };
+
+        // Find users whose username matches this term
+        const matchingUsers = await User.find({ username: regex })
+          .select('_id')
+          .lean();
+        const authorIds = matchingUsers.map((u) => u._id);
+
+        const orConditions = [
+          { title: regex },
+          { description: regex },
+          { tags: regex },
+        ];
+
+        // Include author match only when users were found
+        if (authorIds.length > 0) {
+          orConditions.push({ author: { $in: authorIds } });
+        }
+
+        return { $or: orConditions };
+      }),
+    );
+
+    query.$and = termConditions;
   }
 
   if (req.query.dateFrom || req.query.dateTo) {
