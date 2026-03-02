@@ -54,6 +54,11 @@
   --theme-text: var(--noir-velvet-text);
   --theme-text-secondary: var(--noir-velvet-text-secondary);
   --theme-bg: var(--noir-velvet-bg);
+  --theme-surface: rgba(255, 255, 255, 0.04);
+  --theme-surface-elevated: rgba(255, 255, 255, 0.08);
+  --theme-border: rgba(255, 255, 255, 0.2);
+  --theme-hover: rgba(255, 255, 255, 0.12);
+  --theme-accent-rgb: 108, 117, 125;
 }
 
 .theme-deep-space {
@@ -63,6 +68,11 @@
   --theme-text: var(--deep-space-text);
   --theme-text-secondary: var(--deep-space-text-secondary);
   --theme-bg: var(--deep-space-bg);
+  --theme-surface: rgba(255, 255, 255, 0.04);
+  --theme-surface-elevated: rgba(255, 255, 255, 0.08);
+  --theme-border: rgba(255, 255, 255, 0.2);
+  --theme-hover: rgba(255, 255, 255, 0.12);
+  --theme-accent-rgb: 26, 148, 255;
 }
 
 .theme-crimson-night {
@@ -72,6 +82,11 @@
   --theme-text: var(--crimson-night-text);
   --theme-text-secondary: var(--crimson-night-text-secondary);
   --theme-bg: var(--crimson-night-bg);
+  --theme-surface: rgba(255, 255, 255, 0.04);
+  --theme-surface-elevated: rgba(255, 255, 255, 0.08);
+  --theme-border: rgba(255, 255, 255, 0.2);
+  --theme-hover: rgba(255, 255, 255, 0.12);
+  --theme-accent-rgb: 239, 68, 68;
 }
 
 .theme-rose-quartz {
@@ -81,21 +96,22 @@
   --theme-text: var(--rose-quartz-text);
   --theme-text-secondary: var(--rose-quartz-text-secondary);
   --theme-bg: var(--rose-quartz-bg);
+  --theme-surface: #ffffff;
+  --theme-surface-elevated: #f8dce6;
+  --theme-border: #e3c1cf;
+  --theme-hover: #f3d2de;
+  --theme-accent-rgb: 250, 141, 193;
 }
 
 /* ---------------------------------------------------------
    BASE LAYER
 ---------------------------------------------------------- */
 @layer base {
-  * {
-    border-color: var(--glass-border);
-  }
-
   body {
     font-family: Inter, sans-serif;
     background: var(--theme-bg);
     color: var(--theme-text);
-    transition: all 0.3s ease-in-out;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   html {
@@ -116,49 +132,104 @@
 }
 
 /* ---------------------------------------------------------
-   UTILITIES LAYER
+   UTILITIES
 ---------------------------------------------------------- */
 @layer utilities {
-  /* Glass Elements */
+  /* ---- Theme Semantic Classes ---- */
+  .theme-surface {
+    background: var(--theme-surface);
+  }
+
+  .theme-surface-elevated {
+    background: var(--theme-surface-elevated);
+  }
+
+  .theme-border {
+    border: 1px solid var(--theme-border);
+  }
+
+  .theme-border-t {
+    border-top: 1px solid var(--theme-border);
+  }
+
+  .theme-text {
+    color: var(--theme-text);
+  }
+
+  .theme-text-secondary {
+    color: var(--theme-text-secondary);
+  }
+
+  .theme-hover:hover {
+    background: var(--theme-hover);
+  }
+
+  /* ---- Table Utilities ---- */
+  .theme-table {
+    border-collapse: collapse;
+    border: 1px solid var(--theme-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .theme-table-header {
+    background: var(--theme-surface-elevated);
+  }
+
+  .theme-table-header th {
+    color: var(--theme-text);
+  }
+
+  .theme-table-row {
+    border-top: 1px solid var(--theme-border);
+    color: var(--theme-text);
+    transition: background 0.15s ease;
+  }
+
+  .theme-table-row:hover {
+    background: var(--theme-hover);
+  }
+
+  /* ---- Glass Elements ---- */
   .glass {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--theme-surface-elevated);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--theme-border);
   }
 
   .glass-card {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--theme-surface-elevated);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--theme-border);
   }
 
   .glass-dark {
     background: var(--glass-black);
     backdrop-filter: blur(12px) saturate(180%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--theme-border);
   }
 
   .glass-transparent {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--theme-surface);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--theme-border);
   }
 
   .glass-button {
     @apply px-6 py-3 rounded-xl font-medium transition-all duration-300;
-    background: var(--glass-white);
+    background: var(--theme-surface);
     backdrop-filter: blur(12px);
   }
 
   .glass-input {
     width: 100%;
     padding: 12px 16px;
-    background: var(--glass-white);
-    border: 1px solid var(--glass-border);
+    background: var(--theme-surface);
+    border: 1px solid var(--theme-border);
     border-radius: 12px;
     color: var(--theme-text);
     transition: 0.3s;
@@ -174,17 +245,17 @@
   }
 
   .glass-hover {
-    background: var(--glass-white);
+    background: var(--theme-surface);
     backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--theme-border);
     transition: all 0.3s ease;
   }
   .glass-hover:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--theme-hover);
+    border-color: var(--theme-border);
   }
 
-  /* Gradient Text */
+  /* ---- Visual Effects ---- */
   .gradient-text {
     background: linear-gradient(
       90deg,
@@ -192,10 +263,10 @@
       var(--theme-secondary)
     );
     -webkit-background-clip: text;
+    background-clip: text;
     color: transparent;
   }
 
-  /* Glow */
   .glow {
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
   }
@@ -210,13 +281,14 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
 
-  /* Floating Animation */
   .floating {
     animation: float 6s ease-in-out infinite;
   }
 }
 
-/* Floating effect keyframes */
+/* ---------------------------------------------------------
+   KEYFRAMES
+---------------------------------------------------------- */
 @keyframes float {
   0%,
   100% {
@@ -289,12 +361,13 @@
   }
 }
 
-/* Gradient radial utility */
+/* ---------------------------------------------------------
+   GLOBAL LAYOUT & MISCELLANEOUS
+---------------------------------------------------------- */
 .bg-gradient-radial {
   background: radial-gradient(circle, var(--tw-gradient-stops));
 }
 
-/* Prevent horizontal scroll */
 html,
 body {
   max-width: 100%;
