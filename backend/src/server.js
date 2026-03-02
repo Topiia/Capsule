@@ -20,31 +20,7 @@ if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
 // PRODUCTION SAFETY: Validate CRITICAL environment variables EARLY
 // Fail fast if any required production secrets are missing.
 // This block ONLY runs here in server.js, never in app.js.
-const criticalEnv = [
-  'MONGODB_URI',
-  'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
-  'CLOUDINARY_CLOUD_NAME',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-  'RESEND_API_KEY',
-  'FRONTEND_URL',
-  'FROM_EMAIL',
-  'NODE_ENV',
-];
-
-const missingCritical = criticalEnv.filter((key) => !process.env[key]);
-
-if (missingCritical.length > 0) {
-  console.error('='.repeat(60));
-  console.error('[FATAL] Missing CRITICAL environment variables:');
-  missingCritical.forEach((key) => console.error(`  - ${key}`));
-  console.error('='.repeat(60));
-  console.error('Server cannot start without these variables.');
-  console.error('Set them in Render dashboard: Settings > Environment');
-  console.error('='.repeat(60));
-  process.exit(1);
-}
+require('./config/env').validateEnv();
 
 // Warn about optional services (graceful degradation)
 const optionalServices = {

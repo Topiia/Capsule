@@ -28,6 +28,9 @@ const { correlationMiddleware } = require('./middleware/correlation');
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/database');
 const { createRedisClient } = require('./config/redis');
+const mongoSanitize = require('./middleware/mongoSanitize');
+const csrfProtection = require('./middleware/csrfProtection');
+const isAllowedOrigin = require('./middleware/originValidator');
 
 const redis = new Proxy({}, {
   get: (target, prop) => {
@@ -52,8 +55,17 @@ if (process.env.NODE_ENV !== 'test') {
   connectDB();
 }
 
-// Trust proxy for rate limiting behind reverse proxy
-app.set('trust proxy', 1);
+// SECURITY: Proxy Configuration
+// In production we run behind Render/Vercel reverse proxies.
+// trust proxy must be enabled so req.ip reflects real client IP.
+// Disabled in development to prevent IP spoofing via X-Forwarded-For.
+const { NODE_ENV } = require('./config/env');
+
+if (NODE_ENV === 'production') {
+  app.set('trust proxy', true);
+} else {
+  app.set('trust proxy', false);
+}
 
 // OBSERVABILITY: Correlation ID middleware (must be early in stack)
 app.use(correlationMiddleware);
@@ -78,44 +90,11 @@ app.use((req, res, next) => {
 // CORS configuration
 const corsOptions = {
   origin(origin, callback) {
-    const allowedOrigins = process.env.CORS_ORIGINS
-      ? process.env.CORS_ORIGINS.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-      : ['http://localhost:3000'];
-
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    // Check if origin is in explicit allowlist
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
+    if (!origin || isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS blocked'));
     }
-
-    // PRODUCTION: Support Vercel preview deployments safely and Production Domain
-    try {
-      const { hostname, protocol } = new URL(origin);
-
-      // Explicitly allow production domain
-      if (protocol === 'https:' && hostname === 'capsule.topiiaa.site') {
-        return callback(null, true);
-      }
-
-      const isValidVercelPreview = protocol === 'https:'
-        && hostname.endsWith('.vercel.app')
-        && (hostname === 'vlogspherefrontend.vercel.app'
-          || hostname.startsWith('vlogspherefrontend-')
-          || hostname === 'capsule-frontend.vercel.app'
-          || hostname.startsWith('capsule-frontend-'));
-
-      if (isValidVercelPreview) {
-        return callback(null, true);
-      }
-    } catch (err) {
-      // Invalid URL, fall through to rejection
-    }
-
-    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,
@@ -221,9 +200,21 @@ const sessionLimiter = process.env.NODE_ENV !== 'test'
   : (req, res, next) => next();
 
 // Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '500kb' }));
+app.use(express.urlencoded({ extended: true, limit: '500kb' }));
 app.use(cookieParser());
+
+// SECURITY: Delete MongoDB NoSQL Operators ($ and .)
+// Removes MongoDB operators from request input.
+// Prevents NoSQL injection attacks using $ operators.
+// Must run after body parsing and before routes.
+app.use(mongoSanitize());
+
+// CSRF Protection Middleware
+// Blocks cross-site authenticated requests.
+// Uses Origin/Referer validation.
+// Required because cookies use SameSite=None.
+app.use(csrfProtection);
 
 // Compression middleware
 app.use(compression());
