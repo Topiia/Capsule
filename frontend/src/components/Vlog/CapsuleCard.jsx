@@ -92,6 +92,12 @@ const CapsuleCard = ({ vlog, featured = false, compact = false }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Vitest / Node environment does not support IntersectionObserver
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
