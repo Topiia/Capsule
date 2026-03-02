@@ -99,6 +99,26 @@ const server = app.listen(PORT, () => {
   }
 });
 
+// Graceful shutdown prevents port lock during nodemon restart
+const shutdown = () => {
+  console.log('[SERVER] Graceful shutdown');
+  server.close(() => {
+    process.exit(0);
+  });
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[DEV ERROR] Port ${PORT} already in use`);
+    process.exit(1);
+  } else {
+    throw err;
+  }
+});
+
 // Export for graceful shutdown tooling
 module.exports = app;
 module.exports.server = server;
