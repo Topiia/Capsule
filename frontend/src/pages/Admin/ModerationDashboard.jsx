@@ -4,8 +4,9 @@ import { adminAPI } from "../../services/api";
 import { toast } from "react-hot-toast";
 import StatusBadge from "../../components/UI/StatusBadge";
 import LoadingSpinner from "../../components/UI/LoadingSpinner";
+import AdminLayout from "../../components/Layout/AdminLayout";
 import { formatDistanceToNow } from "date-fns";
-import { FiCheck, FiX, FiAlertTriangle } from "react-icons/fi";
+import { FiCheck, FiX } from "react-icons/fi";
 
 const ModerationDashboard = () => {
   const [vlogs, setVlogs] = useState([]);
@@ -58,31 +59,27 @@ const ModerationDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="large" />
-      </div>
+      <AdminLayout title="Moderation Dashboard">
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="large" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-          <FiAlertTriangle className="text-yellow-500" />
-          Moderation Actions Needed
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Review flagged content below. Your decision is final.
-        </p>
-      </div>
+    <AdminLayout title="Moderation Dashboard">
+      <p className="theme-text-secondary">
+        Review flagged content below. Your decision is final.
+      </p>
 
       {vlogs.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+        <div className="theme-surface-elevated rounded-lg shadow p-8 text-center">
           <div className="text-green-500 text-5xl mb-4 mx-auto w-fit">
             <FiCheck />
           </div>
-          <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-white">All Caught Up!</h2>
-          <p className="text-gray-500 dark:text-gray-400">No content currently requires moderation.</p>
+          <h2 className="text-xl font-semibold mb-2 theme-text">All Caught Up!</h2>
+          <p className="theme-text-secondary">No content currently requires moderation.</p>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
@@ -90,15 +87,15 @@ const ModerationDashboard = () => {
             <div
               key={vlog._id}
               onClick={() => navigate(`/vlog/${vlog._id}`)}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col cursor-pointer hover:shadow-xl transition-shadow"
+              className="theme-surface-elevated rounded-xl shadow-lg overflow-hidden theme-border flex flex-col cursor-pointer hover:shadow-xl transition-shadow"
             >
               {/* Media Preview */}
-              <div className="relative h-48 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+              <div className="relative h-48 theme-surface flex items-center justify-center">
                  {/* Quick hack for video preview if thumbnail exists */}
                  {vlog.thumbnailUrl ? (
                     <img src={vlog.thumbnailUrl} alt={vlog.title} className="w-full h-full object-cover" />
                  ) : (
-                    <div className="text-gray-400">No Preview</div>
+                     <div className="theme-text-secondary">No Preview</div>
                  )}
                  <div className="absolute top-2 right-2">
                     <StatusBadge status={vlog.status} />
@@ -107,28 +104,28 @@ const ModerationDashboard = () => {
 
               <div className="p-5 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1">{vlog.title}</h3>
+                    <h3 className="font-bold text-lg theme-text line-clamp-1">{vlog.title}</h3>
                 </div>
                 
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
+                <p className="text-sm theme-text-secondary mb-4 line-clamp-2">
                     {vlog.description || "No description"}
                 </p>
 
                 {/* AI Insights - Only show high level info */}
-                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm mb-4 space-y-1">
+                <div className="theme-surface p-3 rounded-lg text-sm mb-4 space-y-1">
                     <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">AI Score:</span>
+                        <span className="theme-text-secondary">AI Score:</span>
                         <span className={`font-mono font-bold ${vlog.moderation?.score > 60 ? 'text-red-500' : 'text-yellow-500'}`}>
                             {vlog.moderation?.score || 0}
                         </span>
                     </div>
                      <div className="flex justify-between">
-                        <span className="text-gray-500 dark:text-gray-400">Author Trust:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
+                        <span className="theme-text-secondary">Author Trust:</span>
+                        <span className="font-medium theme-text">
                             {vlog.author?.trustScore || 50}
                         </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">
+                    <div className="text-xs theme-text-secondary mt-1">
                         Posted {formatDistanceToNow(new Date(vlog.createdAt), { addSuffix: true })}
                     </div>
                 </div>
@@ -154,7 +151,7 @@ const ModerationDashboard = () => {
           ))}
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

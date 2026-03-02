@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "../../services/api";
 import toast from "react-hot-toast";
+import AdminLayout from "../../components/Layout/AdminLayout";
 
 const AdminUserList = () => {
   const [users, setUsers] = useState([]);
@@ -26,16 +27,18 @@ const AdminUserList = () => {
   };
 
   if (loading) {
-    return <div className="p-6">Loading Users...</div>;
+    return (
+      <AdminLayout title="Users">
+        <div className="theme-text">Loading Users...</div>
+      </AdminLayout>
+    );
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Users</h1>
-
-      <table className="w-full border">
+    <AdminLayout title="Users">
+      <table className="w-full theme-table">
         <thead>
-          <tr className="bg-gray-100">
+          <tr className="theme-table-header">
             <th className="p-2 text-left">Username</th>
             <th className="p-2 text-left">Email</th>
             <th className="p-2 text-left">Role</th>
@@ -46,7 +49,7 @@ const AdminUserList = () => {
 
         <tbody>
           {users.map((user) => (
-            <tr key={user._id} className="border-t">
+            <tr key={user._id} className="theme-table-row">
               <td className="p-2">{user.username}</td>
               <td className="p-2">{user.email}</td>
               <td className="p-2">{user.role}</td>
@@ -56,7 +59,7 @@ const AdminUserList = () => {
           ))}
         </tbody>
       </table>
-    </div>
+    </AdminLayout>
   );
 };
 

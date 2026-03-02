@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "../../services/api";
 import toast from "react-hot-toast";
+import AdminLayout from "../../components/Layout/AdminLayout";
 
 const AdminAnalytics = () => {
   const [stats, setStats] = useState(null);
@@ -25,7 +26,11 @@ const AdminAnalytics = () => {
   };
 
   if (loading) {
-    return <div className="p-6">Loading Analytics...</div>;
+    return (
+      <AdminLayout title="Platform Analytics">
+        <div className="theme-text">Loading Analytics...</div>
+      </AdminLayout>
+    );
   }
 
   if (!stats) {
@@ -33,26 +38,24 @@ const AdminAnalytics = () => {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Platform Analytics</h1>
-
+    <AdminLayout title="Platform Analytics">
       <div className="grid grid-cols-3 gap-6">
-        <div className="border p-4 rounded">
-          <h2>Total Users</h2>
-          <p className="text-3xl font-bold">{stats.totalUsers}</p>
+        <div className="p-4 rounded-lg theme-surface theme-border">
+          <h2 className="theme-text-secondary">Total Users</h2>
+          <p className="text-3xl font-bold theme-text">{stats.totalUsers}</p>
         </div>
 
-        <div className="border p-4 rounded">
-          <h2>Total Vlogs</h2>
-          <p className="text-3xl font-bold">{stats.totalVlogs}</p>
+        <div className="p-4 rounded-lg theme-surface theme-border">
+          <h2 className="theme-text-secondary">Total Vlogs</h2>
+          <p className="text-3xl font-bold theme-text">{stats.totalVlogs}</p>
         </div>
 
-        <div className="border p-4 rounded">
-          <h2>Active Users</h2>
-          <p className="text-3xl font-bold">{stats.activeUsers}</p>
+        <div className="p-4 rounded-lg theme-surface theme-border">
+          <h2 className="theme-text-secondary">Active Users</h2>
+          <p className="text-3xl font-bold theme-text">{stats.activeUsers}</p>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 
