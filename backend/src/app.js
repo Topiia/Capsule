@@ -30,7 +30,7 @@ const connectDB = require('./config/database');
 const { createRedisClient } = require('./config/redis');
 const mongoSanitize = require('./middleware/mongoSanitize');
 const csrfProtection = require('./middleware/csrfProtection');
-const isAllowedOrigin = require('./middleware/originValidator');
+const isTrustedOrigin = require('./utils/trustedOrigin');
 
 const redis = new Proxy({}, {
   get: (target, prop) => {
@@ -90,12 +90,16 @@ app.use((req, res, next) => {
 // CORS configuration
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || isAllowedOrigin(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS blocked'));
+    try {
+      if (isTrustedOrigin(origin, { requireDefinedOrigin: false })) {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS blocked'));
+    } catch (err) {
+      return callback(err); // Handles throws like the missing ALLOWED_ORIGINS error
     }
   },
+
   credentials: true,
   optionsSuccessStatus: 200,
 };
