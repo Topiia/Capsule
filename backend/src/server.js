@@ -26,7 +26,7 @@ require('./config/env').validateEnv();
 // REDIS_URL is the Render/Upstash production env var (not REDIS_HOST which is local-only)
 const optionalServices = {
   REDIS_URL: 'Caching & job queues (Upstash/Managed Redis)',
-  ALLOWED_ORIGINS: 'CORS origin whitelist (required for browser clients)',
+  CORS_ORIGINS: 'CORS origin whitelist (required for browser clients)',
 };
 
 const missingOptional = Object.keys(optionalServices)

@@ -23,7 +23,7 @@ module.exports = {
         'JWT_REFRESH_SECRET',
         'MONGODB_URI',
         'CLOUDINARY_API_SECRET',
-        'ALLOWED_ORIGINS',
+        'CORS_ORIGINS',
       ];
       required.forEach((req) => {
         if (!process.env[req]) {
