@@ -21,7 +21,7 @@ module.exports = {
       const required = [
         'JWT_SECRET',
         'JWT_REFRESH_SECRET',
-        'MONGO_URI',
+        'MONGODB_URI',
         'CLOUDINARY_SECRET',
       ];
       required.forEach((req) => {
