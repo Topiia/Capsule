@@ -10,6 +10,10 @@ const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 
 const router = express.Router();
+const { mutationLimiter } = require('../middleware/rateLimit');
+
+// Apply mutation limit to all upload routes natively
+router.use(mutationLimiter);
 
 /* ---------- single upload ---------- */
 router.post(

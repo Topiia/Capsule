@@ -8,6 +8,7 @@ const { sendEmail } = require('../utils/sendEmail');
 
 // PROTECT ALL ROUTES (Admin only)
 const { protect, authorize } = require('../middleware/auth');
+const { generalReadLimiter, mutationLimiter } = require('../middleware/rateLimit');
 
 router.use(protect);
 router.use(authorize('admin'));
@@ -16,7 +17,7 @@ router.use(authorize('admin'));
  * @desc Get Flagged Vlogs
  * @route GET /api/admin/moderation/flagged
  */
-router.get('/flagged', async (req, res) => {
+router.get('/flagged', generalReadLimiter, async (req, res) => {
   try {
     const vlogs = await Vlog.find({ status: { $in: ['FLAGGED', 'PENDING'] } })
       .populate('author', 'username email trustScore')
@@ -33,7 +34,7 @@ router.get('/flagged', async (req, res) => {
  * @route PATCH /api/admin/moderation/:id/override
  * @body { status: 'APPROVED' | 'REJECTED', reason: string }
  */
-router.patch('/:id/override', async (req, res) => {
+router.patch('/:id/override', mutationLimiter, async (req, res) => {
   try {
     const { status, reason } = req.body;
     const vlog = await Vlog.findById(req.params.id).populate('author');
@@ -105,7 +106,7 @@ router.patch('/:id/override', async (req, res) => {
  * @desc Get Moderation Metrics
  * @route GET /api/admin/moderation/metrics
  */
-router.get('/metrics', (req, res) => {
+router.get('/metrics', generalReadLimiter, (req, res) => {
   res.json({
     success: true,
     data: metricsService.getMetrics(),

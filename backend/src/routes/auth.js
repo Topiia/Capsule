@@ -22,36 +22,31 @@ const {
   validate,
 } = require('../middleware/validation');
 
-// Import rate limiters (defined in server.js, exported via app.locals)
-// Initialize as no-op middleware until setLimiters is called
-let loginLimiter = (req, res, next) => next();
-let sessionLimiter = (req, res, next) => next();
-
-// Export function to set limiters from server.js
-router.setLimiters = (loginLim, sessionLim) => {
-  loginLimiter = loginLim;
-  sessionLimiter = sessionLim;
-};
+const {
+  authLimiter,
+  identityLimiter,
+  mutationLimiter,
+} = require('../middleware/rateLimit');
 
 // Routes with appropriate rate limiting
 // Strict limiting (prevent brute force)
 router.post(
   '/register',
-  (req, res, next) => loginLimiter(req, res, next),
+  authLimiter,
   registerValidation,
   validate,
   register,
 );
 router.post(
   '/login',
-  (req, res, next) => loginLimiter(req, res, next),
+  authLimiter,
   loginValidation,
   validate,
   login,
 );
 router.post(
   '/forgotpassword',
-  (req, res, next) => loginLimiter(req, res, next),
+  authLimiter,
   forgotPasswordValidation,
   forgotPassword,
 );
@@ -59,30 +54,32 @@ router.post(
 // Lenient limiting (allow normal usage)
 router.get(
   '/me',
-  (req, res, next) => sessionLimiter(req, res, next),
   protect,
+  identityLimiter,
   getMe,
 );
 router.post(
   '/refresh',
-  (req, res, next) => sessionLimiter(req, res, next),
+  identityLimiter,
   refreshToken,
 );
 
 // No rate limiting (protected by auth middleware)
-router.put('/updatedetails', protect, updateProfileValidation, updateDetails);
+router.put('/updatedetails', protect, mutationLimiter, updateProfileValidation, updateDetails);
 router.put(
   '/updatepassword',
   protect,
+  mutationLimiter,
   updatePasswordValidation,
   updatePassword,
 );
 router.put(
   '/resetpassword/:resettoken',
+  authLimiter,
   resetPasswordValidation,
   resetPassword,
 );
-router.get('/verify/:token', verifyEmail);
-router.post('/logout', protect, logout);
+router.get('/verify/:token', authLimiter, verifyEmail);
+router.post('/logout', protect, identityLimiter, logout);
 
 module.exports = router;
