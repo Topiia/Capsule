@@ -13,7 +13,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
@@ -47,8 +46,17 @@ const userRoutes = require('./routes/users');
 const adminModerationRoutes = require('./routes/admin.moderation.routes');
 const adminUsersRoutes = require('./routes/admin.users.routes');
 
+// OBSERVABILITY: Metrics
+const { metricsMiddleware, getMetrics } = require('./monitoring/metrics');
+
 // Initialize express app
 const app = express();
+
+// Expose metrics early before limiters/auth
+app.get('/metrics', getMetrics);
+
+// Record all other API requests
+app.use(metricsMiddleware);
 
 // Connect to database (skip in test — integration.setup.js handles DB lifecycle)
 if (process.env.NODE_ENV !== 'test') {
@@ -59,13 +67,8 @@ if (process.env.NODE_ENV !== 'test') {
 // In production we run behind Render/Vercel reverse proxies.
 // trust proxy must be enabled so req.ip reflects real client IP.
 // Disabled in development to prevent IP spoofing via X-Forwarded-For.
-const { NODE_ENV } = require('./config/env');
 
-if (NODE_ENV === 'production') {
-  app.set('trust proxy', true);
-} else {
-  app.set('trust proxy', false);
-}
+app.set('trust proxy', 1);
 
 // OBSERVABILITY: Correlation ID middleware (must be early in stack)
 app.use(correlationMiddleware);
@@ -136,72 +139,6 @@ if (process.env.NODE_ENV !== 'test' && statusMonitor) {
     }),
   );
 }
-
-// Rate limiting (disabled in test mode)
-if (process.env.NODE_ENV !== 'test') {
-  const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
-    message: {
-      success: false,
-      error: 'Too many requests from this IP, please try again later.',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  app.use('/api/', limiter);
-}
-
-// SECURITY: Separate rate limiters for auth endpoints
-// 1. Login/Register limiter - Strict (prevent brute force)
-const loginLimiter = process.env.NODE_ENV !== 'test'
-  ? rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: {
-      success: false,
-      errorType: 'ratelimit',
-      error: 'Too many login attempts. Please try again in 15 minutes.',
-    },
-    skipSuccessfulRequests: true,
-    standardHeaders: true,
-    handler: (req, res) => {
-      res.status(429).json({
-        success: false,
-        errorType: 'ratelimit',
-        error: 'Too many login attempts. Please try again in 15 minutes.',
-        retryAfterSeconds: Math.ceil(
-          (req.rateLimit.resetTime - Date.now()) / 1000,
-        ),
-      });
-    },
-  })
-  : (req, res, next) => next();
-
-// 2. Session check limiter - Lenient (allow normal app usage)
-const sessionLimiter = process.env.NODE_ENV !== 'test'
-  ? rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: {
-      success: false,
-      errorType: 'ratelimit',
-      error: 'Too many requests. Please wait a moment.',
-    },
-    standardHeaders: true,
-    handler: (req, res) => {
-      res.status(429).json({
-        success: false,
-        errorType: 'ratelimit',
-        error: 'Too many requests. Please wait a moment.',
-        retryAfterSeconds: Math.ceil(
-          (req.rateLimit.resetTime - Date.now()) / 1000,
-        ),
-      });
-    },
-  })
-  : (req, res, next) => next();
 
 // Body parser middleware
 app.use(express.json({ limit: '500kb' }));
@@ -285,8 +222,7 @@ app.get('/health/db', (req, res) => {
   }
 });
 
-// API routes with appropriate rate limiting
-authRoutes.setLimiters(loginLimiter, sessionLimiter);
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vlogs', vlogRoutes);
 app.use('/api/upload', uploadRoutes);

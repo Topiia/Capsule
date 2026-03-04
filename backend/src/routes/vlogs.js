@@ -20,7 +20,12 @@ const {
 const { protect, optionalAuth } = require('../middleware/auth');
 const { uploadMultiple } = require('../middleware/upload');
 const { cacheMiddleware } = require('../middleware/cache');
-const { viewCountLimiter } = require('../middleware/rateLimit');
+const {
+  viewCountLimiter,
+  generalReadLimiter,
+  mutationLimiter,
+} = require('../middleware/rateLimit');
+const { readSlowDown } = require('../middleware/slowDown');
 
 // Validation rules
 const createVlogValidation = [
@@ -148,13 +153,14 @@ const commentValidation = [
 
 // Routes
 // Cached GET routes (TTL in seconds)
-router.get('/trending', cacheMiddleware(600), getTrendingVlogs); // Cache for 10 minutes
-router.get('/user/:userId', optionalAuth, cacheMiddleware(300), getUserVlogs); // Cache for 5 minutes
-router.get('/', optionalAuth, cacheMiddleware(180), getVlogs); // Cache for 3 minutes
-router.get('/:id', optionalAuth, cacheMiddleware(300), getVlog); // Cache for 5 minutes
+router.get('/trending', readSlowDown, generalReadLimiter, cacheMiddleware(600), getTrendingVlogs); // Cache for 10 minutes
+router.get('/user/:userId', optionalAuth, readSlowDown, generalReadLimiter, cacheMiddleware(300), getUserVlogs); // Cache for 5 minutes
+router.get('/', optionalAuth, readSlowDown, generalReadLimiter, cacheMiddleware(180), getVlogs); // Cache for 3 minutes
+router.get('/:id', optionalAuth, readSlowDown, generalReadLimiter, cacheMiddleware(300), getVlog); // Cache for 5 minutes
 router.post(
   '/',
   protect,
+  mutationLimiter,
   uploadMultiple('images', 10),
   createVlogValidation,
   createVlog,
@@ -162,16 +168,17 @@ router.post(
 router.put(
   '/:id',
   protect,
+  mutationLimiter,
   uploadMultiple('images', 10),
   updateVlogValidation,
   updateVlog,
 );
-router.delete('/:id', protect, deleteVlog);
-router.put('/:id/like', protect, toggleLike);
-router.put('/:id/dislike', protect, toggleDislike);
-router.put('/:id/share', protect, incrementShare);
+router.delete('/:id', protect, mutationLimiter, deleteVlog);
+router.put('/:id/like', protect, mutationLimiter, toggleLike);
+router.put('/:id/dislike', protect, mutationLimiter, toggleDislike);
+router.put('/:id/share', protect, mutationLimiter, incrementShare);
 router.put('/:id/view', protect, viewCountLimiter, recordView);
-router.post('/:id/comments', protect, commentValidation, addComment);
-router.delete('/:id/comments/:commentId', protect, deleteComment);
+router.post('/:id/comments', protect, mutationLimiter, commentValidation, addComment);
+router.delete('/:id/comments/:commentId', protect, mutationLimiter, deleteComment);
 
 module.exports = router;

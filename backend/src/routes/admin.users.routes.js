@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Vlog = require('../models/Vlog');
 
 const { protect, authorize } = require('../middleware/auth');
+const { generalReadLimiter } = require('../middleware/rateLimit');
 
 router.use(protect);
 router.use(authorize('admin'));
@@ -14,7 +15,7 @@ router.use(authorize('admin'));
  * @desc Get All Users
  * @route GET /api/admin/users
  */
-router.get('/users', async (req, res) => {
+router.get('/users', generalReadLimiter, async (req, res) => {
   try {
     const users = await User.find({})
       .select('-password')
@@ -37,7 +38,7 @@ router.get('/users', async (req, res) => {
  * @desc Platform Analytics
  * @route GET /api/admin/stats
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', generalReadLimiter, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalVlogs = await Vlog.countDocuments();
