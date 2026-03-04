@@ -23,8 +23,10 @@ if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
 require('./config/env').validateEnv();
 
 // Warn about optional services (graceful degradation)
+// REDIS_URL is the Render/Upstash production env var (not REDIS_HOST which is local-only)
 const optionalServices = {
-  REDIS_HOST: 'Caching & job queues',
+  REDIS_URL: 'Caching & job queues (Upstash/Managed Redis)',
+  ALLOWED_ORIGINS: 'CORS origin whitelist (required for browser clients)',
 };
 
 const missingOptional = Object.keys(optionalServices)
@@ -32,9 +34,9 @@ const missingOptional = Object.keys(optionalServices)
   .map((key) => `${key} (${optionalServices[key]})`);
 
 if (missingOptional.length > 0) {
-  console.warn('[WARN] Optional services will be disabled:');
+  console.warn('[WARN] Optional services not configured:');
   missingOptional.forEach((msg) => console.warn(`  - ${msg}`));
-  console.warn('[WARN] App will run with reduced functionality.');
+  console.warn('[WARN] App may run with reduced functionality.');
 }
 
 // PRODUCTION SAFETY: Global crash handlers (attach before any async code)

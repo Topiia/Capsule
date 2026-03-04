@@ -25,7 +25,6 @@ const { correlationMiddleware } = require('./middleware/correlation');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
-const connectDB = require('./config/database');
 const { createRedisClient } = require('./config/redis');
 const mongoSanitize = require('./middleware/mongoSanitize');
 const csrfProtection = require('./middleware/csrfProtection');
@@ -58,10 +57,8 @@ app.get('/metrics', getMetrics);
 // Record all other API requests
 app.use(metricsMiddleware);
 
-// Connect to database (skip in test — integration.setup.js handles DB lifecycle)
-if (process.env.NODE_ENV !== 'test') {
-  connectDB();
-}
+// NOTE: DB connection is handled in server.js AFTER env validation.
+// app.js must remain side-effect-free for clean test imports.
 
 // SECURITY: Proxy Configuration
 // In production we run behind Render/Vercel reverse proxies.
@@ -81,14 +78,7 @@ app.use(
   }),
 );
 
-// DEBUG: Log cookies for auth debugging (disabled in test environment)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/auth') && process.env.NODE_ENV !== 'test') {
-    console.log(`[DEBUG] ${req.method} ${req.path}`);
-    console.log('[DEBUG] Cookies:', req.cookies);
-  }
-  next();
-});
+// (Auth cookie debug logging removed — do not log cookies in production)
 
 // CORS configuration
 const corsOptions = {
@@ -131,7 +121,7 @@ if (process.env.NODE_ENV !== 'test' && statusMonitor) {
       healthChecks: [
         {
           protocol: 'http',
-          host: 'localhost',
+          host: '0.0.0.0',
           path: '/health',
           port: process.env.PORT || 5000,
         },
