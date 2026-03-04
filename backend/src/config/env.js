@@ -22,7 +22,7 @@ module.exports = {
         'JWT_SECRET',
         'JWT_REFRESH_SECRET',
         'MONGODB_URI',
-        'CLOUDINARY_SECRET',
+        'CLOUDINARY_API_SECRET',
       ];
       required.forEach((req) => {
         if (!process.env[req]) {
