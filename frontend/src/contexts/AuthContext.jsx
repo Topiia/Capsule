@@ -255,16 +255,26 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         console.log("[AuthContext] User authenticated via session cookie");
       } catch (error) {
-        // Rate limit on initial /me call
+        // ─── 429: Rate-limited — do NOT wipe auth state ───────────────────────
+        // The user IS still authenticated; the backend is merely throttling the
+        // /me endpoint. Clearing auth here causes the spurious logout that was
+        // observed after deleting a vlog (delete → cache invalidation cascade →
+        // concurrent /me call → 429 → incorrect logout).
         if (error.response?.status === 429) {
           const retryAfter = error.response.data?.retryAfterSeconds || 60;
           console.warn(
-            `[AuthContext] Rate limited on /me. Retry after ${retryAfter} seconds`
+            `[AuthContext] Rate limited on /me. Retry after ${retryAfter}s. ` +
+            `Auth state preserved — NOT logging out.`
           );
-        } else {
-          // Other error or 401, assume not logged in (interceptor handles active refresh if token available)
-          console.log("[AuthContext] No active session");
+          // Do NOT touch isAuthenticated or user — keep whatever state we had.
+          // NOTE: `return` here still runs the finally block (setLoading, ref),
+          // but prevents `setIsAuthenticated(false)` / `setUser(null)` below.
+          return;
         }
+
+        // ─── 401 or any other error: genuine auth failure ─────────────────────
+        // Only here do we actually clear the session.
+        console.log("[AuthContext] No active session (status:", error.response?.status ?? "network error", ")");
         setIsAuthenticated(false);
         setUser(null);
       } finally {
