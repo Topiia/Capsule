@@ -8,19 +8,19 @@
  * @returns {boolean} - True if the origin is trusted, false otherwise
  */
 const isTrustedOrigin = (origin, { requireDefinedOrigin = false } = {}) => {
-  const { NODE_ENV, ALLOWED_ORIGINS } = process.env;
+  const { NODE_ENV, CORS_ORIGINS } = process.env;
 
   // ===== PRODUCTION =====
   if (NODE_ENV === 'production') {
-    if (!ALLOWED_ORIGINS) {
-      throw new Error('CORS misconfiguration: ALLOWED_ORIGINS not set');
+    if (!CORS_ORIGINS) {
+      throw new Error('CORS misconfiguration: CORS_ORIGINS not set');
     }
 
     if (origin === undefined || origin === null) {
       return !requireDefinedOrigin;
     }
 
-    const allowedOrigins = ALLOWED_ORIGINS
+    const allowedOrigins = CORS_ORIGINS
       .split(',')
       .map((o) => o.trim().replace(/\/$/, '')); // normalize
 
