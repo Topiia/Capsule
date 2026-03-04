@@ -48,6 +48,13 @@ if (isProductionLike(isolatedUri) || isProductionLike(process.env.MONGODB_URI ||
 // Pass URI down via process env just in case any application code reads it indirectly
 process.env.MONGODB_URI = isolatedUri;
 
+// MongoMemoryServer starts as a standalone instance (no replica set).
+// Multi-document transactions require a replica set. Setting this flag
+// activates the sessionless fallback path in deleteVlog, addComment,
+// deleteComment, and userDeletionService — identical to the production
+// transaction path minus the session wrapper.
+process.env.SKIP_TRANSACTIONS = 'true';
+
 beforeAll(async () => {
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(isolatedUri, {

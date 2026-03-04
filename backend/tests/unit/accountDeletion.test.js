@@ -75,12 +75,28 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
 
     // Mock Redis
     mockRedisClient = {
-      delPattern: jest.fn().mockResolvedValue(3),
+      safeDel: jest.fn().mockResolvedValue(2),
+      invalidateTags: jest.fn().mockResolvedValue(1),
     };
     redis.createRedisClient.mockReturnValue(mockRedisClient);
 
     // Mock queue
     queueAssetCleanup.mockResolvedValue({ id: 'job-123' });
+
+    // Mock new operations added in Phase D cascade:
+    // Comment.find / Like.find used to collect counter deltas before bulk delete
+    Comment.find.mockReturnValue({
+      session: jest.fn().mockResolvedValue([]),
+    });
+    Like.find.mockReturnValue({
+      session: jest.fn().mockResolvedValue([]),
+    });
+    // User.updateMany used for follower[], following[], bookmarks[] cleanup
+    User.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    // Vlog.bulkWrite used for bulk counter decrements
+    Vlog.bulkWrite.mockResolvedValue({ modifiedCount: 0 });
+    // Vlog.updateMany used for floor protection after counter decrements
+    Vlog.updateMany.mockResolvedValue({ modifiedCount: 0 });
   });
 
   afterEach(() => {
@@ -203,16 +219,11 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
       await userDeletionService.deleteUser(mockUser._id);
 
       // Assert
-      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`user:${mockUser._id}:*`);
-      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`session:${mockUser._id}`);
-      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(`socket:${mockUser._id}`);
-      expect(mockRedisClient.delPattern).toHaveBeenCalledWith(
-        `cache:vlogs:author:${mockUser._id}`,
-      );
+      expect(mockRedisClient.safeDel).toHaveBeenCalledWith(`session:${mockUser._id}`, `socket:${mockUser._id}`);
 
       // Verify Redis cleanup happens after commit
       const commitCallOrder = mockSession.commitTransaction.mock.invocationCallOrder[0];
-      const redisCallOrder = mockRedisClient.delPattern.mock.invocationCallOrder[0];
+      const redisCallOrder = mockRedisClient.safeDel.mock.invocationCallOrder[0];
 
       expect(redisCallOrder).toBeGreaterThan(commitCallOrder);
     });
@@ -375,7 +386,8 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
         userDeletionService.deleteUser(mockUser._id),
       ).rejects.toThrow('Query timeout');
 
-      expect(mockRedisClient.delPattern).not.toHaveBeenCalled();
+      expect(mockRedisClient.safeDel).not.toHaveBeenCalled();
+      expect(mockRedisClient.invalidateTags).not.toHaveBeenCalled();
       expect(queueAssetCleanup).not.toHaveBeenCalled();
     });
   });
@@ -478,7 +490,7 @@ describe('userDeletionService.deleteUser() - Unit Tests', () => {
       Vlog.deleteMany.mockResolvedValue({ deletedCount: 0 });
       User.findByIdAndDelete.mockResolvedValue(mockUser);
 
-      mockRedisClient.delPattern.mockRejectedValue(new Error('Redis connection lost'));
+      mockRedisClient.safeDel.mockRejectedValue(new Error('Redis connection lost'));
 
       // Act
       const result = await userDeletionService.deleteUser(mockUser._id);

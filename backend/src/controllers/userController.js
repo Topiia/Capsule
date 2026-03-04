@@ -5,6 +5,7 @@ const Like = require('../models/Like');
 const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const userDeletionService = require('../services/userDeletionService');
+const { invalidateUser } = require('../middleware/cache');
 
 /* ----------------------------------------------------------
    GET USER BOOKMARKS
@@ -139,6 +140,10 @@ exports.followUser = asyncHandler(async (req, res, next) => {
     // Commit transaction
     await session.commitTransaction();
 
+    // SURGICAL INVALIDATION: clear all cached vlog responses embedding this
+    // user's author data (followerCount, isFollowedByCurrentUser, avatar, etc.)
+    await invalidateUser(userId);
+
     // Fetch updated counts (outside transaction for better performance)
     const updatedFollower = await User.findById(followerId).select(
       'followingCount following',
@@ -206,6 +211,10 @@ exports.unfollowUser = asyncHandler(async (req, res) => {
 
     // Commit transaction
     await session.commitTransaction();
+
+    // SURGICAL INVALIDATION: clear all cached vlog responses embedding this
+    // user's author data (followerCount, isFollowedByCurrentUser, avatar, etc.)
+    await invalidateUser(userId);
 
     // Fetch updated counts (outside transaction for better performance)
     const updatedFollower = await User.findById(followerId).select(

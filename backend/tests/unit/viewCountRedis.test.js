@@ -10,6 +10,9 @@ describe('Redis TTL-Based Unique View Counting', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     redis.createRedisClient.mockReturnValue(redis);
+    // Required by invalidateVlog (called from controller after recordView)
+    redis.isAvailable = jest.fn().mockReturnValue(true);
+    redis.invalidateTags = jest.fn().mockResolvedValue(0);
   });
 
   describe('SUCCESS: First view increments', () => {

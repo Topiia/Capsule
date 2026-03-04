@@ -184,21 +184,93 @@ function createRedisClient() {
   };
 
   /**
-   * Safe delete by pattern — returns 0 if Redis unavailable
-   * @param {string} pattern
-   * @returns {Promise<number>}
+   * Add cache keys to tag sets with MAX TTL enforcement.
+   *
+   * Ensures that the tag TTL is always the MAXIMUM of the new TTL and any
+   * existing TTL. This prevents a short-lived cache entry (e.g. list=180s)
+   * from overwriting the TTL of a long-lived tag (e.g. trending=600s).
+   *
+   * Pipeline 1 (RT1): SADD + TTL in one round-trip.
+   * Pipeline 2 (RT2): Conditional EXPIRE only for tags whose TTL must grow.
+   *                   Skipped entirely if no tag needs updating.
+   *
+   * @param {string[]} keys - Cache keys to tag
+   * @param {string[]} tags - Tags to associate with the keys
+   * @param {number} [ttl=300] - Candidate expiration time for tags (seconds)
    */
-  redisClient.safeScanDelPattern = async function safeScanDelPattern(pattern) {
-    if (!isRedisAvailable) return 0;
+  redisClient.addTags = async function addTags(keys, tags, ttl = 300) {
+    if (!isRedisAvailable || keys.length === 0 || tags.length === 0) return;
     try {
-      const keys = await this.keys(pattern);
-      if (keys.length === 0) return 0;
-      return await this.del(...keys);
-    } catch (error) {
-      logger.error('[Redis] safeScanDelPattern error', {
-        pattern,
-        error: error.message,
+      // RT1: SADD all tag sets + read current TTL of each tag in one pipeline.
+      // Results array layout: [sadd, ttl, sadd, ttl, ...] (2 entries per tag).
+      const rt1 = this.pipeline();
+      tags.forEach((tag) => {
+        rt1.sadd(tag, ...keys);
+        rt1.ttl(tag); // -2=missing, -1=no-expire, >=0=remaining seconds
       });
+      const rt1Results = await rt1.exec();
+
+      // Determine which tags need a longer TTL (max-enforcement).
+      const rt2 = this.pipeline();
+      let needsExpire = false;
+      tags.forEach((tag, i) => {
+        const [ttlErr, existingTTL] = rt1Results[i * 2 + 1] || [null, -2];
+        if (ttlErr) return; // Skip if Redis returned an error for this TTL read
+
+        const shouldExpire = existingTTL === -2 // Key did not exist → set TTL
+          || existingTTL === -1 // Key exists with no expiry → set TTL
+          || ttl > existingTTL; // New TTL is strictly longer → update
+
+        if (shouldExpire) {
+          rt2.expire(tag, ttl);
+          needsExpire = true;
+        }
+        // If ttl <= existingTTL: do nothing → TTL stays at the longer value.
+      });
+
+      // RT2: Only execute if at least one tag needs a TTL update.
+      if (needsExpire) {
+        await rt2.exec();
+      }
+    } catch (error) {
+      logger.error('[Redis] addTags error', { tags, error: error.message });
+    }
+  };
+
+  /**
+   * Invalidate all cache keys associated with specific tags
+   * @param {string[]} tags - Tags to invalidate
+   * @returns {Promise<number>} Number of cache keys deleted
+   */
+  redisClient.invalidateTags = async function invalidateTags(tags) {
+    if (!isRedisAvailable || tags.length === 0) return 0;
+    try {
+      // 1. Get all cache keys for these tags
+      const pipeline = this.pipeline();
+      tags.forEach((tag) => pipeline.smembers(tag));
+      const results = await pipeline.exec();
+
+      // Flatten and deduplicate cache keys
+      const cacheKeysToDel = new Set();
+      results.forEach(([err, members]) => {
+        if (!err && members) {
+          members.forEach((key) => cacheKeysToDel.add(key));
+        }
+      });
+
+      if (cacheKeysToDel.size === 0) return 0;
+
+      // 2. Delete the cache keys AND the tag sets themselves
+      const delPipeline = this.pipeline();
+      const keysArray = Array.from(cacheKeysToDel);
+      delPipeline.del(...keysArray);
+      delPipeline.del(...tags);
+
+      const delResults = await delPipeline.exec();
+      // delResults[0][1] contains the count of deleted cache keys
+      return delResults && delResults[0] ? delResults[0][1] : 0;
+    } catch (error) {
+      logger.error('invalidateTags error', { tags, error: error.message });
       return 0;
     }
   };
@@ -237,23 +309,6 @@ function createRedisClient() {
     } catch (error) {
       logger.error('[Redis] setJSON error', { key, error: error.message });
       return null;
-    }
-  };
-
-  /**
-   * Delete cached data by pattern
-   * @param {string} pattern
-   * @returns {Promise<number>}
-   */
-  redisClient.delPattern = async function delPattern(pattern) {
-    if (!isRedisAvailable) return 0;
-    try {
-      const keys = await this.keys(pattern);
-      if (keys.length === 0) return 0;
-      return await this.del(...keys);
-    } catch (error) {
-      logger.error('[Redis] delPattern error', { pattern, error: error.message });
-      return 0;
     }
   };
 

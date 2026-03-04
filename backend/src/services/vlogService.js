@@ -239,45 +239,107 @@ class VlogService {
       throw new ErrorResponse('Comment cannot exceed 500 characters', 400);
     }
 
-    const comment = await Comment.create({
-      vlog: vlogId,
-      user: userId,
-      text: text.trim(),
-    });
+    const isTransactionEnabled = process.env.SKIP_TRANSACTIONS !== 'true';
+    let session = null;
 
-    // Increment count (atomic)
-    await Vlog.findByIdAndUpdate(vlogId, { $inc: { commentCount: 1 } });
+    if (isTransactionEnabled) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
 
-    const populatedComment = await comment.populate('user', 'username avatar');
-    // Normalize response contract
-    const commentObj = populatedComment.toObject();
-    return {
-      ...commentObj,
-      content: commentObj.text, // contract requires 'content'
-    };
+    try {
+      const sessionOpt = session ? { session } : {};
+
+      // Both writes inside the same session — atomic.
+      // Comment.create requires array form when using sessions.
+      const [comment] = await Comment.create(
+        [{ vlog: vlogId, user: userId, text: text.trim() }],
+        sessionOpt,
+      );
+
+      await Vlog.findByIdAndUpdate(
+        vlogId,
+        { $inc: { commentCount: 1 } },
+        { new: false, ...sessionOpt },
+      );
+
+      if (session) {
+        await session.commitTransaction();
+      }
+
+      // Populate outside transaction (read-only, no consistency requirement)
+      const populatedComment = await comment.populate('user', 'username avatar');
+      const commentObj = populatedComment.toObject();
+      return {
+        ...commentObj,
+        content: commentObj.text, // contract requires 'content'
+      };
+    } catch (error) {
+      if (session) {
+        await session.abortTransaction();
+      }
+      throw error;
+    } finally {
+      if (session) {
+        session.endSession();
+      }
+    }
   }
 
   async deleteComment(vlogId, commentId, userId, isAdmin = false) {
-    const comment = await Comment.findById(commentId);
-    if (!comment) throw new ErrorResponse('Comment not found', 404);
+    const isTransactionEnabled = process.env.SKIP_TRANSACTIONS !== 'true';
+    let session = null;
 
-    const vlog = await Vlog.findById(vlogId);
-
-    // Auth check
-    if (
-      comment.user.toString() !== userId
-      && vlog.author.toString() !== userId
-      && !isAdmin
-    ) {
-      throw new ErrorResponse('Not authorized', 403);
+    if (isTransactionEnabled) {
+      session = await mongoose.startSession();
+      session.startTransaction();
     }
 
-    await Comment.deleteOne({ _id: commentId });
-    // FIXED Bug #8: Prevent negative commentCount
-    await Vlog.findByIdAndUpdate(vlogId, {
-      $inc: { commentCount: -1 },
-      $max: { commentCount: 0 },
-    });
+    try {
+      // All reads inside session for snapshot consistency
+      const comment = await Comment.findById(commentId).session(session);
+      if (!comment) throw new ErrorResponse('Comment not found', 404);
+
+      const vlog = await Vlog.findById(vlogId).session(session);
+
+      // Authorization: comment owner, vlog author, or admin
+      if (
+        comment.user.toString() !== userId
+        && vlog.author.toString() !== userId
+        && !isAdmin
+      ) {
+        throw new ErrorResponse('Not authorized', 403);
+      }
+
+      const sessionOpt = session ? { session } : {};
+
+      // Delete the comment document
+      await Comment.deleteOne({ _id: commentId }, sessionOpt);
+
+      // Floor protection (Option A): only decrement if counter is positive.
+      // This avoids negative values without $max — $max caused a Mongo
+      // operator conflict when combined with $inc on the same field.
+      if (vlog.commentCount > 0) {
+        await Vlog.findByIdAndUpdate(
+          vlogId,
+          { $inc: { commentCount: -1 } },
+          { new: false, ...sessionOpt },
+        );
+      }
+
+      if (session) {
+        await session.commitTransaction();
+      }
+    } catch (error) {
+      if (session) {
+        await session.abortTransaction();
+      }
+      throw error;
+    } finally {
+      if (session) {
+        session.endSession();
+      }
+    }
   }
 
   async recordView(vlogId, viewerId) {

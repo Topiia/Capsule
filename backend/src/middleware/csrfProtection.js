@@ -1,4 +1,4 @@
-const isAllowedOrigin = require('./originValidator');
+const isTrustedOrigin = require('../utils/trustedOrigin');
 
 // CSRF Protection Middleware
 // Blocks cross-site authenticated requests.
@@ -24,7 +24,7 @@ const csrfProtection = (req, res, next) => {
   // Step 3: Origin header check
   const { origin } = req.headers;
   if (origin) {
-    if (isAllowedOrigin(origin)) {
+    if (isTrustedOrigin(origin, { requireDefinedOrigin: true })) {
       return next();
     }
     console.warn(
@@ -50,7 +50,7 @@ const csrfProtection = (req, res, next) => {
   if (referer) {
     try {
       const refererUrl = new URL(referer);
-      if (isAllowedOrigin(refererUrl.origin)) {
+      if (isTrustedOrigin(refererUrl.origin, { requireDefinedOrigin: true })) {
         return next();
       }
     // eslint-disable-next-line no-empty

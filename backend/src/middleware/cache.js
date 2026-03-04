@@ -82,17 +82,70 @@ exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async 
 
     res.setHeader('X-Cache', 'MISS');
 
+    // Helper: extract vlog IDs from response payload
+    const extractVlogIds = (responseData) => {
+      const ids = new Set();
+      const dig = (obj) => {
+        if (!obj) return;
+        if (Array.isArray(obj)) {
+          obj.forEach(dig);
+        } else if (typeof obj === 'object') {
+          if (obj._id && (obj.title || obj.author || obj.views !== undefined)) {
+            ids.add(obj._id.toString());
+          }
+          if (obj.data) dig(obj.data);
+          if (obj.pages) dig(obj.pages);
+        }
+      };
+      dig(responseData);
+      return Array.from(ids);
+    };
+
+    // Helper: extract unique author IDs embedded in vlog objects
+    const extractAuthorIds = (responseData) => {
+      const ids = new Set();
+      const dig = (obj) => {
+        if (!obj) return;
+        if (Array.isArray(obj)) {
+          obj.forEach(dig);
+        } else if (typeof obj === 'object') {
+          // Collect author._id from any embedded author object
+          if (obj.author && typeof obj.author === 'object' && obj.author._id) {
+            ids.add(obj.author._id.toString());
+          }
+          if (obj.data) dig(obj.data);
+          if (obj.pages) dig(obj.pages);
+        }
+      };
+      dig(responseData);
+      return Array.from(ids);
+    };
+
     // Override res.json to cache response
     const originalJson = res.json.bind(res);
     res.json = function jsonOverride(data) {
       // Only cache successful responses
       if (res.statusCode === 200 && data) {
-        redis.setJSON(cacheKey, data, ttl).catch((err) => {
-          logger.error('Failed to cache response', {
-            key: cacheKey,
-            error: err.message,
+        redis.setJSON(cacheKey, data, ttl)
+          .then(() => {
+            // FIRE AND FORGET: Build Reverse Index Tags (vlog + user dimensions)
+            const vlogIds = extractVlogIds(data);
+            const authorIds = extractAuthorIds(data);
+            const tags = [
+              ...vlogIds.map((id) => `tag:vlog:${id}`),
+              ...authorIds.map((id) => `tag:user:${id}`),
+            ];
+            if (tags.length > 0) {
+              // Single addTags call — both dimensions in one pipeline exec
+              redis.addTags([cacheKey], tags, ttl);
+            }
+          })
+          .catch((err) => {
+            logger.error('Failed to cache response', {
+              key: cacheKey,
+              error: err.message,
+            });
           });
-        });
       }
       return originalJson(data);
     };
@@ -109,28 +162,23 @@ exports.cacheMiddleware = (ttl = 300, keyGenerator = generateCacheKey) => async 
 };
 
 /**
- * Invalidate cache by pattern
- * Use after create/update/delete operations
- *
- * @param {string} pattern - Cache key pattern (e.g., 'cache:/api/vlogs:*')
+ * Invalidate a specific vlog across all cached endpoints
+ * Uses tag-based reverse index
+ * @param {string} vlogId - MongoDB ObjectId of the vlog
  */
-exports.invalidateCache = async (pattern) => {
-  // Skip if Redis unavailable
-  if (!redis.isAvailable()) {
-    logger.debug('Cache invalidation skipped - Redis unavailable', { pattern });
-    return 0;
-  }
+exports.invalidateVlog = async (vlogId) => {
+  if (!redis.isAvailable() || !vlogId) return 0;
 
   try {
-    const deleted = await redis.delPattern(pattern);
-    logger.info('Cache invalidated', {
-      pattern,
+    const deleted = await redis.invalidateTags([`tag:vlog:${vlogId}`]);
+    logger.info('Vlog cache invalidated', {
+      vlogId,
       keysDeleted: deleted,
     });
     return deleted;
   } catch (error) {
-    logger.error('Cache invalidation error', {
-      pattern,
+    logger.error('Vlog cache invalidation error', {
+      vlogId,
       error: error.message,
     });
     return 0;
@@ -138,21 +186,28 @@ exports.invalidateCache = async (pattern) => {
 };
 
 /**
- * Invalidate vlog-related caches
- * Called after vlog create/update/delete
+ * Invalidate all cached responses that embed data from a specific User.
+ * Covers: followerCount, isFollowedByCurrentUser, username, avatar, bio.
+ * Called after: follow, unfollow, profile update, avatar change.
+ * @param {string} userId - MongoDB ObjectId of the user
  */
-exports.invalidateVlogCache = async () => {
-  await exports.invalidateCache('cache:/api/vlogs:*');
-  await exports.invalidateCache('cache:/api/vlogs/*');
-};
+exports.invalidateUser = async (userId) => {
+  if (!redis.isAvailable() || !userId) return 0;
 
-/**
- * Invalidate user-related caches
- * Called after user profile update
- */
-exports.invalidateUserCache = async (userId) => {
-  await exports.invalidateCache(`cache:/api/users:${userId}:*`);
-  await exports.invalidateCache(`cache:/api/users/*:${userId}:*`);
+  try {
+    const deleted = await redis.invalidateTags([`tag:user:${userId}`]);
+    logger.info('User cache invalidated', {
+      userId,
+      keysDeleted: deleted,
+    });
+    return deleted;
+  } catch (error) {
+    logger.error('User cache invalidation error', {
+      userId,
+      error: error.message,
+    });
+    return 0;
+  }
 };
 
 /**
@@ -161,9 +216,10 @@ exports.invalidateUserCache = async (userId) => {
  */
 exports.clearAllCache = async () => {
   try {
-    const deleted = await redis.delPattern('cache:*');
-    logger.warn('All caches cleared', { keysDeleted: deleted });
-    return deleted;
+    // Deprecated delPattern since it uses KEYS.
+    // Use DB FLUSHDB for full wipe; this endpoint is typically inactive in prod.
+    logger.warn('clearAllCache skipped - legacy wildcard deletion removed');
+    return 0;
   } catch (error) {
     logger.error('Clear all cache error', { error: error.message });
     return 0;

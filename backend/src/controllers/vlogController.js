@@ -9,7 +9,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const { generateTags } = require('../services/aiService');
 const VlogService = require('../services/vlogService');
-const { invalidateVlogCache } = require('../middleware/cache');
+const { invalidateVlog } = require('../middleware/cache');
 const logger = require('../config/logger');
 const { createModerationQueue } = require('../queues/moderationQueue');
 
@@ -199,8 +199,8 @@ exports.createVlog = asyncHandler(async (req, res) => {
     // In production, might want alerting here.
   }
 
-  // PERFORMANCE: Invalidate vlog caches after creation
-  await invalidateVlogCache();
+  // PERFORMANCE: Invalidate specific vlog presence
+  await invalidateVlog(vlog._id.toString());
 
   res.status(201).json({ success: true, data: vlog });
 });
@@ -254,8 +254,8 @@ exports.updateVlog = asyncHandler(async (req, res, next) => {
     runValidators: true,
   }).populate('author', 'username avatar bio');
 
-  // PERFORMANCE: Invalidate vlog caches after update
-  await invalidateVlogCache();
+  // PERFORMANCE: Invalidate specific cached vlog
+  await invalidateVlog(vlog._id.toString());
 
   res.status(200).json({ success: true, data: vlog });
 });
@@ -264,38 +264,77 @@ exports.updateVlog = asyncHandler(async (req, res, next) => {
    DELETE VLOG (with image cleanup)
 ---------------------------------------------------------- */
 exports.deleteVlog = asyncHandler(async (req, res, next) => {
-  const vlog = await Vlog.findById(req.params.id);
+  const { id: vlogId } = req.params;
 
+  // Pre-flight: verify existence and authorization before opening a session
+  const vlog = await Vlog.findById(vlogId);
   if (!vlog) return next(new ErrorResponse('Vlog not found', 404));
 
   if (vlog.author.toString() !== req.user.id && req.user.role !== 'admin') {
     return next(new ErrorResponse('Not authorized to delete this vlog', 403));
   }
 
+  // Cloudinary cleanup is best-effort and intentionally outside the transaction.
+  // Cloud storage is non-transactional; failures here are logged but never block deletion.
   if (vlog.images?.length > 0) {
     await Promise.all(
       vlog.images.map(async (img) => {
         try {
           await deleteImage(img.publicId);
         } catch (error) {
-          console.error(
-            `Failed to delete image ${img.publicId}: `,
-            error.message,
-          );
+          logger.error('Failed to delete Cloudinary image', {
+            publicId: img.publicId,
+            error: error.message,
+          });
         }
       }),
     );
   }
 
-  // FIXED Bug #4: CASCADE DELETE - Remove associated records to prevent orphaned data
-  await Promise.all([
-    Like.deleteMany({ vlog: req.params.id }),
-    Comment.deleteMany({ vlog: req.params.id }),
-    vlog.deleteOne(),
-  ]);
+  // TRANSACTION: atomic cascade delete — all or nothing.
+  // Covers: Likes, Comments, User bookmarks, Vlog document.
+  // Without this, a partial failure leaves orphaned Likes/Comments permanently.
+  const isTransactionEnabled = process.env.SKIP_TRANSACTIONS !== 'true';
+  let session = null;
 
-  // PERFORMANCE: Invalidate vlog caches after deletion
-  await invalidateVlogCache();
+  if (isTransactionEnabled) {
+    session = await mongoose.startSession();
+    session.startTransaction();
+  }
+
+  try {
+    const sessionOpt = session ? { session } : {};
+
+    // All four writes are atomic. If any fails, abortTransaction() rolls back all.
+    await Promise.all([
+      Like.deleteMany({ vlog: vlogId }, sessionOpt),
+      Comment.deleteMany({ vlog: vlogId }, sessionOpt),
+      // Remove vlog from any user's bookmarks array (previously missing)
+      User.updateMany(
+        { bookmarks: vlogId },
+        { $pull: { bookmarks: vlogId } },
+        sessionOpt,
+      ),
+      vlog.deleteOne(sessionOpt),
+    ]);
+
+    if (session) {
+      await session.commitTransaction();
+    }
+  } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
+    throw error;
+  } finally {
+    if (session) {
+      session.endSession();
+    }
+  }
+
+  // Cache invalidation fires only after confirmed DB commit.
+  // If the transaction aborted, the throw above skips this line.
+  await invalidateVlog(vlogId);
 
   res.status(200).json({
     success: true,
@@ -309,6 +348,8 @@ exports.deleteVlog = asyncHandler(async (req, res, next) => {
 ---------------------------------------------------------- */
 exports.toggleLike = asyncHandler(async (req, res) => {
   const result = await VlogService.toggleLike(req.params.id, req.user.id);
+  // SURGICAL INVALIDATION: clear only paths containing this vlog
+  await invalidateVlog(req.params.id);
   res.status(200).json({ success: true, data: result });
 });
 
@@ -317,6 +358,8 @@ exports.toggleLike = asyncHandler(async (req, res) => {
 ---------------------------------------------------------- */
 exports.toggleDislike = asyncHandler(async (req, res) => {
   const result = await VlogService.toggleDislike(req.params.id, req.user.id);
+  // SURGICAL INVALIDATION: clear only paths containing this vlog
+  await invalidateVlog(req.params.id);
   res.status(200).json({ success: true, data: result });
 });
 
@@ -329,6 +372,8 @@ exports.addComment = asyncHandler(async (req, res) => {
     req.user.id,
     req.body.text,
   );
+  // SURGICAL INVALIDATION
+  await invalidateVlog(req.params.id);
   res.status(201).json({ success: true, data: comment });
 });
 
@@ -342,6 +387,8 @@ exports.deleteComment = asyncHandler(async (req, res) => {
     req.user.id,
     req.user.role === 'admin',
   );
+  // SURGICAL INVALIDATION
+  await invalidateVlog(req.params.id);
   res.status(200).json({ success: true, data: {} });
 });
 
@@ -355,6 +402,8 @@ exports.incrementShare = asyncHandler(async (req, res, next) => {
     { new: true },
   );
   if (!vlog) return next(new ErrorResponse('Vlog not found', 404));
+  // SURGICAL INVALIDATION
+  await invalidateVlog(req.params.id);
   res.status(200).json({ success: true, data: { shares: vlog.shares } });
 });
 
@@ -467,6 +516,14 @@ exports.recordView = asyncHandler(async (req, res) => {
     correlationId: req.correlationId,
     ip: req.ip, // Useful for abuse monitoring (if generic IP logging allowed)
   });
+
+  // If view was tracked (incremented), invalidate cache.
+  // We explicitly check result.incremented to avoid invalidating aggressively
+  // if this is a deduplicated view from the same user TTL window.
+  if (result.incremented) {
+    // SURGICAL INVALIDATION
+    await invalidateVlog(req.params.id);
+  }
 
   // Response TTL: Use same logic as service for consistency
   const VIEW_TTL_SECONDS = parseInt(process.env.VIEW_TTL_SECONDS, 10) || 300;
