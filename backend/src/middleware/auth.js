@@ -251,11 +251,11 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     // ATOMIC UPDATE: Prevent race conditions if multiple concurrent refresh requests
     const updatedUser = await User.findOneAndUpdate(
       { _id: user._id, tokenVersion }, // Filter exactly by the version we validated
-      { 
-        $inc: { tokenVersion: 1 }, 
-        $set: { refreshTokenHash: newHash } 
+      {
+        $inc: { tokenVersion: 1 },
+        $set: { refreshTokenHash: newHash },
       },
-      { new: true } // Return updated document
+      { new: true }, // Return updated document
     );
 
     if (!updatedUser) {
