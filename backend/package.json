@@ -20,6 +20,7 @@
   "dependencies": {
     "@fluidjs/multer-cloudinary": "^1.0.0",
     "@huggingface/inference": "^4.13.12",
+    "@sentry/node": "^10.42.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",
     "cloudinary": "^2.8.0",

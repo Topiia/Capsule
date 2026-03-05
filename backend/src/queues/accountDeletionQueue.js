@@ -1,6 +1,8 @@
 const Queue = require('bull');
 const cloudinary = require('../config/cloudinary');
 const logger = require('../config/logger');
+const emailConfig = require('../config/email');
+const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
 
 /**
  * PERFORMANCE: Account Deletion Queue
@@ -30,11 +32,8 @@ exports.createAccountDeletionQueue = () => {
 
   try {
     accountDeletionQueue = new Queue('accountDeletion', {
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-        password: process.env.REDIS_PASSWORD || undefined,
-      },
+      // HIGH-5: Use centralized Redis config (same as emailQueue) to ensure consistent connection
+      redis: emailConfig.redis,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -70,6 +69,7 @@ exports.createAccountDeletionQueue = () => {
       });
     });
 
+    const deletionSpikeDetector = createFailureSpikeDetector('accountDeletion');
     accountDeletionQueue.on('failed', (job, err) => {
       logger.error('Asset cleanup job failed (all retries exhausted)', {
         jobId: job.id,
@@ -78,6 +78,11 @@ exports.createAccountDeletionQueue = () => {
         error: err.message,
         attempts: job.attemptsMade,
       });
+      // OBSERVABILITY: Push to DLQ and increment spike counter
+      if (job.attemptsMade >= (job.opts.attempts || 3)) {
+        onJobFailed('accountDeletion', job, err, accountDeletionQueue.client);
+      }
+      deletionSpikeDetector();
     });
 
     accountDeletionQueue.on('stalled', (job) => {

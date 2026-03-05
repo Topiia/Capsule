@@ -30,6 +30,10 @@ const mongoSanitize = require('./middleware/mongoSanitize');
 const csrfProtection = require('./middleware/csrfProtection');
 const isTrustedOrigin = require('./utils/trustedOrigin');
 
+// OBSERVABILITY: Sentry — loaded from instrumentation/sentry.js which was already
+// initialised in server.js before this module was required
+const Sentry = require('./instrumentation/sentry');
+
 const redis = new Proxy({}, {
   get: (target, prop) => {
     const client = createRedisClient();
@@ -47,12 +51,13 @@ const adminUsersRoutes = require('./routes/admin.users.routes');
 
 // OBSERVABILITY: Metrics
 const { metricsMiddleware, getMetrics } = require('./monitoring/metrics');
+const { protect, authorize } = require('./middleware/auth');
 
 // Initialize express app
 const app = express();
 
-// Expose metrics early before limiters/auth
-app.get('/metrics', getMetrics);
+// MED-8: Protect metrics endpoint — only admins can view internal metrics
+app.get('/metrics', protect, authorize('admin'), getMetrics);
 
 // Record all other API requests
 app.use(metricsMiddleware);
@@ -66,6 +71,12 @@ app.use(metricsMiddleware);
 // Disabled in development to prevent IP spoofing via X-Forwarded-For.
 
 app.set('trust proxy', 1);
+
+// OBSERVABILITY: Sentry request handler — must be first middleware after trust proxy
+// Attaches a transaction to each request so Sentry can correlate errors with requests
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+}
 
 // OBSERVABILITY: Correlation ID middleware (must be early in stack)
 app.use(correlationMiddleware);
@@ -130,9 +141,9 @@ if (process.env.NODE_ENV !== 'test' && statusMonitor) {
   );
 }
 
-// Body parser middleware
-app.use(express.json({ limit: '500kb' }));
-app.use(express.urlencoded({ extended: true, limit: '500kb' }));
+// CRIT-4: Limit request body to 50kb to prevent DoS via large payloads
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 app.use(cookieParser());
 
 // SECURITY: Delete MongoDB NoSQL Operators ($ and .)
@@ -279,6 +290,12 @@ app.get('/api/docs', (req, res) => {
     },
   });
 });
+
+// OBSERVABILITY: Sentry error handler — must be before 404 and global error handler
+// Captures all Express route errors and sends them to Sentry
+if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // Handle 404 errors
 app.use('*', (req, res) => {

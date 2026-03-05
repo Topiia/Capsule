@@ -343,12 +343,12 @@ exports.getFollowing = asyncHandler(async (req, res, next) => {
 exports.getUserByUsername = asyncHandler(async (req, res, next) => {
   const { username } = req.params;
 
-  // Case-insensitive lookup so 'TestUser' matches 'testuser'
-  const user = await User.findOne({
-    username: new RegExp(`^${username}$`, 'i'),
-  }).select(
-    '_id username avatar bio followerCount followingCount createdAt',
-  );
+  // SECURITY: Case-insensitive lookup using collation to prevent ReDoS from regex injection
+  const user = await User.findOne({ username })
+    .collation({ locale: 'en', strength: 2 })
+    .select(
+      '_id username avatar bio followerCount followingCount createdAt',
+    );
 
   if (!user) {
     return next(new ErrorResponse('User not found', 404));
