@@ -4,6 +4,7 @@ const Like = require('../../src/models/Like');
 const Comment = require('../../src/models/Comment');
 const { getVlog } = require('../../src/controllers/vlogController');
 const VlogService = require('../../src/services/vlogService');
+
 jest.mock('../../src/models/Vlog');
 jest.mock('../../src/models/User');
 jest.mock('../../src/models/Like');
@@ -62,7 +63,7 @@ describe('VlogDetail Follow Status', () => {
     });
     const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author, isFollowedByCurrentUser: true }
+      author: { ...mockVlog.author, isFollowedByCurrentUser: true },
     };
     VlogService.getVlog.mockResolvedValue(serviceReturn);
     User.findById = jest.fn().mockReturnValue({
@@ -104,7 +105,7 @@ describe('VlogDetail Follow Status', () => {
     });
     const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author, isFollowedByCurrentUser: false }
+      author: { ...mockVlog.author, isFollowedByCurrentUser: false },
     };
     VlogService.getVlog.mockResolvedValue(serviceReturn);
     User.findById = jest.fn().mockReturnValue({
@@ -144,7 +145,7 @@ describe('VlogDetail Follow Status', () => {
     };
     const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author, isFollowedByCurrentUser: false }
+      author: { ...mockVlog.author, isFollowedByCurrentUser: false },
     };
     VlogService.getVlog.mockResolvedValue(serviceReturn);
     await getVlog(req, res, next);
@@ -178,7 +179,7 @@ describe('VlogDetail Follow Status', () => {
     };
     const serviceReturn = {
       ...mockVlog,
-      author: { ...mockVlog.author, isFollowedByCurrentUser: true }
+      author: { ...mockVlog.author, isFollowedByCurrentUser: true },
     };
     VlogService.getVlog.mockResolvedValue(serviceReturn);
 

@@ -77,8 +77,16 @@ describe('Property 4: Update persistence and navigation', () => {
     title: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 ]{1,48}[a-zA-Z0-9]$/),
     description: fc.stringMatching(/^[a-zA-Z0-9][a-zA-Z0-9 .,!?]{8,198}[a-zA-Z0-9]$/),
     category: fc.constantFrom(
-      'technology', 'travel', 'lifestyle', 'food', 'fashion',
-      'fitness', 'music', 'art', 'business', 'education'
+      'technology',
+      'travel',
+      'lifestyle',
+      'food',
+      'fashion',
+      'fitness',
+      'music',
+      'art',
+      'business',
+      'education',
     ),
     tags: fc.array(fc.stringMatching(/^[a-zA-Z0-9]{1,20}$/), { maxLength: 5 }),
     images: fc.array(

@@ -7,12 +7,14 @@ const Vlog = require("../models/Vlog");
 
 dotenv.config();
 
+const DEFAULT_SEED_PASSWORD = process.env.SEED_PASSWORD;
+
 // Sample data
 const users = [
   {
     username: "techguru2024",
     email: "techguru@example.com",
-    password: "TechPass123!",
+    password: DEFAULT_SEED_PASSWORD,
     bio: "Tech enthusiast sharing the latest in AI, gadgets, and software development.",
     avatar:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
@@ -21,7 +23,7 @@ const users = [
   {
     username: "wanderlust_sarah",
     email: "sarah@example.com",
-    password: "TravelPass123!",
+    password: DEFAULT_SEED_PASSWORD,
     bio: "Digital nomad exploring the world one country at a time. Sharing travel tips and adventures.",
     avatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
@@ -30,7 +32,7 @@ const users = [
   {
     username: "foodie_mike",
     email: "mike@example.com",
-    password: "FoodPass123!",
+    password: DEFAULT_SEED_PASSWORD,
     bio: "Chef turned food blogger. Cooking up delicious recipes and restaurant reviews.",
     avatar:
       "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
@@ -39,7 +41,7 @@ const users = [
   {
     username: "fitlife_anna",
     email: "anna@example.com",
-    password: "FitPass123!",
+    password: DEFAULT_SEED_PASSWORD,
     bio: "Certified personal trainer helping you achieve your fitness goals with workout routines and nutrition tips.",
     avatar:
       "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
@@ -48,7 +50,7 @@ const users = [
   {
     username: "creative_alex",
     email: "alex@example.com",
-    password: "ArtPass123!",
+    password: DEFAULT_SEED_PASSWORD,
     bio: "Digital artist and designer sharing creative process and tutorials.",
     avatar:
       "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
@@ -197,6 +199,10 @@ const vlogs = [
 ];
 
 const seedDatabase = async () => {
+  if (!DEFAULT_SEED_PASSWORD) {
+    throw new Error("SEED_PASSWORD must be set before running seedDatabase");
+  }
+
   try {
     console.log("Connecting to MongoDB...");
     await mongoose.connect(

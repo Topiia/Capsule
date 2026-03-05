@@ -17,6 +17,14 @@ jest.mock('../../src/utils/sendEmailSync', () => ({
 // Import app after mocking
 const app = require('../../src/app');
 
+// Helper to extract cookie value
+function extractCookie(res, name) {
+  const cookies = res.headers['set-cookie'] || [];
+  const cookie = cookies.find((c) => c.startsWith(`${name}=`));
+  if (!cookie) return null;
+  return cookie.split(';')[0].split('=')[1];
+}
+
 /**
  * SECURITY TEST SUITE: Refresh Token Rotation & Secure Storage
  *
@@ -65,8 +73,8 @@ describe('Refresh Token Security Tests', () => {
 
     return {
       user: registerRes.body.user,
-      token: registerRes.body.token,
-      refreshToken: registerRes.body.refreshToken,
+      token: extractCookie(registerRes, 'token'),
+      refreshToken: extractCookie(registerRes, 'refreshToken'),
     };
   };
 
@@ -102,15 +110,15 @@ describe('Refresh Token Security Tests', () => {
     // Refresh token
     const refreshRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(refreshRes.status).toBe(200);
     expect(refreshRes.body.success).toBe(true);
-    expect(refreshRes.body.accessToken).toBeDefined();
-    expect(refreshRes.body.refreshToken).toBeDefined();
+    expect(extractCookie(refreshRes, 'token')).toBeDefined();
+    expect(extractCookie(refreshRes, 'refreshToken')).toBeDefined();
 
     // New tokens should be different
-    expect(refreshRes.body.refreshToken).not.toBe(refreshToken);
+    expect(extractCookie(refreshRes, 'refreshToken')).not.toBe(refreshToken);
 
     // Version should be incremented
     user = await User.findOne({ email: 'test@example.com' });
@@ -123,15 +131,15 @@ describe('Refresh Token Security Tests', () => {
     // Use token1 to get token2
     const refreshRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token1 });
+      .set('Cookie', `refreshToken=${token1}`);
 
     expect(refreshRes.status).toBe(200);
-    const token2 = refreshRes.body.refreshToken;
+    const token2 = extractCookie(refreshRes, 'refreshToken');
 
     // Try to use token1 again (should fail)
     const reuseRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token1 });
+      .set('Cookie', `refreshToken=${token1}`);
 
     expect(reuseRes.status).toBe(401);
     expect(reuseRes.body.success).toBe(false);
@@ -140,7 +148,7 @@ describe('Refresh Token Security Tests', () => {
     // Verify token2 is also now invalid (session should be revoked)
     const token2Res = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token2 });
+      .set('Cookie', `refreshToken=${token2}`);
 
     expect(token2Res.status).toBe(401);
 
@@ -155,19 +163,19 @@ describe('Refresh Token Security Tests', () => {
     // Refresh to get token2
     const refresh1 = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token1 });
-    const token2 = refresh1.body.refreshToken;
+      .set('Cookie', `refreshToken=${token1}`);
+    const token2 = extractCookie(refresh1, 'refreshToken');
 
     // Refresh to get token3
     const refresh2 = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token2 });
-    const token3 = refresh2.body.refreshToken;
+      .set('Cookie', `refreshToken=${token2}`);
+    const token3 = extractCookie(refresh2, 'refreshToken');
 
     // Now attempt to use token1 (old token) - should trigger revocation
     const reuseRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token1 });
+      .set('Cookie', `refreshToken=${token1}`);
 
     expect(reuseRes.status).toBe(401);
     expect(reuseRes.body.error.message).toMatch(/reuse|revoked/i);
@@ -175,7 +183,7 @@ describe('Refresh Token Security Tests', () => {
     // Verify token3 (the current token) is also invalid
     const token3Res = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: token3 });
+      .set('Cookie', `refreshToken=${token3}`);
 
     expect(token3Res.status).toBe(401);
 
@@ -198,7 +206,7 @@ describe('Refresh Token Security Tests', () => {
     // Attempt to refresh should fail
     const refreshRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(refreshRes.status).toBe(401);
     expect(refreshRes.body.error.message).toMatch(/revoked/i);
@@ -220,7 +228,7 @@ describe('Refresh Token Security Tests', () => {
       .post('/api/auth/register')
       .send(user2Data);
 
-    const user2RefreshToken = user2Res.body.refreshToken;
+    const user2RefreshToken = extractCookie(user2Res, 'refreshToken');
 
     // Decode user2's token to get tokenFamily
     // eslint-disable-next-line no-unused-vars
@@ -237,7 +245,7 @@ describe('Refresh Token Security Tests', () => {
     // Attempt to refresh should fail (family mismatch)
     const refreshRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: user2RefreshToken });
+      .set('Cookie', `refreshToken=${user2RefreshToken}`);
 
     expect(refreshRes.status).toBe(401);
     expect(refreshRes.body.error.message).toMatch(/invalid/i);
@@ -254,7 +262,7 @@ describe('Refresh Token Security Tests', () => {
     // Attempt to refresh should fail
     const refreshRes = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(refreshRes.status).toBe(401);
     expect(refreshRes.body.error.message).toMatch(/invalid/i);
@@ -275,20 +283,20 @@ describe('Refresh Token Security Tests', () => {
       .send({ email: userData.email, password: userData.password });
 
     expect(loginRes.status).toBe(200);
-    let { refreshToken } = loginRes.body;
+    let refreshToken = extractCookie(loginRes, 'refreshToken');
 
     // First refresh
     const refresh1 = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(refresh1.status).toBe(200);
-    refreshToken = refresh1.body.refreshToken;
+    refreshToken = extractCookie(refresh1, 'refreshToken');
 
     // Second refresh
     const refresh2 = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(refresh2.status).toBe(200);
 

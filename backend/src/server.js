@@ -10,6 +10,10 @@
  * Tests import app.js directly — this file is never loaded by Jest.
  */
 
+// OBSERVABILITY: Sentry must be initialised BEFORE the app is loaded so it
+// can instrument all subsequent requires (Express, Mongoose, etc.)
+require('./instrumentation/sentry');
+
 const dotenv = require('dotenv');
 
 // Load .env in non-production environments (strictly exclude tests)
@@ -58,6 +62,8 @@ const logger = require('./config/logger');
 const connectDB = require('./config/database');
 const { connectRedis } = require('./config/redis');
 
+const { startQueueMetrics } = require('./monitoring/queueMetrics');
+
 const PORT = process.env.PORT || 5000;
 
 // Connect to database and Redis before starting the server
@@ -66,9 +72,6 @@ connectDB().catch((_err) => {
   process.exit(1);
 });
 connectRedis();
-
-// ─── [FP] Signal 5 — Cold Start Detection ─────────────────────────────────
-console.log(`[FP] SERVER_START  ${new Date().toISOString()}  pid=${process.pid}`);
 
 // Start HTTP server
 const server = app.listen(PORT, () => {
@@ -82,16 +85,15 @@ const server = app.listen(PORT, () => {
   try {
     // eslint-disable-next-line global-require
     const { createEmailQueue } = require('./queues/emailQueue');
-    // ─── [FP] Signal 5 — Queue Init Timing ──────────────────────────────
-    console.log(`[FP] QUEUE_INIT_START  ${new Date().toISOString()}`);
-    createEmailQueue();
-    // NOTE: createEmailQueue() sets queueReady async via emailQueue.isReady().then()
-    // QUEUE_INIT_DONE marks the sync setup completion; queueReady becomes true later.
-    console.log(`[FP] QUEUE_INIT_DONE  ${new Date().toISOString()}  (queueReady will be set asynchronously)`);
+    const emailQueue = createEmailQueue();
 
     // eslint-disable-next-line global-require
-    const { startAccountDeletionWorker } = require('./queues/accountDeletionQueue');
+    const { startAccountDeletionWorker, createAccountDeletionQueue } = require('./queues/accountDeletionQueue');
+    const accountDeletionQueue = createAccountDeletionQueue();
     startAccountDeletionWorker();
+
+    // OBSERVABILITY: Register Prometheus queue gauges (uses collect() hook, no polling)
+    startQueueMetrics(emailQueue, accountDeletionQueue);
 
     // eslint-disable-next-line global-require
     const moderationWorker = require('./workers/moderation.worker');

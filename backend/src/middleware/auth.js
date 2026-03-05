@@ -246,9 +246,26 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
     );
 
     // SECURITY: Hash new refresh token before storing
-    user.refreshTokenHash = await user.hashRefreshToken(newRefreshToken);
-    user.tokenVersion = newTokenVersion;
-    await user.save();
+    const newHash = await user.hashRefreshToken(newRefreshToken);
+
+    // ATOMIC UPDATE: Prevent race conditions if multiple concurrent refresh requests
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: user._id, tokenVersion }, // Filter exactly by the version we validated
+      {
+        $inc: { tokenVersion: 1 },
+        $set: { refreshTokenHash: newHash },
+      },
+      { new: true }, // Return updated document
+    );
+
+    if (!updatedUser) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(
+          `[SECURITY] Refresh token race condition mitigated - User: ${user.username}`,
+        );
+      }
+      return next(new ErrorResponse('Session refresh conflict. Please try again.', 409));
+    }
 
     if (process.env.NODE_ENV !== 'test') {
       console.log(
@@ -261,8 +278,6 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
       user: {
         id: user._id,
         username: user.username,

@@ -246,8 +246,6 @@ api.interceptors.response.use(
         // Prevent refresh loops if the refresh call itself triggered 401
         if (originalRequest.url === "/auth/refresh") {
           error.message = "Your session has expired. Please log in again.";
-          localStorage.removeItem("token");
-          localStorage.removeItem("refreshToken");
           
           const currentPath = window.location.pathname;
           // Only redirect if on protected route to avoid looping on public routes
@@ -309,8 +307,6 @@ api.interceptors.response.use(
               error.response?.data?.error ||
               error.response?.data?.message ||
               "Token expired";
-            localStorage.removeItem("token");
-            localStorage.removeItem("refreshToken");
             
             const currentPath = window.location.pathname;
             const protectedPrefixes = [
@@ -338,10 +334,6 @@ api.interceptors.response.use(
           error.response?.data?.error ||
           error.response?.data?.message ||
           "Token expired";
-
-        // Clear auth data from localStorage
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
 
         // Only hard-redirect to /login when the user is on a PROTECTED route.
         const currentPath = window.location.pathname;

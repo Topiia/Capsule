@@ -2,6 +2,7 @@ const Queue = require('bull');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 const { sendEmailSync } = require('../utils/sendEmailSync');
+const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
 
 /**
  * PERFORMANCE: Email Job Queue (Producer Only)
@@ -77,6 +78,16 @@ exports.createEmailQueue = () => {
         impact: 'Emails will be sent synchronously (blocking)',
       });
     });
+
+    // OBSERVABILITY: DLQ + spike detection on permanent job failure
+    const emailSpikeDetector = createFailureSpikeDetector('email');
+    emailQueue.on('failed', (job, err) => {
+      // Only push to DLQ when all retries are exhausted
+      if (job.attemptsMade >= (job.opts?.attempts || 3)) {
+        onJobFailed('email', job, err, emailQueue.client);
+      }
+      emailSpikeDetector();
+    });
   } catch (error) {
     queueReady = false;
     logger.warn('Bull queue initialization failed - using synchronous fallback', {
@@ -102,23 +113,7 @@ exports.createEmailQueue = () => {
  * @returns {Promise<object>} - Job object or fallback result
  */
 exports.queueEmail = async (emailData, priority = 5) => {
-  const Q_START = Date.now();
-  const qlog = (label, extra = '') => {
-    console.log(`[FP] ${label} +${Date.now() - Q_START}ms${extra ? `  ${extra}` : ''}  (${new Date().toISOString()})`);
-  };
-
-  // ─── Proactive mode decision — check Redis + worker health BEFORE queue.add() ─
-  // This replaces the old reactive `if (!queueReady)` guard.
-  //
-  // Decision factors:
-  //   redisReady  — Bull's internal ioredis client is connected (synchronous check)
-  //   workerAlive — 'email:worker:heartbeat' key exists and is < 90s old
-  //
-  // If either is false → sync-fallback immediately (no queue.add() attempt).
-  // This prevents jobs piling up in Redis when the worker is dead.
-
   const WORKER_HEARTBEAT_KEY = 'email:worker:heartbeat';
-
   const redisReady = emailQueue?.client?.status === 'ready';
 
   let workerAlive = false;
@@ -132,75 +127,22 @@ exports.queueEmail = async (emailData, priority = 5) => {
   }
 
   const selectedMode = (redisReady && workerAlive) ? 'async-queue' : 'sync-fallback';
-  let reason;
-  if (!redisReady) {
-    reason = 'redis_down';
-  } else if (!workerAlive) {
-    reason = 'worker_dead';
-  } else {
-    reason = 'healthy';
-  }
-
-  console.log(
-    `[EMAIL_MODE_DECISION]  workerAlive=${workerAlive}  redisReady=${redisReady}`
-    + `  selectedMode=${selectedMode}  reason=${reason}  (${new Date().toISOString()})`,
-  );
 
   if (selectedMode === 'sync-fallback') {
-    logger.warn('Email sync-fallback selected', { reason, to: emailData.to, subject: emailData.subject });
+    logger.warn('Email sync-fallback selected', { to: emailData.to, subject: emailData.subject });
 
-    console.log(`[FP] EMAIL_MODE  sync-fallback-fire-and-forget  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    qlog('EMAIL_SEND_START', '(sync-fallback — FIRE AND FORGET — not blocking response)');
-    const emailT0 = Date.now();
     sendEmailSync(emailData)
-      .then((result) => {
-        const emailDuration = Date.now() - emailT0;
-        qlog('EMAIL_SEND_DONE', `(sync-fallback background result.id=${result && result.id})`);
-        console.log(`[FP] EMAIL_DURATION  ${emailDuration}ms  (background sync send completed)  (${new Date().toISOString()})`);
-      })
       .catch((err) => {
-        console.error(`[FP] EMAIL_SEND_ERROR  (sync-fallback background failed: ${err.message})  (${new Date().toISOString()})`);
         logger.error('Background sync email send failed', { to: emailData.to, error: err.message });
       });
-    console.log(`[FP] EMAIL_DURATION  0ms  (fire-and-forget — response not blocked)  (${new Date().toISOString()})`);
     return { emailId: null, fallback: true, fireAndForget: true };
   }
 
-  // ─── Queue email normally (preferred async path) ─────────────────────────
   try {
-    // ─── [FP] Signal 3 — Email Mode/Provider (async queue) ───────────────
-    console.log(`[FP] EMAIL_MODE  async-queue  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-
-    // ─── [FP] Phase 6 — Redis Queue Health Snapshot ──────────────────────
-    // Capture queue depth at the exact moment the request lands
-    try {
-      const [_waiting, _active, _delayed] = await Promise.all([
-        emailQueue.getWaitingCount(),
-        emailQueue.getActiveCount(),
-        emailQueue.getDelayedCount(),
-      ]);
-      console.log(`[FP] QUEUE_STATS  waiting=${_waiting}  active=${_active}  delayed=${_delayed}  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    } catch (_statsErr) {
-      console.log(`[FP] QUEUE_STATS_ERROR  ${_statsErr.message}  +${Date.now() - Q_START}ms`);
-    }
-    console.log(`[FP] EMAIL_PROVIDER  resend-via-worker  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-
-    // ─── [FP] Signal 4 — QUEUE_ADD_ATTEMPT ───────────────────────────────
-    qlog('QUEUE_ADD_ATTEMPT', `(priority=${priority}  critical=${!!emailData.critical})`);
-    qlog('EMAIL_SEND_START', '(async queue path — calling emailQueue.add)');
-    const addT0 = Date.now();
     const job = await emailQueue.add(emailData, {
       priority,
       attempts: emailData.critical ? 5 : 3, // More retries for critical emails
     });
-    const addDuration = Date.now() - addT0;
-
-    // ─── [FP] Signal 4 — QUEUE_ADD_SUCCESS ───────────────────────────────
-    qlog('QUEUE_ADD_SUCCESS', `(jobId=${job && job.id}  addDuration=${addDuration}ms)`);
-    qlog('EMAIL_SEND_DONE', `(async queue path — jobId=${job && job.id})`);
-    // NOTE: EMAIL_DURATION for async path = cost of queue.add only (worker sends it later)
-    console.log(`[FP] EMAIL_DURATION  ${addDuration}ms  (queue.add cost only — worker delivers async)  (${new Date().toISOString()})`);
 
     logger.info('Email queued (async)', {
       jobId: job.id,
@@ -210,32 +152,17 @@ exports.queueEmail = async (emailData, priority = 5) => {
     });
     return { jobId: job.id, queued: true };
   } catch (error) {
-    // ─── [FP] Signal 4 — QUEUE_ADD_ERROR ─────────────────────────────────
-    qlog('QUEUE_ADD_ERROR', `(queue.add threw: ${error.message})`);
-    qlog('EMAIL_SEND_DONE', `(queue.add threw: ${error.message} — falling back to sync)`);
     logger.error('Failed to queue email - attempting synchronous fallback', {
       to: emailData.to,
       subject: emailData.subject,
       error: error.message,
     });
 
-    // ─── [FP] Signal 3 — Email Mode/Provider (catch-fallback FIRE-AND-FORGET) ─
-    console.log(`[FP] EMAIL_MODE  catch-fallback-fire-and-forget  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    console.log(`[FP] EMAIL_PROVIDER  resend  +${Date.now() - Q_START}ms  (${new Date().toISOString()})`);
-    qlog('EMAIL_SEND_START', '(catch-fallback — FIRE AND FORGET — not blocking response)');
     // CRITICAL FIX: Do NOT await. Fire-and-forget so HTTP response returns immediately.
-    const fallT0 = Date.now();
     sendEmailSync(emailData)
-      .then((result) => {
-        const fallDuration = Date.now() - fallT0;
-        qlog('EMAIL_SEND_DONE', `(catch-fallback background result.id=${result && result.id})`);
-        console.log(`[FP] EMAIL_DURATION  ${fallDuration}ms  (background catch-fallback completed)  (${new Date().toISOString()})`);
-      })
       .catch((err) => {
-        console.error(`[FP] EMAIL_SEND_ERROR  (catch-fallback background failed: ${err.message})  (${new Date().toISOString()})`);
         logger.error('Background catch-fallback email send failed', { to: emailData.to, error: err.message });
       });
-    console.log(`[FP] EMAIL_DURATION  0ms  (fire-and-forget — response not blocked)  (${new Date().toISOString()})`);
     return { emailId: null, fallback: true, fireAndForget: true };
   }
 };
@@ -458,7 +385,7 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
                     <table role="presentation" style="margin: 30px 0;">
                       <tr>
                         <td style="border-radius: 6px; background-color: #4F46E5;">
-                          <a href="${process.env.FRONTEND_URL || 'https://vlogspherefrontend.vercel.app'}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">Start Creating</a>
+                          <a href="${process.env.FRONTEND_URL}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">Start Creating</a>
                         </td>
                       </tr>
                     </table>
@@ -486,7 +413,7 @@ exports.queueWelcomeEmail = async (email, username) => exports.queueEmail(
       </body>
       </html>
     `,
-    text: `Welcome to Capsule, ${username}! 🎉\n\nThank you for joining Capsule! We're excited to have you as part of our creative community.\n\nGet Started:\n✓ Complete your profile to let others know who you are\n✓ Create your first vlog and share your story\n✓ Follow other creators and discover amazing content\n\nVisit Capsule: ${process.env.FRONTEND_URL || 'https://vlogspherefrontend.vercel.app'}\n\nIf you have any questions or need help getting started, feel free to reach out to our support team.\n\n---\nCapsule - Your vlog platform`,
+    text: `Welcome to Capsule, ${username}! 🎉\n\nThank you for joining Capsule! We're excited to have you as part of our creative community.\n\nGet Started:\n✓ Complete your profile to let others know who you are\n✓ Create your first vlog and share your story\n✓ Follow other creators and discover amazing content\n\nVisit Capsule: ${process.env.FRONTEND_URL}\n\nIf you have any questions or need help getting started, feel free to reach out to our support team.\n\n---\nCapsule - Your vlog platform`,
   },
   5,
 );

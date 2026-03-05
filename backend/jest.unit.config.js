@@ -6,7 +6,10 @@ module.exports = {
   clearMocks: true,
   restoreMocks: true,
   resetModules: true,
-  setupFiles: ['<rootDir>/tests/setup/cloudinary.enforce.js'],
+  setupFiles: [
+    '<rootDir>/tests/setup/env.setup.js',
+    '<rootDir>/tests/setup/cloudinary.enforce.js',
+  ],
   // TODO: Remove forceExit once open handles are fixed
   forceExit: true,
 };

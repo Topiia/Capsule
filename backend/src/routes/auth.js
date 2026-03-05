@@ -48,6 +48,7 @@ router.post(
   '/forgotpassword',
   authLimiter,
   forgotPasswordValidation,
+  validate,
   forgotPassword,
 );
 

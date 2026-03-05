@@ -3,6 +3,8 @@ const Queue = require('bull');
 const { Resend } = require('resend');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
+// OBSERVABILITY: Sentry for worker crash monitoring
+const Sentry = require('../instrumentation/sentry');
 
 /**
  * Send email via Resend with 10 s timeout
@@ -275,6 +277,12 @@ const startWorker = () => {
       error: err.message,
       attempts: job.attemptsMade,
     });
+    // OBSERVABILITY: Report permanent failures to Sentry
+    if (job.attemptsMade >= (job.opts?.attempts || 3)) {
+      Sentry.captureException(err, {
+        extra: { jobId: job.id, to: job.data.to, subject: job.data.subject },
+      });
+    }
   });
 
   // Graceful shutdown
@@ -303,6 +311,20 @@ const startWorker = () => {
 
 // Auto-run only when executed directly: node emailWorker.js
 if (require.main === module) {
+  // OBSERVABILITY: Worker process crash handlers
+  // Must be registered before startWorker() so they catch init errors too
+  process.on('uncaughtException', (err) => {
+    logger.error('Email worker uncaught exception', { error: err.message, stack: err.stack });
+    Sentry.captureException(err);
+    Sentry.close(2000).then(() => process.exit(1));
+  });
+
+  process.on('unhandledRejection', (err) => {
+    logger.error('Email worker unhandled promise rejection', { error: err && err.message });
+    Sentry.captureException(err);
+    Sentry.close(2000).then(() => process.exit(1));
+  });
+
   startWorker();
 }
 

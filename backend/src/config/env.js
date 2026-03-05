@@ -10,8 +10,18 @@
 
 module.exports = {
   get NODE_ENV() { return process.env.NODE_ENV || 'test'; },
-  get JWT_SECRET() { return process.env.JWT_SECRET || (this.NODE_ENV !== 'production' ? 'testsecret' : undefined); },
-  get JWT_REFRESH_SECRET() { return process.env.JWT_REFRESH_SECRET || (this.NODE_ENV !== 'production' ? 'refreshsecret' : undefined); },
+  get JWT_SECRET() {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET must be defined in environment variables');
+    }
+    return process.env.JWT_SECRET;
+  },
+  get JWT_REFRESH_SECRET() {
+    if (!process.env.JWT_REFRESH_SECRET) {
+      throw new Error('JWT_REFRESH_SECRET must be defined in environment variables');
+    }
+    return process.env.JWT_REFRESH_SECRET;
+  },
   get JWT_EXPIRE() { return process.env.JWT_EXPIRE || '7d'; },
   get JWT_REFRESH_EXPIRE() { return process.env.JWT_REFRESH_EXPIRE || '30d'; },
   get EMAIL_ENABLED() { return this.NODE_ENV !== 'test'; },
@@ -24,6 +34,9 @@ module.exports = {
         'MONGODB_URI',
         'CLOUDINARY_API_SECRET',
         'CORS_ORIGINS',
+        'FRONTEND_URL',
+        'REDIS_URL',
+        'RESEND_API_KEY',
       ];
       required.forEach((req) => {
         if (!process.env[req]) {

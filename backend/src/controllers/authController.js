@@ -6,6 +6,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const { sendEmail } = require('../utils/sendEmail');
 const { queuePasswordResetEmail } = require('../queues/emailQueue');
 const envConfig = require('../config/env');
+const logger = require('../config/logger');
 
 // Generate JWT Token — uses fallback so undefined JWT_EXPIRE never crashes jwt.sign
 const generateToken = (id) => jwt.sign({ id }, envConfig.JWT_SECRET, {
@@ -125,7 +126,7 @@ exports.register = asyncHandler(async (req, res, next) => {
   // Send verification email — skip entirely in test env to avoid external calls
   if (process.env.NODE_ENV !== 'test' && (process.env.EMAIL_HOST || process.env.NODE_ENV === 'development')) {
     try {
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${verificationToken}`;
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
       await sendEmail({
         to: user.email,
@@ -174,8 +175,6 @@ The Capsule Team`,
   res.status(201).json({
     success: true,
     message: 'Registration successful',
-    token,
-    refreshToken,
     user: {
       id: user._id,
       username: user.username,
@@ -296,8 +295,6 @@ The Capsule Team`,
 
   res.status(200).json({
     success: true,
-    token,
-    refreshToken,
     user: {
       id: user._id,
       username: user.username,
@@ -355,7 +352,22 @@ exports.updateDetails = asyncHandler(async (req, res, _next) => {
   if (email) fieldsToUpdate.email = email;
   if (bio !== undefined) fieldsToUpdate.bio = bio;
   if (avatar) fieldsToUpdate.avatar = avatar;
-  if (preferences) fieldsToUpdate.preferences = preferences;
+
+  if (preferences && typeof preferences === 'object' && !Array.isArray(preferences)) {
+    // SECURITY: strictly validate preferences object to prevent NoSQL/prototype injection
+    const allowedPreferences = {};
+    if (typeof preferences.theme === 'string') {
+      allowedPreferences.theme = preferences.theme;
+    }
+    if (preferences.notifications && typeof preferences.notifications === 'object') {
+      allowedPreferences.notifications = {
+        email: Boolean(preferences.notifications.email),
+        push: Boolean(preferences.notifications.push),
+        follows: Boolean(preferences.notifications.follows),
+      };
+    }
+    fieldsToUpdate.preferences = allowedPreferences;
+  }
 
   const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
     new: true,
@@ -405,121 +417,51 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
 // @route   POST /api/auth/forgotpassword
 // @access  Public
 exports.forgotPassword = asyncHandler(async (req, res) => {
-  // ─── [FP] PHASE 1 — Request Lifecycle Timing ────────────────────────────
-  const FP_START = Date.now();
-  const fp = (label) => {
-    const elapsed = Date.now() - FP_START;
-    console.log(`[FP] ${label} +${elapsed}ms  (${new Date().toISOString()})`);
-  };
-
-  fp('REQUEST_START');
-  fp('BODY_PARSED'); // Body already parsed by Express middleware before controller runs
-
-  // ─── [FP] MISSING SIGNAL 1 — HTTP Socket Completion Listeners ───────────
-  // Attach immediately so they fire on EVERY exit path (success, error, timeout)
-  res.on('finish', () => {
-    console.log(`[FP] RES_FINISH  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  statusCode=${res.statusCode}`);
-  });
-  res.on('close', () => {
-    console.log(`[FP] RES_CLOSE  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  finished=${res.writableFinished}`);
-  });
-  res.on('error', (socketErr) => {
-    console.log(`[FP] RES_ERROR  +${Date.now() - FP_START}ms  (${new Date().toISOString()})  err=${socketErr.message}`);
-  });
-
-  // ─── [FP] PHASE 4 — Redis Health Snapshot ───────────────────────────────
-  // Capture Redis state at the moment the request executes
-  try {
-    // eslint-disable-next-line global-require
-    const { createRedisClient } = require('../config/redis');
-    const redisSnap = createRedisClient();
-    const redisStatus = redisSnap ? redisSnap.status : 'not-created';
-    const redisAvailable = redisSnap && typeof redisSnap.isAvailable === 'function'
-      ? redisSnap.isAvailable()
-      : 'unknown';
-    console.log(`[FP] REDIS_STATUS  status=${redisStatus}  available=${redisAvailable}  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
-  } catch (redisErr) {
-    console.log(`[FP] REDIS_STATUS  ERROR: ${redisErr.message}  +${Date.now() - FP_START}ms`);
-  }
-
-  // ─── [FP] PHASE 3a — DB: User Lookup ────────────────────────────────────
-  fp('USER_LOOKUP_START');
   const user = await User.findOne({ email: req.body.email });
-  fp('USER_LOOKUP_DONE');
 
   if (!user) {
-    fp('RESPONSE_SENDING'); // Early exit — no user found
-    console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
     // Security: Don't reveal if email exists
-    const earlyRes = res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'If that email exists, a password reset link has been sent.',
     });
-    console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
-    fp('RESPONSE_SENT');
-    return earlyRes;
   }
-
-  // ─── [FP] Token Generation ───────────────────────────────────────────────
-  fp('TOKEN_GENERATED'); // generatePasswordResetToken is synchronous
 
   // Get reset token
   const resetToken = user.generatePasswordResetToken();
 
-  // ─── [FP] PHASE 3b — DB: Token Save ─────────────────────────────────────
-  fp('TOKEN_SAVE_START');
+  // We MUST save the token before we queue the email
   await user.save({ validateBeforeSave: false });
-  fp('TOKEN_SAVE_DONE');
-  fp('TOKEN_SAVED');
 
   // Create reset URL - point to frontend
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL;
   const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
-  // ─── [FP] Part 5 — Reset Link Verification ───────────────────────────────
-  console.log(`[FP] RESET_URL: ${resetUrl}  +${Date.now() - FP_START}ms`);
 
-  // ─── [FP] PHASE 3c — Queue Operations (FIRE AND FORGET) ─────────────────
-  // eslint-disable-next-line global-require
-  const { isQueueAvailable } = require('../queues/emailQueue');
-  const _qReady = isQueueAvailable();
-  console.log(`[FP] QUEUE_STATE  queueReady=${_qReady}  emailQueue=${_qReady ? 'exists' : 'null'}  queue=email  +${Date.now() - FP_START}ms  (${new Date().toISOString()})`);
-
-  // CRITICAL: Do NOT await email sending.
-  // Email is a side-effect — it must NEVER block the HTTP response.
-  // Token is already saved; response goes out now regardless of email outcome.
+  // Queue email (using top-level import)
   if (process.env.NODE_ENV !== 'test') {
-    fp('QUEUE_ADD_START');
     queuePasswordResetEmail(user.email, resetUrl)
-      .then(() => {
-        fp('QUEUE_ADD_DONE');
+      .then((queueResult) => {
+        if (queueResult && queueResult.fallback) {
+          logger.warn('Password reset email queued via synchronous fallback');
+        } else {
+          logger.info('Password reset email queued via Redis', { jobId: queueResult?.jobId });
+        }
       })
       .catch((err) => {
-        fp('QUEUE_ADD_DONE'); // Mark done even on failure
         // SECURITY: log internally, never expose to user
-        console.error({
-          level: 'error',
-          service: 'email',
-          event: 'password_reset_send_failed',
-          user_id: user._id,
-          username: user.username,
+        logger.error('CRITICAL: Complete failure to queue/send password reset email', {
           error: err.message,
-          timestamp: new Date().toISOString(),
+          email: user.email,
         });
-        // Token remains valid — user can retry forgot-password
       });
   }
 
-  // ─── [FP] PHASE 2 — HTTP Response (sent immediately, before email) ────────
-  fp('RESPONSE_SENDING');
-  console.log(`[FP] BEFORE_RES_JSON  +${Date.now() - FP_START}ms`);
   // SECURITY: Always return same message regardless of email outcome or whether
   // account exists — prevents email enumeration attacks
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: 'If that email exists, a password reset link has been sent.',
   });
-  console.log(`[FP] AFTER_RES_JSON  +${Date.now() - FP_START}ms`);
-  fp('RESPONSE_SENT');
 });
 
 // @desc    Reset password

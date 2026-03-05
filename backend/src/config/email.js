@@ -74,10 +74,14 @@ const buildBullRedisConfig = () => {
 
 const redis = buildBullRedisConfig();
 
+if (!process.env.FROM_EMAIL) {
+  throw new Error('FROM_EMAIL must be configured');
+}
+
 // Resend API configuration (REQUIRED for email)
 const resend = {
   apiKey: process.env.RESEND_API_KEY,
-  fromEmail: process.env.FROM_EMAIL || 'team@topiiaa.site',
+  fromEmail: process.env.FROM_EMAIL,
   fromName: process.env.FROM_NAME || 'Capsule',
 };
 
