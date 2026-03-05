@@ -69,15 +69,9 @@ app.use(metricsMiddleware);
 // In production we run behind Render/Vercel reverse proxies.
 // trust proxy must be enabled so req.ip reflects real client IP.
 // Disabled in development to prevent IP spoofing via X-Forwarded-For.
-
 app.set('trust proxy', 1);
 
-// OBSERVABILITY: Sentry request handler — must be first middleware after trust proxy
-// Attaches a transaction to each request so Sentry can correlate errors with requests
-if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.requestHandler());
-}
-
+// (Sentry v10 auto-instruments incoming requests; manual requestHandler is removed)
 // OBSERVABILITY: Correlation ID middleware (must be early in stack)
 app.use(correlationMiddleware);
 
@@ -294,7 +288,7 @@ app.get('/api/docs', (req, res) => {
 // OBSERVABILITY: Sentry error handler — must be before 404 and global error handler
 // Captures all Express route errors and sends them to Sentry
 if (process.env.NODE_ENV !== 'test' && process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.errorHandler());
+  Sentry.setupExpressErrorHandler(app);
 }
 
 // Handle 404 errors
