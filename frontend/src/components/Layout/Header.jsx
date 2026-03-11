@@ -6,7 +6,6 @@ import SearchBar from "../Search/SearchBar";
 import ThemeSelector from "../Theme/ThemeSelector";
 import UserMenu from "../Auth/UserMenu";
 import MobileMenu from "./MobileMenu";
-import Logo from "../UI/Logo";
 import {
   Bars3Icon,
   XMarkIcon,
@@ -80,7 +79,11 @@ const Header = ({ onToggleSidebar }) => {
                 to="/"
                 className="flex items-center space-x-2 flex-shrink-0"
               >
-                <Logo size="sm" />
+                <img
+                  src="/logo.ico"
+                  alt="Capsule"
+                  className="w-10 h-10 rounded-lg object-contain"
+                />
                 <span className="hidden sm:block text-xl font-bold gradient-text whitespace-nowrap">
                   CAPSULE
                 </span>
