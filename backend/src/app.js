@@ -77,8 +77,27 @@ app.use(correlationMiddleware);
 
 // Security middleware
 app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for React/Vite
+      styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
+      fontSrc: ["'self'", 'fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', '*.cloudinary.com'],
+      connectSrc: [
+        "'self'",
+        process.env.FRONTEND_URL || 'https://vlogspherefrontend.vercel.app',
+        'https://*.vercel-analytics.com',
+        'wss://*.onrender.com',
+      ],
+      reportUri: '/api/csp-report',
+    },
+    reportOnly: false, // Enforcing policy based on 7-day telemetry validation
+  }),
+);
+app.use(
   helmet({
-    contentSecurityPolicy: false, // Will be handled by frontend
+    contentSecurityPolicy: false, // Handled above in enforced mode
     crossOriginEmbedderPolicy: false,
   }),
 );
@@ -218,6 +237,12 @@ app.get('/health/db', (req, res) => {
 });
 
 // API routes
+const cspRoutes = require('./routes/csp');
+const cspDashboardRoutes = require('./routes/csp-dashboard');
+
+app.use('/api', cspRoutes);
+app.use('/api', cspDashboardRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/vlogs', vlogRoutes);
 app.use('/api/upload', uploadRoutes);
