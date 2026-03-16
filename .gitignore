@@ -108,3 +108,8 @@ cookies.txt
 # --- Phase 3 Hardening Scripts ---
 phase_*.md
 simulate_*.js
+
+# --- Phase 4 Docs ---
+docs/csp-maintenance.md
+docs/security-runbook.md
+docs/security_architecture.md

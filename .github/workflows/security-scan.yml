@@ -1,0 +1,114 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9:00 AM UTC
+  workflow_dispatch:       # Allow manual runs from GitHub UI
+
+jobs:
+  security-scan:
+    name: Weekly Security Headers & SSL Audit
+    runs-on: ubuntu-latest
+
+    env:
+      BACKEND_URL: https://capsule-backend.onrender.com
+      FRONTEND_URL: https://vlogspherefrontend.vercel.app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. Backend CSP enforcement header ───────────────────────────────────
+      - name: Check CSP enforcement header (backend)
+        run: |
+          echo "=== Backend: /health headers ==="
+          HEADERS=$(curl -sI "$BACKEND_URL/health")
+          echo "$HEADERS"
+          if echo "$HEADERS" | grep -qi "content-security-policy"; then
+            echo "✅ Content-Security-Policy header present (enforced, not report-only)"
+          else
+            echo "❌ Content-Security-Policy header MISSING"
+            exit 1
+          fi
+
+      # ── 2. Frontend Vercel security headers ─────────────────────────────────
+      - name: Check Vercel security headers (frontend)
+        run: |
+          echo "=== Frontend: / headers ==="
+          HEADERS=$(curl -sI "$FRONTEND_URL")
+          echo "$HEADERS"
+          FAILED=0
+          for h in "Strict-Transport-Security" "X-Frame-Options" "X-Content-Type-Options" "Referrer-Policy"; do
+            if echo "$HEADERS" | grep -qi "$h"; then
+              echo "✅ $h present"
+            else
+              echo "❌ $h MISSING"
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+      # ── 3. SSL certificate expiry ────────────────────────────────────────────
+      - name: Check SSL certificate expiry
+        run: |
+          echo "=== SSL Certificate Dates ==="
+          echo | openssl s_client \
+            -servername capsule-backend.onrender.com \
+            -connect capsule-backend.onrender.com:443 2>/dev/null \
+            | openssl x509 -noout -dates
+
+          # Fail if certificate expires within 14 days
+          EXPIRY=$(echo | openssl s_client \
+            -servername capsule-backend.onrender.com \
+            -connect capsule-backend.onrender.com:443 2>/dev/null \
+            | openssl x509 -noout -enddate | cut -d= -f2)
+          EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || date -j -f "%b %d %T %Y %Z" "$EXPIRY" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+          echo "Days until expiry: $DAYS_LEFT"
+          if [ "$DAYS_LEFT" -lt 14 ]; then
+            echo "❌ Certificate expires in < 14 days — renew immediately!"
+            exit 1
+          else
+            echo "✅ Certificate OK — $DAYS_LEFT days remaining"
+          fi
+
+      # ── 4. npm audit ─────────────────────────────────────────────────────────
+      - name: Backend npm audit
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: Frontend npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      # ── 5. Save report artifact ───────────────────────────────────────────────
+      - name: Generate security report
+        if: always()
+        run: |
+          REPORT="security-report-$(date +%Y%m%d).md"
+          {
+            echo "# Security Scan Report — $(date -u)"
+            echo ""
+            echo "## Environment"
+            echo "- Backend: \`$BACKEND_URL\`"
+            echo "- Frontend: \`$FRONTEND_URL\`"
+            echo ""
+            echo "## Backend Headers"
+            echo "\`\`\`"
+            curl -sI "$BACKEND_URL/health" || true
+            echo "\`\`\`"
+            echo ""
+            echo "## Frontend Headers"
+            echo "\`\`\`"
+            curl -sI "$FRONTEND_URL" || true
+            echo "\`\`\`"
+          } > "$REPORT"
+          echo "Report saved: $REPORT"
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_number }}
+          path: security-report-*.md
+          retention-days: 90
