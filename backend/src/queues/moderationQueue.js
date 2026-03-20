@@ -1,5 +1,4 @@
-const Bull = require('bull');
-const { redisConfig } = require('../config/queue.config');
+const { createQueue } = require('../config/queue.config');
 
 let moderationQueue = null;
 
@@ -10,8 +9,7 @@ function createModerationQueue() {
 
   if (moderationQueue) return moderationQueue;
 
-  moderationQueue = new Bull('moderation-queue', {
-    ...redisConfig,
+  moderationQueue = createQueue('moderation-queue', {
     defaultJobOptions: {
       attempts: 3,
       backoff: {

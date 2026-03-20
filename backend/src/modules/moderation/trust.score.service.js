@@ -23,19 +23,23 @@ class TrustScoreService {
       const user = await User.findById(userId);
       if (!user) return;
 
-      // Update Score
-      let newScore = (user.trustScore || 50) + impact;
-      newScore = Math.max(0, Math.min(100, newScore)); // Clamp between 0-100
-
-      // Update Flags Count
+      // FIX: Use atomic $inc to prevent read-modify-write lost updates during concurrency
+      const updateDoc = { $inc: { trustScore: impact } };
       if (status === 'FLAGGED' || status === 'REJECTED') {
-        user.flagsCount = (user.flagsCount || 0) + 1;
+        updateDoc.$inc.flagsCount = 1;
       }
 
-      user.trustScore = newScore;
-      await user.save();
+      const updatedUser = await User.findByIdAndUpdate(userId, updateDoc, { new: true });
+      if (!updatedUser) return;
 
-      logger.info(`Updated trust score for user ${userId}: ${newScore} (${impact > 0 ? '+' : ''}${impact})`);
+      // Lazy background clamping (Minor tradeoff: score might briefly exceed 100 before clamping,
+      // but strictly prevents lost updates on the increment itself)
+      if (updatedUser.trustScore > 100 || updatedUser.trustScore < 0) {
+        updatedUser.trustScore = Math.max(0, Math.min(100, updatedUser.trustScore));
+        await updatedUser.save();
+      }
+
+      logger.info(`Updated trust score for user ${userId}: ${updatedUser.trustScore} (${impact > 0 ? '+' : ''}${impact})`);
     } catch (error) {
       logger.error(`Failed to update trust score for user ${userId}`, error);
     }

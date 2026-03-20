@@ -18,6 +18,7 @@ const logger = require('./logger');
 
 // Singleton reference — created lazily on first call to createRedisClient()
 let redisClient = null;
+let redisSubscriber = null;
 
 // Track Redis availability (event-driven, non-blocking)
 let isRedisAvailable = false;
@@ -183,55 +184,19 @@ function createRedisClient() {
     }
   };
 
-  /**
-   * Add cache keys to tag sets with MAX TTL enforcement.
-   *
-   * Ensures that the tag TTL is always the MAXIMUM of the new TTL and any
-   * existing TTL. This prevents a short-lived cache entry (e.g. list=180s)
-   * from overwriting the TTL of a long-lived tag (e.g. trending=600s).
-   *
-   * Pipeline 1 (RT1): SADD + TTL in one round-trip.
-   * Pipeline 2 (RT2): Conditional EXPIRE only for tags whose TTL must grow.
-   *                   Skipped entirely if no tag needs updating.
-   *
-   * @param {string[]} keys - Cache keys to tag
-   * @param {string[]} tags - Tags to associate with the keys
-   * @param {number} [ttl=300] - Candidate expiration time for tags (seconds)
-   */
   redisClient.addTags = async function addTags(keys, tags, ttl = 300) {
     if (!isRedisAvailable || keys.length === 0 || tags.length === 0) return;
     try {
-      // RT1: SADD all tag sets + read current TTL of each tag in one pipeline.
-      // Results array layout: [sadd, ttl, sadd, ttl, ...] (2 entries per tag).
-      const rt1 = this.pipeline();
+      // Phase 2 Optimization: Drop two-round-trip read-modify-write for tags.
+      // Run SADD and EXPIRE unconditionally in 1 single pipeline.
+      const pipeline = this.pipeline();
       tags.forEach((tag) => {
-        rt1.sadd(tag, ...keys);
-        rt1.ttl(tag); // -2=missing, -1=no-expire, >=0=remaining seconds
+        pipeline.sadd(tag, ...keys);
+        // FIX: 'GT' flag ensures the TTL only extends (Requires Redis 7.0+)
+        // Prevents short-lived items from crushing the TTL of long-lived parent tags
+        pipeline.expire(tag, ttl, 'GT');
       });
-      const rt1Results = await rt1.exec();
-
-      // Determine which tags need a longer TTL (max-enforcement).
-      const rt2 = this.pipeline();
-      let needsExpire = false;
-      tags.forEach((tag, i) => {
-        const [ttlErr, existingTTL] = rt1Results[i * 2 + 1] || [null, -2];
-        if (ttlErr) return; // Skip if Redis returned an error for this TTL read
-
-        const shouldExpire = existingTTL === -2 // Key did not exist → set TTL
-          || existingTTL === -1 // Key exists with no expiry → set TTL
-          || ttl > existingTTL; // New TTL is strictly longer → update
-
-        if (shouldExpire) {
-          rt2.expire(tag, ttl);
-          needsExpire = true;
-        }
-        // If ttl <= existingTTL: do nothing → TTL stays at the longer value.
-      });
-
-      // RT2: Only execute if at least one tag needs a TTL update.
-      if (needsExpire) {
-        await rt2.exec();
-      }
+      await pipeline.exec();
     } catch (error) {
       logger.error('[Redis] addTags error', { tags, error: error.message });
     }
@@ -316,6 +281,45 @@ function createRedisClient() {
 }
 
 /**
+ * Get (or lazily create) the singleton Redis subscriber client for Bull.
+ * No connection is attempted here — connection is explicit.
+ *
+ * @returns {Redis} ioredis client instance (subscriber)
+ */
+function createRedisSubscriber() {
+  if (redisSubscriber) return redisSubscriber;
+
+  const { args } = buildRedisConfig();
+
+  // Bull subscribers shouldn't hit max retries and die because they just listen,
+  // but we keep consistent config.
+  redisSubscriber = new Redis(...args);
+
+  redisSubscriber.on('error', (err) => {
+    logger.error('[Redis Subscriber] Connection error', {
+      error: { message: err.message, code: err.code },
+    });
+  });
+
+  return redisSubscriber;
+}
+
+/**
+ * Creates a brand new, isolated Redis client.
+ * Essential for Bull's bclient, which MUST NOT be shared.
+ */
+function createIsolatedRedisClient() {
+  const { args } = buildRedisConfig();
+  const client = new Redis(...args);
+  client.on('error', (err) => {
+    logger.error('[Redis bclient] Connection error', {
+      error: { message: err.message, code: err.code },
+    });
+  });
+  return client;
+}
+
+/**
  * Explicitly connect Redis — called ONLY from server.js after DB connects.
  *
  * Rules:
@@ -347,5 +351,7 @@ async function connectRedis() {
 
 module.exports = {
   createRedisClient,
+  createRedisSubscriber,
+  createIsolatedRedisClient,
   connectRedis,
 };

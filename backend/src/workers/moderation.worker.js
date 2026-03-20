@@ -11,6 +11,7 @@ module.exports = {
 
     // Process jobs from the queue
     queue.process(async (job) => {
+      const JOB_START = Date.now();
       const { vlogId } = job.data;
 
       if (!vlogId) {
@@ -21,7 +22,16 @@ module.exports = {
       try {
         logger.info(`Processing moderation job for vlog: ${vlogId}`);
         await moderationService.moderateVlog(vlogId);
-        logger.info(`Moderation job completed for vlog: ${vlogId}`);
+
+        const jobDuration = Date.now() - JOB_START;
+        const queueSettings = queue.clients[0]?.options?.settings;
+        if (jobDuration > Math.floor((queueSettings?.lockDuration || 120000) / 2)) {
+          logger.warn('Job duration exceeded 50% of lock duration', {
+            jobId: job.id, duration: jobDuration,
+          });
+        }
+
+        logger.info(`Moderation job completed for vlog: ${vlogId} in ${jobDuration}ms`);
       } catch (error) {
         logger.error(`Moderation job failed for vlog: ${vlogId}`, error);
         // Bull will automatically handle retries based on queue config

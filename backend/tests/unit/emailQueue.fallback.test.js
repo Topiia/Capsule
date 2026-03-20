@@ -1,7 +1,6 @@
 /* eslint-disable global-require, no-unused-vars, prefer-destructuring */
 
 // ─── All mocks must be declared BEFORE any require of production code ───────
-jest.mock('bull');
 jest.mock('../../src/config/logger');
 jest.mock('../../src/config/email', () => ({
   redis: { host: 'localhost', port: 6379 },
@@ -15,9 +14,13 @@ jest.mock('../../src/config/email', () => ({
 jest.mock('../../src/utils/sendEmailSync', () => ({
   sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-email-id' }),
 }));
+// Mock the createQueue factory — emailQueue.js uses this, not bull directly
+jest.mock('../../src/config/queue.config', () => ({
+  createQueue: jest.fn(),
+}));
 
 // ─── Require mocked modules AFTER jest.mock() calls ─────────────────────────
-const Queue = require('bull');
+const { createQueue } = require('../../src/config/queue.config');
 const logger = require('../../src/config/logger');
 const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 const { createEmailQueue, queueEmail } = require('../../src/queues/emailQueue');
@@ -37,16 +40,15 @@ describe('Email Queue - Graceful Degradation', () => {
     mockQueue = {
       add: mockAdd,
       isReady: mockIsReady,
-      // Required by queueEmail(): proactive Redis + worker health check
       client: {
         status: 'ready',
-        get: jest.fn().mockResolvedValue(String(Date.now())), // fresh heartbeat
+        get: jest.fn().mockResolvedValue(String(Date.now())),
         set: jest.fn(),
         on: jest.fn(),
       },
     };
 
-    Queue.mockImplementation(() => mockQueue);
+    createQueue.mockReturnValue(mockQueue);
   });
 
   describe('When Redis is UP', () => {
@@ -75,16 +77,9 @@ describe('Email Queue - Graceful Degradation', () => {
 
   describe('When Redis is DOWN', () => {
     beforeEach(async () => {
-      // Return a rejected promise for the mock
-      mockIsReady.mockRejectedValue(new Error('Redis unavailable'));
-      mockAdd.mockRejectedValue(new Error('Redis connection failed'));
-
-      // We must reset the internal queue module state to test failure after success
-      // In tests, we reset the node module cache to get fresh queueReady logic
       jest.resetModules();
 
-      // Re-apply mocks internally for the isolated require
-      jest.mock('bull');
+      // Re-apply all mocks after resetModules
       jest.mock('../../src/config/logger');
       jest.mock('../../src/config/email', () => ({
         redis: { host: 'localhost', port: 6379 },
@@ -94,23 +89,22 @@ describe('Email Queue - Graceful Degradation', () => {
       jest.mock('../../src/utils/sendEmailSync', () => ({
         sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-email-id' }),
       }));
-
-      const QueueFresh = require('bull');
-      QueueFresh.mockImplementation(() => ({
-        add: jest.fn().mockRejectedValue(new Error('Redis connection failed')),
-        isReady: jest.fn().mockRejectedValue(new Error('Redis unavailable')),
-        // client.status !== 'ready' → redisReady=false → sync-fallback immediately
-        client: {
-          status: 'connecting',
-          get: jest.fn(),
-          set: jest.fn(),
-          on: jest.fn(),
-        },
+      jest.mock('../../src/config/queue.config', () => ({
+        createQueue: jest.fn().mockReturnValue({
+          add: jest.fn().mockRejectedValue(new Error('Redis connection failed')),
+          isReady: jest.fn().mockRejectedValue(new Error('Redis unavailable')),
+          // client.status !== 'ready' → redisReady=false → sync-fallback immediately
+          client: {
+            status: 'connecting',
+            get: jest.fn(),
+            set: jest.fn(),
+            on: jest.fn(),
+          },
+        }),
       }));
 
       const { createEmailQueue: freshCreate } = require('../../src/queues/emailQueue');
       freshCreate();
-      // Wait for rejected promise microtask to flush
       await Promise.resolve();
     });
 
@@ -128,10 +122,7 @@ describe('Email Queue - Graceful Degradation', () => {
 
       const result = await freshQueueEmail(emailData);
 
-      // Fire-and-forget: returns immediately without awaiting sendEmailSync.
-      // emailId is null because we don't await the result; email sends in background.
       expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
-
       expect(freshSendSync).toHaveBeenCalledWith(emailData);
       expect(freshLogger.warn).toHaveBeenCalledWith(
         'Email sync-fallback selected',
@@ -145,7 +136,6 @@ describe('Email Queue - Graceful Degradation', () => {
     it('should NOT crash the application', async () => {
       const { queueEmail: freshQueueEmail } = require('../../src/queues/emailQueue');
 
-      // Should not throw
       await expect(freshQueueEmail({
         to: 'user@example.com',
         subject: 'Test',

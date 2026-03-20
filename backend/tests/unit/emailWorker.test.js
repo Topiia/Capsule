@@ -1,9 +1,12 @@
 /* eslint-disable global-require, prefer-destructuring, no-promise-executor-return */
 
 // ─── All mocks must be declared BEFORE any require of production code ───────
-jest.mock('bull');
 jest.mock('resend');
 jest.mock('../../src/config/logger');
+jest.mock('../../src/instrumentation/sentry', () => ({
+  captureException: jest.fn(),
+  close: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('../../src/config/email', () => ({
   resend: {
     apiKey: 'test-api-key',
@@ -17,43 +20,43 @@ jest.mock('../../src/config/email', () => ({
   },
 }));
 
-// ─── Require mocked modules AFTER jest.mock() calls ─────────────────────────
-const Queue = require('bull');
-const { Resend } = require('resend');
-const logger = require('../../src/config/logger');
-const { startWorker } = require('../../src/workers/emailWorker');
-
 // ─── Shared mock instances set up in beforeEach ──────────────────────────────
 let mockQueue;
 let mockProcess;
 let mockOn;
 let mockEmailSend;
+const { Resend } = require('resend');
+
+// Mock queue.config factory so startWorker gets our controlled mock queue
+jest.mock('../../src/config/queue.config', () => ({
+  createQueue: jest.fn(),
+}));
+
+const { createQueue } = require('../../src/config/queue.config');
+const logger = require('../../src/config/logger');
+const { startWorker } = require('../../src/workers/emailWorker');
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
 
-  // Set up Bull mock
+  // Set up mock queue returned by createQueue factory
   mockProcess = jest.fn();
   mockOn = jest.fn();
   mockQueue = {
     process: mockProcess,
     on: mockOn,
     close: jest.fn().mockResolvedValue(true),
-    // Required by instrumentation: startWorker() calls emailQueue.isReady()
-    // to attach the QUEUE_READY / REDIS_STATUS_START / QUEUE_STATS probes.
     isReady: jest.fn().mockResolvedValue(true),
-    // Required by instrumentation: called inside isReady().then() for QUEUE_STATS,
-    // and at JOB_RECEIVED for QUEUE_DEPTH.
     getWaitingCount: jest.fn().mockResolvedValue(0),
     getActiveCount: jest.fn().mockResolvedValue(0),
     getCompletedCount: jest.fn().mockResolvedValue(0),
     getFailedCount: jest.fn().mockResolvedValue(0),
     getDelayedCount: jest.fn().mockResolvedValue(0),
-    // Required by instrumentation: getRedisStatus() reads emailQueue.client.status
     client: { status: 'ready' },
   };
-  Queue.mockImplementation(() => mockQueue);
+
+  createQueue.mockReturnValue(mockQueue);
 
   // Set up Resend mock
   mockEmailSend = jest.fn();
@@ -64,26 +67,26 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
-  // Remove signal listeners added by startWorker to prevent leaks between tests
+  // Remove all signal listeners added by startWorker
   process.removeAllListeners('SIGTERM');
   process.removeAllListeners('SIGINT');
+  process.removeAllListeners('SIGTERM_HEARTBEAT_CLEANUP');
   global.__workerSignalsAttached = false;
 });
+
+// Suppress MaxListenersExceededWarning — multiple startWorker() calls across
+// tests register SIGTERM/SIGINT/SIGTERM_HEARTBEAT_CLEANUP listeners; they are
+// all cleaned up in afterEach so this is safe to raise.
+process.setMaxListeners(50);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Email Worker', () => {
   describe('Worker Initialization', () => {
-    it('should initialize Bull queue consumer with correct config', () => {
+    it('should call createQueue with email queue name', () => {
       startWorker();
 
-      expect(Queue).toHaveBeenCalledWith('email', {
-        redis: {
-          host: 'localhost',
-          port: 6379,
-          password: undefined,
-        },
-      });
+      expect(createQueue).toHaveBeenCalledWith('email');
     });
 
     it('should register job processor', () => {
@@ -168,15 +171,13 @@ describe('Email Worker', () => {
 
     beforeEach(() => {
       // Switch to real timers for this describe only — the QUEUE_DEPTH probe
-      // has multiple nested async awaits (Promise.all in a try block) that
-      // cannot be drained reliably under fake timers.
+      // has multiple nested async awaits that cannot be drained under fake timers.
       jest.useRealTimers();
       startWorker();
       [jobProcessor] = mockProcess.mock.calls[0];
     });
 
     afterEach(() => {
-      // Restore fake timers for other describe blocks
       jest.useFakeTimers();
     });
 
@@ -192,7 +193,6 @@ describe('Email Worker', () => {
         attemptsMade: 1,
       };
 
-      // Never-resolving promise — forces the 10s Resend timeout to fire
       mockEmailSend.mockImplementation(() => new Promise(() => {}));
 
       await expect(jobProcessor(mockJob)).rejects.toThrow('Resend API timeout');
@@ -210,7 +210,6 @@ describe('Email Worker', () => {
         attemptsMade: 0,
       };
 
-      // Resolves immediately — well within the 10s timeout
       mockEmailSend.mockResolvedValue({ id: 'fast-msg' });
 
       await expect(jobProcessor(mockJob)).resolves.toEqual({ success: true });

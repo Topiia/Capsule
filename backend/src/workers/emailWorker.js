@@ -1,6 +1,7 @@
 require('dotenv').config();
-const Queue = require('bull');
+const crypto = require('crypto');
 const { Resend } = require('resend');
+const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 // OBSERVABILITY: Sentry for worker crash monitoring
@@ -85,9 +86,11 @@ const startWorker = () => {
     );
   }, 60000);
 
-  const emailQueue = new Queue('email', {
-    redis: emailConfig.redis,
-  });
+  const emailQueue = createQueue('email');
+
+  // Guard: createQueue returns null in test environments (NODE_ENV=test).
+  // Bail out cleanly so tests that import emailWorker don't crash.
+  if (!emailQueue) return null;
 
   // ─── [WORKER] Heartbeat key — written to Redis every 30s ────────────────────
   // API reads this key before queue.add() to determine if worker is alive.
@@ -237,6 +240,28 @@ const startWorker = () => {
       redisStatus: redisStatusAtJob,
     });
 
+    // FIX: Deterministic, retry-safe business key.
+    // Generates same key for identical payloads within a 1-hour window.
+    const payloadHash = crypto.createHash('sha256')
+      .update(`${to}-${subject}-${Math.floor(Date.now() / 3600000)}`)
+      .digest('hex');
+    const idempotencyKey = `idemp:email:${payloadHash}`;
+
+    try {
+      if (emailQueue.client) {
+        // FIX: Atomic SET NX locks the job BEFORE the external Resend API side-effect.
+        // Tradeoff: If worker crashes after this block but before Resend receives it,
+        // it is permanently dropped for 7 days (prevents duplicate spam at cost of delivery loss).
+        const acquired = await emailQueue.client.set(idempotencyKey, 'LOCKED', 'NX', 'EX', 86400 * 7); // 7 days TTL
+        if (!acquired) {
+          logger.warn('Duplicate email job payload detected and prevented', { jobId: job.id, to, idempotencyKey });
+          return { success: true, duplicate: true };
+        }
+      }
+    } catch (idempErr) {
+      logger.warn('Failed to check/set idempotency key', { jobId: job.id, error: idempErr.message });
+    }
+
     try {
       // ─── [WORKER] Phase 2 — Email send starts ─────────────────────────────
       const EMAIL_SEND_START = Date.now();
@@ -246,9 +271,27 @@ const startWorker = () => {
         to, subject, text, html,
       });
 
-      // ─── [WORKER] Phase 2 — Job completed ─────────────────────────────────
       const JOB_DONE = Date.now();
       const jobDuration = JOB_DONE - JOB_RECEIVED;
+
+      // Warn if execution safely exceeded lock tolerance.
+      // emailQueue.clients is a Bull internal array not available in test mocks;
+      // fall back to the configured lockDuration (120s) to avoid TypeError.
+      const lockDuration = emailQueue.clients?.[0]?.options?.settings?.lockDuration ?? 120000;
+      if (jobDuration > lockDuration / 2) {
+        logger.warn('Job duration exceeded 50% of lock duration', { jobId: job.id, duration: jobDuration });
+      }
+
+      // Safety Audit: LOCKED vs DONE distinction preserved for crash diagnostics.
+      // Without DONE, a LOCKED key could mean crashed-before-send or successfully sent — ambiguous.
+      try {
+        if (emailQueue.client) {
+          await emailQueue.client.set(idempotencyKey, 'DONE', 'XX', 'EX', 86400 * 7);
+        }
+      } catch (idempSetErr) {
+        logger.warn('Failed to update idempotency key to DONE', { jobId: job.id, error: idempSetErr.message });
+      }
+
       console.log(`[WORKER] JOB_COMPLETED  jobId=${job.id}  duration=${jobDuration}ms  (${new Date(JOB_DONE).toISOString()})`);
 
       return { success: true };
