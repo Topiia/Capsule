@@ -5,6 +5,7 @@ describe('Email Queue Producer', () => {
   let mockAdd;
   let mockIsReady;
   let emailQueueModule;
+  let createQueue;
 
   beforeEach(() => {
     jest.resetModules();
@@ -24,16 +25,19 @@ describe('Email Queue Producer', () => {
       getDelayedCount: jest.fn().mockResolvedValue(0),
       clean: jest.fn().mockResolvedValue([]),
       close: jest.fn().mockResolvedValue(true),
-      // Required by queueEmail(): proactive Redis + worker health check
       client: {
         status: 'ready',
-        get: jest.fn().mockResolvedValue(String(Date.now())), // fresh heartbeat
+        get: jest.fn().mockResolvedValue(String(Date.now())),
         set: jest.fn(),
         on: jest.fn(),
       },
     };
 
-    jest.mock('bull', () => jest.fn(() => mockQueue));
+    // Mock the createQueue factory — emailQueue.js uses this, not bull directly
+    jest.mock('../../src/config/queue.config', () => ({
+      createQueue: jest.fn(),
+    }));
+
     jest.mock('../../src/config/logger', () => ({
       info: jest.fn(),
       warn: jest.fn(),
@@ -48,23 +52,27 @@ describe('Email Queue Producer', () => {
       redis: { host: 'localhost', port: 6379, password: undefined },
     }));
 
+    createQueue = require('../../src/config/queue.config').createQueue;
+    createQueue.mockReturnValue(mockQueue);
+
     emailQueueModule = require('../../src/queues/emailQueue');
   });
 
   describe('Queue Initialization', () => {
-    it('should initialize Bull queue with correct config when createEmailQueue is called', () => {
+    it('should initialize queue via createQueue factory when createEmailQueue is called', () => {
       emailQueueModule.createEmailQueue();
-      const Queue = require('bull');
 
-      expect(Queue).toHaveBeenCalledWith('email', {
-        redis: { host: 'localhost', port: 6379, password: undefined },
-        defaultJobOptions: {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 2000 },
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      });
+      expect(createQueue).toHaveBeenCalledWith(
+        'email',
+        expect.objectContaining({
+          defaultJobOptions: expect.objectContaining({
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: true,
+            removeOnFail: false,
+          }),
+        }),
+      );
     });
 
     it('should call isReady to verify Redis connectivity on init', () => {
@@ -102,7 +110,6 @@ describe('Email Queue Producer', () => {
       const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      // Fire-and-forget: function returns immediately; email sends in background
       expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
     });
   });
@@ -121,7 +128,6 @@ describe('Email Queue Producer', () => {
       const { sendEmailSync } = require('../../src/utils/sendEmailSync');
 
       expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      // Fire-and-forget: function returns immediately; email sends in background
       expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
     });
   });

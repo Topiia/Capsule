@@ -88,6 +88,10 @@ const startWorker = () => {
 
   const emailQueue = createQueue('email');
 
+  // Guard: createQueue returns null in test environments (NODE_ENV=test).
+  // Bail out cleanly so tests that import emailWorker don't crash.
+  if (!emailQueue) return null;
+
   // ─── [WORKER] Heartbeat key — written to Redis every 30s ────────────────────
   // API reads this key before queue.add() to determine if worker is alive.
   // Key has 90s TTL: if worker dies, key expires and API falls back to sync send.
@@ -270,8 +274,11 @@ const startWorker = () => {
       const JOB_DONE = Date.now();
       const jobDuration = JOB_DONE - JOB_RECEIVED;
 
-      // Warn if execution safely exceeded lock tolerance
-      if (jobDuration > (emailQueue.clients[0]?.options?.settings?.lockDuration || 120000) / 2) {
+      // Warn if execution safely exceeded lock tolerance.
+      // emailQueue.clients is a Bull internal array not available in test mocks;
+      // fall back to the configured lockDuration (120s) to avoid TypeError.
+      const lockDuration = emailQueue.clients?.[0]?.options?.settings?.lockDuration ?? 120000;
+      if (jobDuration > lockDuration / 2) {
         logger.warn('Job duration exceeded 50% of lock duration', { jobId: job.id, duration: jobDuration });
       }
 
