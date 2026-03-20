@@ -73,9 +73,22 @@ jobs:
           fi
 
       # ── 4. npm audit ─────────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
       - name: Backend npm audit
         working-directory: backend
         run: npm audit --audit-level=high
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
 
       - name: Frontend npm audit
         working-directory: frontend
