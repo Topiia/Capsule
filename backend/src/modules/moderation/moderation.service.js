@@ -43,6 +43,14 @@ class ModerationService {
       return;
     }
 
+    // IDEMPOTENCY GUARD: Prevent duplicate execution
+    // If the vlog is already moderated (status changed from PENDING),
+    // skip to prevent double-counting trust scores.
+    if (vlog.status && vlog.status !== 'PENDING') {
+      logger.info(`Skipped AI moderation for ${vlogId} – already processed (status: ${vlog.status})`);
+      return;
+    }
+
     // 0. Trust Score Check
     const userTrust = vlog.author
       ? trustScoreService.getTrustLevel(vlog.author.trustScore)
@@ -54,7 +62,18 @@ class ModerationService {
     const textContent = `${vlog.title} ${vlog.description} ${vlog.content}`;
 
     // 1. Rule-based Filter
-    if (ruleFilter.isBlocked(textContent)) {
+    const filterStart = Date.now();
+    const isBlockedSync = ruleFilter.isBlocked(textContent);
+
+    // FIX: Detect synchronous event loop blocking
+    if (Date.now() - filterStart > 50) {
+      logger.warn('Event loop blocked by synchronous ruleFilter', {
+        elapsed: Date.now() - filterStart,
+        vlogId,
+      });
+    }
+
+    if (isBlockedSync) {
       await this.updateStatus(vlog, 'REJECTED', 100, { reason: 'Blocked keyword found' });
       metricsService.recordDecision('REJECTED', Date.now() - start);
       if (vlog.author) await trustScoreService.updateTrustScore(vlog.author._id, 'REJECTED');

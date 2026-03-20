@@ -1,4 +1,4 @@
-const Queue = require('bull');
+const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 const { sendEmailSync } = require('../utils/sendEmailSync');
@@ -29,8 +29,7 @@ exports.createEmailQueue = () => {
   if (emailQueue) return emailQueue;
 
   try {
-    emailQueue = new Queue('email', {
-      redis: emailConfig.redis,
+    emailQueue = createQueue('email', {
       defaultJobOptions: {
         attempts: 3,
         backoff: {

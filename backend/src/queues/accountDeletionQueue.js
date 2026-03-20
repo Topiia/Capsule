@@ -1,7 +1,6 @@
-const Queue = require('bull');
+const { createQueue } = require('../config/queue.config');
 const cloudinary = require('../config/cloudinary');
 const logger = require('../config/logger');
-const emailConfig = require('../config/email');
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
 
 /**
@@ -31,9 +30,7 @@ exports.createAccountDeletionQueue = () => {
   if (accountDeletionQueue) return accountDeletionQueue;
 
   try {
-    accountDeletionQueue = new Queue('accountDeletion', {
-      // HIGH-5: Use centralized Redis config (same as emailQueue) to ensure consistent connection
-      redis: emailConfig.redis,
+    accountDeletionQueue = createQueue('accountDeletion', {
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -112,6 +109,7 @@ exports.startAccountDeletionWorker = () => {
   if (!queue) return;
 
   queue.process(async (job) => {
+    const JOB_START = Date.now();
     const { userId, publicIds } = job.data;
 
     logger.info('Processing Cloudinary asset cleanup job', {
@@ -173,6 +171,13 @@ exports.startAccountDeletionWorker = () => {
         deleted: totalDeleted,
         errors: errors.length,
       });
+      const jobDuration = Date.now() - JOB_START;
+      const queueSettings = queue.clients[0]?.options?.settings;
+      if (jobDuration > Math.floor((queueSettings?.lockDuration || 120000) / 2)) {
+        logger.warn('Job duration exceeded 50% of lock duration', {
+          jobId: job.id, duration: jobDuration,
+        });
+      }
 
       return {
         success: true,
