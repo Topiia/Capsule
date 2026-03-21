@@ -27,7 +27,12 @@ const counters = {
   // Redis operation errors caught in safe wrappers
   redisFailures: 0,
   // times Resend circuit breaker tripped
-  circuitBreakerOpen: 0,
+  circuitBreakerOpenEvents: 0,
+  // Load shedding metrics
+  rejectedRequests: 0,
+  activeRequests: 0,
+  activePriorityRequests: 0,
+  activeSyncEmails: 0,
 };
 
 const metrics = {

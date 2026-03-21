@@ -1,5 +1,6 @@
 const ErrorResponse = require('../utils/errorResponse');
 const logger = require('../config/logger');
+const { rejectRequest } = require('../utils/rejectRequest');
 
 const errorHandler = (err, req, res, _next) => {
   let error = { ...err };
@@ -88,6 +89,11 @@ const errorHandler = (err, req, res, _next) => {
   if (err.http_code) {
     const message = 'Image upload failed';
     error = new ErrorResponse(message, 400, 'CLOUDINARY_UPLOAD_FAILED');
+  }
+
+  // STANDARDIZED: Fallback or Circuit Breaker 503 Service Unavailable
+  if (err.message && err.message.includes('temporarily unavailable')) {
+    return rejectRequest(res);
   }
 
   // STANDARDIZED: Always return consistent error format

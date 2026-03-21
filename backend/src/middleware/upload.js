@@ -5,6 +5,8 @@ const multer = require('multer');
 const { CloudinaryStorage } = require('@fluidjs/multer-cloudinary');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');
+const { cloudinaryCircuit, safeCall } = require('../config/circuitBreaker');
+const { handleFallback } = require('../config/fallbackPolicy');
 
 /* -------------------- File Type Filter -------------------- */
 const fileFilter = (req, file, cb) => {
@@ -75,7 +77,11 @@ const cleanupCloudinaryUploads = async (publicIds) => {
   if (!publicIds?.length) return;
 
   const results = await Promise.allSettled(
-    publicIds.map((id) => cloudinary.uploader.destroy(id)),
+    publicIds.map((id) => safeCall(
+      cloudinaryCircuit,
+      () => cloudinary.uploader.destroy(id),
+      () => { throw new Error('Cloudinary unavailable - Circuit OPEN'); },
+    )),
   );
 
   // Log any cleanup failures (don't throw - cleanup is best-effort)
@@ -177,7 +183,14 @@ exports.deleteImage = async (publicId) => {
       throw new Error(`Invalid public_id after sanitization: ${publicId}`);
     }
 
-    return await cloudinary.uploader.destroy(sanitizedId);
+    return await safeCall(
+      cloudinaryCircuit,
+      () => cloudinary.uploader.destroy(sanitizedId),
+      () => {
+        handleFallback('deletion'); // Will throw 'Service temporarily unavailable' or 'RETRY' based on policy
+        throw new Error('Service temporarily unavailable');
+      },
+    );
   } catch (err) {
     console.error('Delete image error:', err);
     throw err;

@@ -2,6 +2,10 @@ const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 const { sendEmailSync } = require('../utils/sendEmailSync');
+
+const MAX_SYNC_EMAILS = 5;
+let activeSyncEmails = 0;
+
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
 const systemState = require('../config/systemState');
 const metrics = require('../config/metrics');
@@ -130,30 +134,49 @@ exports.queueEmail = async (emailData, priority = 5) => {
   const selectedMode = (redisReady && workerAlive) ? 'async-queue' : 'sync-fallback';
 
   if (selectedMode === 'sync-fallback') {
-    // ── DEGRADED MODE: explicit log so it's never silent ─────────────────────
-    if (systemState.degraded) {
-      logger.warn('[DEGRADED MODE] Using sync fallback — queue/Redis unavailable', {
-        to: emailData.to,
-        subject: emailData.subject,
-        redis: systemState.redis,
-        queue: systemState.queue,
-      });
-    } else {
-      // Worker not alive yet (still starting or heartbeat expired)
-      logger.warn('[EMAIL] Sync-fallback selected — worker heartbeat not found', {
-        to: emailData.to,
-        subject: emailData.subject,
-      });
+    // eslint-disable-next-line global-require
+    const { handleFallback } = require('../config/fallbackPolicy');
+    const action = handleFallback('email'); // Throws if policy is 'reject', returns 'SYNC' otherwise.
+
+    if (action === 'SYNC') {
+      // ── DEGRADED MODE: explicit log so it's never silent ─────────────────────
+
+      if (systemState.degraded) {
+        logger.warn('[DEGRADED MODE] Using sync fallback — queue/Redis unavailable', {
+          to: emailData.to,
+          subject: emailData.subject,
+          redis: systemState.redis,
+          queue: systemState.queue,
+        });
+      } else {
+        // Worker not alive yet (still starting or heartbeat expired)
+        logger.warn('[EMAIL] Sync-fallback selected — worker heartbeat not found', {
+          to: emailData.to,
+          subject: emailData.subject,
+        });
+      }
+
+      metrics.increment('emailFallback');
+
+      if (!systemState.redis && activeSyncEmails >= MAX_SYNC_EMAILS) {
+        throw new Error('Email service temporarily unavailable');
+      }
+
+      activeSyncEmails += 1;
+      metrics.increment('activeSyncEmails');
+
+      sendEmailSync(emailData)
+        .catch((err) => {
+          logger.error('[EMAIL] Background sync send failed', { to: emailData.to, error: err.message });
+          metrics.increment('redisFailures');
+        })
+        .finally(() => {
+          activeSyncEmails -= 1;
+          metrics.increment('activeSyncEmails', -1);
+        });
+
+      return { emailId: null, fallback: true, fireAndForget: true };
     }
-
-    metrics.increment('emailFallback');
-
-    sendEmailSync(emailData)
-      .catch((err) => {
-        logger.error('[EMAIL] Background sync send failed', { to: emailData.to, error: err.message });
-        metrics.increment('redisFailures');
-      });
-    return { emailId: null, fallback: true, fireAndForget: true };
   }
 
   try {
