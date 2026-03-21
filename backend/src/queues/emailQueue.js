@@ -1,13 +1,9 @@
 const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
-const { sendEmailSync } = require('../utils/sendEmailSync');
-
-const MAX_SYNC_EMAILS = 5;
-let activeSyncEmails = 0;
 
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
-const systemState = require('../config/systemState');
+
 const metrics = require('../config/metrics');
 
 /**
@@ -31,7 +27,6 @@ let queueReady = false;
  * Prevents auto-connection during module import (useful for test isolation).
  */
 exports.createEmailQueue = () => {
-  if (process.env.NODE_ENV === 'test') { return null; }
   if (emailQueue) return emailQueue;
 
   try {
@@ -104,117 +99,89 @@ exports.createEmailQueue = () => {
   return emailQueue;
 };
 
+const EmailJob = require('../models/EmailJob');
+
 /**
- * Queue an email for async processing
- * FALLBACK: If Redis unavailable, sends email synchronously
+ * Queue an email for async processing using Database Outbox Pattern
+ * GUARANTEES at-least-once delivery by writing to MongoDB first.
  *
  * @param {object} emailData - Email data
- * @param {string} emailData.to - Recipient email
- * @param {string} emailData.subject - Email subject
- * @param {string} emailData.text - Plain text content
- * @param {string} emailData.html - HTML content
- * @param {string} emailData.from - Sender (optional)
- * @param {number} priority - Job priority (1-10, higher = more important)
- * @returns {Promise<object>} - Job object or fallback result
+ * @param {number} priority - Job priority
+ * @param {object} context - Request context holding traceId and userId
  */
-exports.queueEmail = async (emailData, priority = 5) => {
-  const WORKER_HEARTBEAT_KEY = 'email:worker:heartbeat';
-  const redisReady = emailQueue?.client?.status === 'ready';
+exports.queueEmail = async (emailData, priority = 5, context = {}) => {
+  const { traceId = null, userId = null } = context;
 
-  let workerAlive = false;
-  if (redisReady && emailQueue.client?.get) {
-    try {
-      const ts = await emailQueue.client.get(WORKER_HEARTBEAT_KEY);
-      workerAlive = !!ts && (Date.now() - Number(ts)) < 90000;
-    } catch (_hbErr) {
-      workerAlive = false;
-    }
-  }
+  // 1. Persist the intent to DB immediately (PENDING state)
+  const jobDoc = await EmailJob.create({
+    userId,
+    email: emailData.to,
+    type: emailData.type || 'general',
+    status: 'PENDING',
+    traceId,
+    maxAttempts: emailData.critical ? 5 : 3,
+    payload: {
+      subject: emailData.subject,
+      html: emailData.html,
+      text: emailData.text,
+    },
+  });
 
-  const selectedMode = (redisReady && workerAlive) ? 'async-queue' : 'sync-fallback';
+  metrics.increment('emailDbCreated');
 
-  if (selectedMode === 'sync-fallback') {
-    // eslint-disable-next-line global-require
-    const { handleFallback } = require('../config/fallbackPolicy');
-    const action = handleFallback('email'); // Throws if policy is 'reject', returns 'SYNC' otherwise.
+  logger.info('[EMAIL] Outbox DB Record Created', {
+    emailJobId: jobDoc._id,
+    traceId,
+    type: jobDoc.type,
+    status: 'PENDING',
+  });
 
-    if (action === 'SYNC') {
-      // ── DEGRADED MODE: explicit log so it's never silent ─────────────────────
-
-      if (systemState.degraded) {
-        logger.warn('[DEGRADED MODE] Using sync fallback — queue/Redis unavailable', {
-          to: emailData.to,
-          subject: emailData.subject,
-          redis: systemState.redis,
-          queue: systemState.queue,
-        });
-      } else {
-        // Worker not alive yet (still starting or heartbeat expired)
-        logger.warn('[EMAIL] Sync-fallback selected — worker heartbeat not found', {
-          to: emailData.to,
-          subject: emailData.subject,
-        });
-      }
-
-      metrics.increment('emailFallback');
-
-      if (!systemState.redis && activeSyncEmails >= MAX_SYNC_EMAILS) {
-        throw new Error('Email service temporarily unavailable');
-      }
-
-      activeSyncEmails += 1;
-      metrics.increment('activeSyncEmails');
-
-      sendEmailSync(emailData)
-        .catch((err) => {
-          logger.error('[EMAIL] Background sync send failed', { to: emailData.to, error: err.message });
-          metrics.increment('redisFailures');
-        })
-        .finally(() => {
-          activeSyncEmails -= 1;
-          metrics.increment('activeSyncEmails', -1);
-        });
-
-      return { emailId: null, fallback: true, fireAndForget: true };
-    }
-  }
-
+  // 2. Attempt direct push to Bull queue to minimize latency
   try {
-    const job = await emailQueue.add(emailData, {
-      priority,
-      attempts: emailData.critical ? 5 : 3,
+    const queueJob = await emailQueue.add(
+      { emailJobId: jobDoc._id },
+      {
+        priority,
+        attempts: jobDoc.maxAttempts,
+      },
+    );
+
+    // If successful, update to QUEUED
+    await EmailJob.updateOne(
+      { _id: jobDoc._id },
+      { $set: { status: 'QUEUED', queuedAt: new Date() } },
+    );
+
+    metrics.increment('emailAsyncQueued');
+    logger.info('[EMAIL] Queued to Bull', {
+      emailJobId: jobDoc._id,
+      bullJobId: queueJob.id,
+      traceId,
+      status: 'QUEUED',
     });
 
-    metrics.increment('emailAsync');
-    logger.info('[EMAIL] Queued async', {
-      jobId: job.id,
-      to: emailData.to,
-      subject: emailData.subject,
-      priority,
-    });
-    return { jobId: job.id, queued: true };
+    return { emailJobId: jobDoc._id, queued: true };
   } catch (error) {
-    logger.error('[EMAIL] queue.add() failed — sync fallback', {
-      to: emailData.to,
-      subject: emailData.subject,
+    // 3. Fallback: Leave it PENDING. The Outbox Dispatcher will pick it up automatically!
+    logger.warn('[EMAIL] Redis queue add failed — Will be swept by dispatcher', {
+      emailJobId: jobDoc._id,
+      traceId,
       error: error.message,
     });
-    metrics.increment('emailFallback');
+    metrics.increment('emailRedisEnqueueFailed');
 
-    sendEmailSync(emailData)
-      .catch((err) => {
-        logger.error('[EMAIL] Catch-fallback sync send failed', { to: emailData.to, error: err.message });
-      });
-    return { emailId: null, fallback: true, fireAndForget: true };
+    // Do NOT throw error; the API must return 200 since the DB preserved the request!
+    return { emailJobId: jobDoc._id, queued: false };
   }
 };
 
 /**
  * Queue verification email
  */
-exports.queueVerificationEmail = async (email, verificationUrl) => exports.queueEmail(
+exports.queueVerificationEmail = async (email, verificationUrl, context = {}) => exports.queueEmail(
   {
     to: email,
+    type: 'verification',
     subject: 'Verify Your Email - Capsule',
     html: `
       <!DOCTYPE html>
@@ -282,14 +249,16 @@ exports.queueVerificationEmail = async (email, verificationUrl) => exports.queue
     critical: true,
   },
   10,
+  context,
 );
 
 /**
  * Queue password reset email
  */
-exports.queuePasswordResetEmail = async (email, resetUrl) => exports.queueEmail(
+exports.queuePasswordResetEmail = async (email, resetUrl, context = {}) => exports.queueEmail(
   {
     to: email,
+    type: 'forgot_password',
     subject: 'Reset Your Password - Capsule',
     html: `
       <!DOCTYPE html>
@@ -364,6 +333,7 @@ exports.queuePasswordResetEmail = async (email, resetUrl) => exports.queueEmail(
     critical: true,
   },
   10,
+  context,
 );
 
 /**

@@ -37,27 +37,37 @@ const createClient = (type) => {
     password: (env || {}).REDIS_PASSWORD || undefined,
   };
 
+  // Helper to safely merge standard options
+  const mergeOpts = (extraOpts) => {
+    if (typeof connectionOpts === 'string') {
+      return [connectionOpts, extraOpts]; // new IORedis(url, options)
+    }
+    return [{ ...connectionOpts, ...extraOpts }]; // new IORedis(options)
+  };
+
   switch (type) {
     case 'client':
       if (!sharedClient) {
-        sharedClient = new IORedis(connectionOpts, { maxRetriesPerRequest: null });
+        // The main client should retain retries for resilience.
+        // DO NOT use maxRetriesPerRequest: null here.
+        sharedClient = new IORedis(...mergeOpts({}));
       }
       return sharedClient;
 
     case 'subscriber':
       if (!sharedSubscriber) {
-        sharedSubscriber = new IORedis(connectionOpts, {
+        sharedSubscriber = new IORedis(...mergeOpts({
           maxRetriesPerRequest: null,
           enableReadyCheck: false, // REQUIRED for Bull pub/sub
-        });
+        }));
       }
       return sharedSubscriber;
 
     case 'bclient':
       // MUST be isolated; one per queue for blocking commands
-      return new IORedis(connectionOpts, {
+      return new IORedis(...mergeOpts({
         maxRetriesPerRequest: null, // REQUIRED for Bull blocking
-      });
+      }));
 
     default:
       throw new Error(`Unknown Redis client type: ${type}`);

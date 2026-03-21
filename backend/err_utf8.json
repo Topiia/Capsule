@@ -1,0 +1,60 @@
+﻿node.exe : FAIL UNIT tests/unit/emailQueue.test.js
+At C:\Program Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL UNIT tests/un 
+   it/emailQueue.test.js:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Email Queue Producer (Outbox Architecture)
+    queueEmail() - Success Path
+      ΓêÜ should create an EmailJob in MongoDB and push to Bull 
+Queue (5 ms)
+    queueEmail() - Bull Failure Path (Self-Healing Enqueue)
+      ├ù should catch Bull errors and leave EmailJob as PENDING 
+for the dispatcher (3 ms)
+    Convenience Wrappers
+      ΓêÜ queueVerificationEmail sets critical priority and 
+attributes (1 ms)
+      ΓêÜ queuePasswordResetEmail sets critical priority and 
+attributes (1 ms)
+      ΓêÜ queueWelcomeEmail creates general email (1 ms)
+    Utilities
+      ΓêÜ returns queue stats (1 ms)
+
+  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ 
+queueEmail() - Bull Failure Path (Self-Healing Enqueue) ΓÇ║ 
+should catch Bull errors and leave EmailJob as PENDING for the 
+dispatcher
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: {"_id": "dbjob-123"}, {"$set": {"queuedAt": 
+2026-03-21T09:15:37.368Z, "status": "QUEUED"}}
+
+    [0m [90m 105 |[39m
+     [90m 106 |[39m       expect([33mEmailJob[39m[33m.[39m
+create)[33m.[39mtoHaveBeenCalled()[33m;[39m
+    [31m[1m>[22m[39m[90m 107 |[39m       expect([33mEmail
+Job[39m[33m.[39mupdateOne)[33m.[39mnot[33m.[39mtoHaveBeen
+Called()[33m;[39m
+     [90m     |[39m                                      
+[31m[1m^[22m[39m
+     [90m 108 |[39m       expect(result)[33m.[39mtoEqual({ 
+emailJobId[33m:[39m [32m'dbjob-123'[39m[33m,[39m 
+queued[33m:[39m [36mfalse[39m })[33m;[39m
+     [90m 109 |[39m     })[33m;[39m
+     [90m 110 |[39m   })[33m;[39m[0m
+
+      at Object.toHaveBeenCalled 
+(tests/unit/emailQueue.test.js:107:38)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 5 passed, 6 total
+Snapshots:   0 total
+Time:        0.624 s, estimated 2 s
+Ran all test suites matching /tests\\unit\\emailQueue.test.js/i.
+{"numFailedTestSuites":1,"numFailedTests":1,"numPassedTestSuites":0,"numPassedTests":5,"numPendingTestSuites":0,"numPendingTests":0,"numRuntimeErrorTestSuites":0,"numTodoTests":0,"numTotalTestSuites":1,"numTotalTests":6,"openHandles":[],"snapshot":{"added":0,"didUpdate":false,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0},"startTime":1774084536783,"success":false,"testResults":[{"assertionResults":[{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","queueEmail() - Success Path"],"duration":5,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) queueEmail() - Success Path should create an EmailJob in MongoDB and push to Bull Queue","invocations":1,"location":null,"numPassingAsserts":4,"retryReasons":[],"status":"passed","title":"should create an EmailJob in MongoDB and push to Bull Queue"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","queueEmail() - Bull Failure Path (Self-Healing Enqueue)"],"duration":3,"failureDetails":[{"matcherResult":{"message":"expect(jest.fn()).not.toHaveBeenCalled()\n\nExpected number of calls: 0\nReceived number of calls: 1\n\n1: {\"_id\": \"dbjob-123\"}, {\"$set\": {\"queuedAt\": 2026-03-21T09:15:37.368Z, \"status\": \"QUEUED\"}}","pass":true}}],"failureMessages":["Error: expect(jest.fn()).not.toHaveBeenCalled()\n\nExpected number of calls: 0\nReceived number of calls: 1\n\n1: {\"_id\": \"dbjob-123\"}, {\"$set\": {\"queuedAt\": 2026-03-21T09:15:37.368Z, \"status\": \"QUEUED\"}}\n    at Object.toHaveBeenCalled (C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js:107:38)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"],"fullName":"Email Queue Producer (Outbox Architecture) queueEmail() - Bull Failure Path (Self-Healing Enqueue) should catch Bull errors and leave EmailJob as PENDING for the dispatcher","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"failed","title":"should catch Bull errors and leave EmailJob as PENDING for the dispatcher"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queueVerificationEmail sets critical priority and attributes","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"queueVerificationEmail sets critical priority and attributes"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queuePasswordResetEmail sets critical priority and attributes","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"queuePasswordResetEmail sets critical priority and attributes"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queueWelcomeEmail creates general email","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"queueWelcomeEmail creates general email"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Utilities"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) Utilities returns queue stats","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"returns queue stats"}],"endTime":1774084537400,"message":"  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ queueEmail() - Bull Failure Path (Self-Healing Enqueue) ΓÇ║ should catch Bull errors and leave EmailJob as PENDING for the dispatcher\n\n    expect(jest.fn()).not.toHaveBeenCalled()\n\n    Expected number of calls: 0\n    Received number of calls: 1\n\n    1: {\"_id\": \"dbjob-123\"}, {\"$set\": {\"queuedAt\": 2026-03-21T09:15:37.368Z, \"status\": \"QUEUED\"}}\n\n    \u001b[0m \u001b[90m 105 |\u001b[39m\n     \u001b[90m 106 |\u001b[39m       expect(\u001b[33mEmailJob\u001b[39m\u001b[33m.\u001b[39mcreate)\u001b[33m.\u001b[39mtoHaveBeenCalled()\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 107 |\u001b[39m       expect(\u001b[33mEmailJob\u001b[39m\u001b[33m.\u001b[39mupdateOne)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39mtoHaveBeenCalled()\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 108 |\u001b[39m       expect(result)\u001b[33m.\u001b[39mtoEqual({ emailJobId\u001b[33m:\u001b[39m \u001b[32m'dbjob-123'\u001b[39m\u001b[33m,\u001b[39m queued\u001b[33m:\u001b[39m \u001b[36mfalse\u001b[39m })\u001b[33m;\u001b[39m\n     \u001b[90m 109 |\u001b[39m     })\u001b[33m;\u001b[39m\n     \u001b[90m 110 |\u001b[39m   })\u001b[33m;\u001b[39m\u001b[0m\n\n      at Object.toHaveBeenCalled (tests/unit/emailQueue.test.js:107:38)\n","name":"C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js","startTime":1774084536898,"status":"failed","summary":""}],"wasInterrupted":false}

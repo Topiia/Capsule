@@ -1,181 +1,140 @@
 /* eslint-disable global-require, prefer-destructuring, no-promise-executor-return */
 
-describe('Email Queue Producer', () => {
+jest.mock('../../src/models/EmailJob', () => ({
+  create: jest.fn().mockImplementation((data) => Promise.resolve({
+    ...data,
+    _id: 'dbjob-123',
+    maxAttempts: data.critical ? 5 : 3,
+  })),
+  updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+}));
+
+jest.mock('../../src/config/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+}));
+
+jest.mock('../../src/monitoring/dlqMonitor', () => ({
+  onJobFailed: jest.fn(),
+  createFailureSpikeDetector: jest.fn(),
+}));
+jest.mock('../../src/config/systemState', () => ({
+  set: jest.fn(),
+  get: jest.fn(),
+}));
+
+jest.mock('../../src/config/metrics', () => ({
+  increment: jest.fn(),
+  gauge: jest.fn(),
+}));
+
+jest.mock('../../src/config/queue.config', () => ({
+  createQueue: jest.fn(),
+}));
+
+const {
+  createEmailQueue, queueEmail, queueVerificationEmail, queuePasswordResetEmail, queueWelcomeEmail, getQueueStats,
+} = require('../../src/queues/emailQueue');
+const { createQueue } = require('../../src/config/queue.config');
+const EmailJob = require('../../src/models/EmailJob');
+
+describe('Email Queue Producer (Outbox Architecture)', () => {
   let mockQueue;
   let mockAdd;
-  let mockIsReady;
-  let emailQueueModule;
-  let createQueue;
 
-  beforeEach(() => {
-    jest.resetModules();
+  beforeEach(async () => {
     jest.clearAllMocks();
-    process.env.NODE_ENV = 'development';
 
-    mockAdd = jest.fn();
-    mockIsReady = jest.fn().mockResolvedValue(true);
-
+    mockAdd = jest.fn().mockResolvedValue({ id: 'bull-msg-123' });
     mockQueue = {
-      add: mockAdd.mockResolvedValue({ id: 'job-123' }),
-      isReady: mockIsReady,
-      getWaitingCount: jest.fn().mockResolvedValue(0),
-      getActiveCount: jest.fn().mockResolvedValue(0),
-      getCompletedCount: jest.fn().mockResolvedValue(5),
-      getFailedCount: jest.fn().mockResolvedValue(1),
-      getDelayedCount: jest.fn().mockResolvedValue(0),
-      clean: jest.fn().mockResolvedValue([]),
-      close: jest.fn().mockResolvedValue(true),
-      client: {
-        status: 'ready',
-        get: jest.fn().mockResolvedValue(String(Date.now())),
-        set: jest.fn(),
-        on: jest.fn(),
-      },
+      add: mockAdd,
+      isReady: jest.fn().mockResolvedValue(true),
+      getWaitingCount: jest.fn().mockResolvedValue(1),
+      getActiveCount: jest.fn().mockResolvedValue(2),
+      getCompletedCount: jest.fn().mockResolvedValue(3),
+      getFailedCount: jest.fn().mockResolvedValue(4),
+      getDelayedCount: jest.fn().mockResolvedValue(5),
+      clean: jest.fn(),
+      close: jest.fn(),
     };
 
-    // Mock the createQueue factory — emailQueue.js uses this, not bull directly
-    jest.mock('../../src/config/queue.config', () => ({
-      createQueue: jest.fn(),
-    }));
-
-    jest.mock('../../src/config/logger', () => ({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    }));
-    jest.mock('../../src/utils/sendEmailSync', () => ({
-      sendEmailSync: jest.fn().mockResolvedValue({ id: 'sync-msg-id' }),
-    }));
-    jest.mock('../../src/config/email', () => ({
-      resend: { apiKey: 'test', fromEmail: 'test', fromName: 'Capsule' },
-      redis: { host: 'localhost', port: 6379, password: undefined },
-    }));
-
-    createQueue = require('../../src/config/queue.config').createQueue;
     createQueue.mockReturnValue(mockQueue);
+    // Bind mock queue locally
+    createEmailQueue();
 
-    emailQueueModule = require('../../src/queues/emailQueue');
+    // Clear the microtask queue to ensure queueReady = true finishes internally
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise(process.nextTick);
   });
 
-  describe('Queue Initialization', () => {
-    it('should initialize queue via createQueue factory when createEmailQueue is called', () => {
-      emailQueueModule.createEmailQueue();
+  describe('queueEmail() - Success Path', () => {
+    it('should create an EmailJob in MongoDB and push to Bull Queue', async () => {
+      const emailData = {
+        to: 'user@example.com', subject: 'Test', html: '<p>Test</p>', text: 'Test', type: 'marketing',
+      };
+      const context = { traceId: 'trace-123', userId: 'user-456' };
 
-      expect(createQueue).toHaveBeenCalledWith(
-        'email',
-        expect.objectContaining({
-          defaultJobOptions: expect.objectContaining({
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 2000 },
-            removeOnComplete: true,
-            removeOnFail: false,
-          }),
-        }),
+      const result = await queueEmail(emailData, 7, context);
+
+      expect(EmailJob.create).toHaveBeenCalledWith(expect.objectContaining({
+        email: 'user@example.com',
+        type: 'marketing',
+        status: 'PENDING',
+        traceId: 'trace-123',
+        userId: 'user-456',
+      }));
+
+      expect(mockAdd).toHaveBeenCalledWith(
+        { emailJobId: 'dbjob-123' },
+        { priority: 7, attempts: 3 },
       );
-    });
 
-    it('should call isReady to verify Redis connectivity on init', () => {
-      emailQueueModule.createEmailQueue();
-      expect(mockIsReady).toHaveBeenCalled();
-    });
-  });
+      expect(EmailJob.updateOne).toHaveBeenCalledWith(
+        { _id: 'dbjob-123' },
+        { $set: expect.objectContaining({ status: 'QUEUED' }) },
+      );
 
-  describe('queueEmail() — Queue Ready Path', () => {
-    beforeEach(async () => {
-      emailQueueModule.createEmailQueue();
-      await Promise.resolve(); // flush microtasks
-    });
-
-    it('should add job to queue with correct payload and priority', async () => {
-      const emailData = { to: 'user@example.com', subject: 'Test', html: '<p>Test</p>' };
-      const result = await emailQueueModule.queueEmail(emailData, 7);
-
-      expect(mockAdd).toHaveBeenCalledWith(emailData, { priority: 7, attempts: 3 });
-      expect(result).toEqual({ jobId: 'job-123', queued: true });
-    });
-
-    it('should use 5 attempts for critical emails', async () => {
-      const emailData = { to: 'test@example.com', critical: true };
-      await emailQueueModule.queueEmail(emailData);
-
-      expect(mockAdd).toHaveBeenCalledWith(emailData, { priority: 5, attempts: 5 });
-    });
-
-    it('should fallback to sync send if queue.add() fails', async () => {
-      const emailData = { to: 'test@example.com', subject: 'Fails' };
-      mockAdd.mockRejectedValue(new Error('Queue memory full'));
-
-      const result = await emailQueueModule.queueEmail(emailData);
-      const { sendEmailSync } = require('../../src/utils/sendEmailSync');
-
-      expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
+      expect(result).toEqual({ emailJobId: 'dbjob-123', queued: true });
     });
   });
 
-  describe('queueEmail() — Fallback Path', () => {
-    beforeEach(async () => {
-      mockIsReady.mockRejectedValue(new Error('Redis connection refused'));
-      mockAdd.mockRejectedValue(new Error('Queue unavailable'));
-      emailQueueModule.createEmailQueue();
-      await Promise.resolve();
-    });
+  describe('queueEmail() - Bull Failure Path (Self-Healing Enqueue)', () => {
+    it('should catch Bull errors and leave EmailJob as PENDING for the dispatcher', async () => {
+      const q = createEmailQueue();
+      q.add.mockRejectedValueOnce(new Error('Redis unavailable'));
 
-    it('should send email synchronously if queue is not ready', async () => {
-      const emailData = { to: 'user@example.com', subject: 'Fallback' };
-      const result = await emailQueueModule.queueEmail(emailData);
-      const { sendEmailSync } = require('../../src/utils/sendEmailSync');
+      const result = await queueEmail({ to: 'user@example.com', type: 'marketing' }, 5, {});
 
-      expect(sendEmailSync).toHaveBeenCalledWith(emailData);
-      expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
+      expect(EmailJob.create).toHaveBeenCalled();
+      expect(EmailJob.updateOne).not.toHaveBeenCalled();
+      expect(result).toEqual({ emailJobId: 'dbjob-123', queued: false });
     });
   });
 
   describe('Convenience Wrappers', () => {
-    beforeEach(async () => {
-      emailQueueModule.createEmailQueue();
-      await Promise.resolve();
+    it('queueVerificationEmail sets critical priority and attributes', async () => {
+      await queueVerificationEmail('test@example.com', 'http://url');
+      expect(EmailJob.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'verification' }));
     });
 
-    it('queueVerificationEmail should queue with critical priority', async () => {
-      await emailQueueModule.queueVerificationEmail('user@test.com', 'https://test');
-      expect(mockAdd).toHaveBeenCalled();
-      expect(mockAdd.mock.calls[0][1].priority).toBe(10);
+    it('queuePasswordResetEmail sets critical priority and attributes', async () => {
+      await queuePasswordResetEmail('test@example.com', 'http://url');
+      expect(EmailJob.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'forgot_password' }));
     });
 
-    it('queuePasswordResetEmail should queue correctly', async () => {
-      await emailQueueModule.queuePasswordResetEmail('user@test.com', 'https://test');
-      expect(mockAdd).toHaveBeenCalled();
-      expect(mockAdd.mock.calls[0][1].priority).toBe(10);
-    });
-
-    it('queueWelcomeEmail should queue correctly', async () => {
-      await emailQueueModule.queueWelcomeEmail('user@test.com', 'Alice');
-      expect(mockAdd).toHaveBeenCalled();
-      expect(mockAdd.mock.calls[0][1].priority).toBe(5);
+    it('queueWelcomeEmail creates general email', async () => {
+      await queueWelcomeEmail('test@example.com', 'Bob');
+      expect(EmailJob.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'general' }));
     });
   });
 
-  describe('Queue Utils', () => {
-    beforeEach(async () => {
-      emailQueueModule.createEmailQueue();
-      await Promise.resolve();
-    });
-
-    it('isQueueAvailable should return true when ready', () => {
-      expect(emailQueueModule.isQueueAvailable()).toBe(true);
-    });
-
-    it('getQueueStats should return formatted counts', async () => {
-      const stats = await emailQueueModule.getQueueStats();
-      expect(stats.total).toBe(6);
-      expect(stats.available).toBe(true);
-    });
-
-    it('cleanOldJobs should call queue clean methods', async () => {
-      await emailQueueModule.cleanOldJobs();
-      expect(mockQueue.clean).toHaveBeenCalledWith(86400000, 'completed');
+  describe('Utilities', () => {
+    it('returns queue stats', async () => {
+      const stats = await getQueueStats();
+      expect(stats.waiting).toBe(1);
     });
   });
 });

@@ -1,345 +1,178 @@
-/* eslint-disable global-require, prefer-destructuring, no-promise-executor-return */
+/* eslint-disable global-require, prefer-destructuring */
 
-// ─── All mocks must be declared BEFORE any require of production code ───────
+// MOCK DEPENDENCIES
 jest.mock('resend');
-jest.mock('../../src/config/logger');
+jest.mock('../../src/config/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+}));
+
+jest.mock('../../src/monitoring/dlqMonitor', () => ({
+  onJobFailed: jest.fn(),
+  createFailureSpikeDetector: jest.fn(),
+}));
+jest.mock('../../src/config/systemState', () => ({
+  set: jest.fn(),
+  get: jest.fn(),
+}));
 jest.mock('../../src/instrumentation/sentry', () => ({
   captureException: jest.fn(),
   close: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../../src/config/email', () => ({
-  resend: {
-    apiKey: 'test-api-key',
-    fromEmail: 'noreply@testdomain.com',
-    fromName: 'VlogSphere Test',
-  },
-  redis: {
-    host: 'localhost',
-    port: 6379,
-    password: undefined,
-  },
+
+// Strictly mock EmailJob models BEFORE imports
+jest.mock('../../src/models/EmailJob', () => ({
+  findOneAndUpdate: jest.fn(),
+  updateOne: jest.fn(),
+  findById: jest.fn(),
 }));
 
-// ─── Shared mock instances set up in beforeEach ──────────────────────────────
-let mockQueue;
-let mockProcess;
-let mockOn;
-let mockEmailSend;
-const { Resend } = require('resend');
-
-// Mock queue.config factory so startWorker gets our controlled mock queue
+// Prevent genuine Bull Queue connections
 jest.mock('../../src/config/queue.config', () => ({
   createQueue: jest.fn(),
 }));
 
+const { Resend } = require('resend');
 const { createQueue } = require('../../src/config/queue.config');
-const logger = require('../../src/config/logger');
-const systemState = require('../../src/config/systemState');
+const EmailJob = require('../../src/models/EmailJob');
 const { startWorker } = require('../../src/workers/emailWorker');
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  jest.useFakeTimers();
+describe('Email Worker Process Architecture', () => {
+  let mockQueue;
+  let mockProcess;
+  let mockEmailSend;
+  let jobProcessor;
 
-  // Ensure system state reflects normal operation for worker tests
-  systemState.set({ redis: true, queue: true });
-
-  // Set up mock queue returned by createQueue factory
-  mockProcess = jest.fn();
-  mockOn = jest.fn();
-  mockQueue = {
-    process: mockProcess,
-    on: mockOn,
-    close: jest.fn().mockResolvedValue(true),
-    isReady: jest.fn().mockResolvedValue(true),
-    getWaitingCount: jest.fn().mockResolvedValue(0),
-    getActiveCount: jest.fn().mockResolvedValue(0),
-    getCompletedCount: jest.fn().mockResolvedValue(0),
-    getFailedCount: jest.fn().mockResolvedValue(0),
-    getDelayedCount: jest.fn().mockResolvedValue(0),
-    client: { status: 'ready' },
-  };
-
-  createQueue.mockReturnValue(mockQueue);
-
-  // Set up Resend mock
-  mockEmailSend = jest.fn();
-  Resend.mockImplementation(() => ({
-    emails: { send: mockEmailSend },
-  }));
-});
-
-afterEach(() => {
-  jest.useRealTimers();
-  // Remove all signal listeners added by startWorker
-  process.removeAllListeners('SIGTERM');
-  process.removeAllListeners('SIGINT');
-  process.removeAllListeners('SIGTERM_HEARTBEAT_CLEANUP');
-  global.__workerSignalsAttached = false;
-});
-
-// Suppress MaxListenersExceededWarning — multiple startWorker() calls across
-// tests register SIGTERM/SIGINT/SIGTERM_HEARTBEAT_CLEANUP listeners; they are
-// all cleaned up in afterEach so this is safe to raise.
-process.setMaxListeners(50);
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Email Worker', () => {
-  describe('Worker Initialization', () => {
-    it('should call createQueue with email queue name', () => {
-      startWorker();
-
-      expect(createQueue).toHaveBeenCalledWith('email');
-    });
-
-    it('should register job processor', () => {
-      startWorker();
-
-      expect(mockProcess).toHaveBeenCalled();
-      expect(typeof mockProcess.mock.calls[0][0]).toBe('function');
-    });
-
-    it('should register event handlers for completed and failed', () => {
-      startWorker();
-
-      const eventNames = mockOn.mock.calls.map((call) => call[0]);
-      expect(eventNames).toContain('completed');
-      expect(eventNames).toContain('failed');
-    });
+  beforeAll(() => {
+    // Completely disable background processes & fake timers
+    // Fake timers cause hanging if setIntervals are active globally
+    // We test logic directly via isolated mocked function extraction
   });
 
-  describe('Job Processing Logic', () => {
-    let jobProcessor;
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-    beforeEach(() => {
-      startWorker();
-      [jobProcessor] = mockProcess.mock.calls[0];
+    mockProcess = jest.fn();
+    mockQueue = {
+      process: mockProcess,
+      on: jest.fn(),
+      isReady: jest.fn().mockResolvedValue(true),
+      close: jest.fn().mockResolvedValue(true),
+      getWaitingCount: jest.fn().mockResolvedValue(0),
+      getActiveCount: jest.fn().mockResolvedValue(0),
+      getDelayedCount: jest.fn().mockResolvedValue(0),
+      getCompletedCount: jest.fn().mockResolvedValue(0),
+      getFailedCount: jest.fn().mockResolvedValue(0),
+    };
+    createQueue.mockReturnValue(mockQueue);
+
+    mockEmailSend = jest.fn().mockResolvedValue({ id: 'resend-msg-123' });
+    Resend.mockImplementation(() => ({
+      emails: { send: mockEmailSend },
+    }));
+
+    // Start the worker to bind handlers, but since queue is blocked, no genuine IO happens
+    startWorker();
+
+    // Extract the processor closure (arg 1, because arg 0 is concurrency limit 10)
+    jobProcessor = mockProcess.mock.calls[0][1];
+  });
+
+  afterEach(() => {
+    // Trigger the interval clearance so node can exit
+    process.emit('SIGTERM_HEARTBEAT_CLEANUP');
+
+    // Remove listeners preventing jest from closing cleanly
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+    process.removeAllListeners('SIGTERM_HEARTBEAT_CLEANUP');
+    global.__workerSignalsAttached = false;
+  });
+
+  describe('jobProcessor (Outbox Execution Flow)', () => {
+    it('aborts legacy jobs seamlessly if emailJobId is missing', async () => {
+      const legacyJob = { id: 'bull-1', data: { to: 'test@example.com' } };
+      await expect(jobProcessor(legacyJob)).rejects.toThrow('Legacy direct job without emailJobId detected');
     });
 
-    it('should call sendEmail with correct arguments', async () => {
-      const mockJob = {
-        id: 'job-123',
-        data: {
-          to: 'user@example.com',
-          subject: 'Test Email',
-          html: '<h1>Test</h1>',
-          text: 'Test',
-        },
-        attemptsMade: 0,
-      };
+    it('bails quietly if EmailJob cannot acquire Mongoose lock (duplicate claim)', async () => {
+      const duplicateJob = { id: 'bull-2', data: { emailJobId: 'db-123' } };
+      EmailJob.findOneAndUpdate.mockResolvedValue(null); // Lock denied
 
-      mockEmailSend.mockResolvedValue({ id: 'resend-msg-123' });
+      const result = await jobProcessor(duplicateJob);
+      expect(result).toEqual({ success: true, duplicate: true });
+      expect(mockEmailSend).not.toHaveBeenCalled();
+    });
 
-      await jobProcessor(mockJob);
-
-      expect(mockEmailSend).toHaveBeenCalledWith({
-        from: 'VlogSphere Test <noreply@testdomain.com>',
-        to: 'user@example.com',
-        subject: 'Test Email',
-        html: '<h1>Test</h1>',
-        text: 'Test',
+    it('completes the full flow: lock -> send -> final state transition (SENT)', async () => {
+      const validJob = { id: 'bull-3', data: { emailJobId: 'db-123' } };
+      EmailJob.findOneAndUpdate.mockResolvedValue({
+        _id: 'db-123',
+        email: 'test@example.com',
+        payload: { subject: 'Test', html: '<p>Hi</p>', text: 'Hi' },
+        traceId: 'trc-1',
+        type: 'general',
       });
 
-      expect(logger.info).toHaveBeenCalledWith(
-        'Email sent via Resend',
-        expect.objectContaining({
-          emailId: 'resend-msg-123',
-          to: 'user@example.com',
-        }),
+      const result = await jobProcessor(validJob);
+
+      expect(mockEmailSend).toHaveBeenCalledWith(expect.objectContaining({
+        to: 'test@example.com',
+        subject: 'Test',
+        headers: { 'X-Entity-Ref-ID': 'db-123' },
+      }));
+
+      expect(EmailJob.updateOne).toHaveBeenCalledWith(
+        { _id: 'db-123' },
+        { $set: { status: 'SENT', providerMessageId: 'resend-msg-123' } },
       );
-    });
-
-    it('should return success object on successful send', async () => {
-      const mockJob = {
-        id: 'job-456',
-        data: {
-          to: 'user@example.com',
-          subject: 'Test',
-          html: '<h1>Test</h1>',
-          text: 'Test',
-        },
-        attemptsMade: 0,
-      };
-
-      mockEmailSend.mockResolvedValue({ id: 'msg-456' });
-
-      const result = await jobProcessor(mockJob);
 
       expect(result).toEqual({ success: true });
     });
-  });
 
-  describe('Timeout Logic', () => {
-    let jobProcessor;
+    it('handles failures: transition to FAILED and increments attempts safely', async () => {
+      const failedJob = { id: 'bull-4', data: { emailJobId: 'db-123' } };
 
-    beforeEach(() => {
-      // Switch to real timers for this describe only — the QUEUE_DEPTH probe
-      // has multiple nested async awaits that cannot be drained under fake timers.
-      jest.useRealTimers();
-      startWorker();
-      [jobProcessor] = mockProcess.mock.calls[0];
-    });
+      EmailJob.findOneAndUpdate.mockResolvedValue({
+        _id: 'db-123',
+        email: 'test@example.com',
+        payload: { subject: 'Test' },
+      });
 
-    afterEach(() => {
-      jest.useFakeTimers();
-    });
+      mockEmailSend.mockRejectedValue(new Error('Resend Down'));
 
-    it('should timeout after 10 seconds if Resend API is slow', async () => {
-      const mockJob = {
-        id: 'job-timeout',
-        data: {
-          to: 'user@example.com',
-          subject: 'Slow Email',
-          html: '<h1>Slow</h1>',
-          text: 'Slow',
-        },
-        attemptsMade: 1,
-      };
+      EmailJob.findById.mockResolvedValue({ attempts: 1, maxAttempts: 5 });
 
-      mockEmailSend.mockImplementation(() => new Promise(() => {}));
+      await expect(jobProcessor(failedJob)).rejects.toThrow('Resend Down');
 
-      await expect(jobProcessor(mockJob)).rejects.toThrow('API timeout');
-    }, 15000);
-
-    it('should succeed if Resend responds within timeout', async () => {
-      const mockJob = {
-        id: 'job-fast',
-        data: {
-          to: 'user@example.com',
-          subject: 'Fast Email',
-          html: '<h1>Fast</h1>',
-          text: 'Fast',
-        },
-        attemptsMade: 0,
-      };
-
-      mockEmailSend.mockResolvedValue({ id: 'fast-msg' });
-
-      await expect(jobProcessor(mockJob)).resolves.toEqual({ success: true });
-    }, 15000);
-  });
-
-  describe('Error Handling and Retries', () => {
-    let jobProcessor;
-
-    beforeEach(() => {
-      startWorker();
-      [jobProcessor] = mockProcess.mock.calls[0];
-    });
-
-    it('should throw error on send failure (trigger Bull retry)', async () => {
-      const mockJob = {
-        id: 'job-fail',
-        data: {
-          to: 'user@example.com',
-          subject: 'Failing Email',
-          html: '<h1>Fail</h1>',
-          text: 'Fail',
-        },
-        attemptsMade: 1,
-      };
-
-      mockEmailSend.mockRejectedValue(new Error('Resend API error'));
-
-      await expect(jobProcessor(mockJob)).rejects.toThrow('Resend API error');
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Email send failed',
-        expect.objectContaining({
-          jobId: 'job-fail',
-          error: 'Resend API error',
-          attempt: 2,
-        }),
+      expect(EmailJob.updateOne).toHaveBeenCalledWith(
+        { _id: 'db-123' },
+        { $set: expect.objectContaining({ status: 'FAILED', attempts: 2 }) },
       );
     });
 
-    it('should log attempt number on each retry', async () => {
-      const mockJob = {
-        id: 'job-retry',
-        data: {
-          to: 'user@example.com',
-          subject: 'Retry Email',
-          html: '<h1>Retry</h1>',
-          text: 'Retry',
-        },
-        attemptsMade: 2,
-      };
+    it('handles permanent exhaustion: transition to DEAD', async () => {
+      const failedJob = { id: 'bull-5', data: { emailJobId: 'db-123' } };
 
-      mockEmailSend.mockResolvedValue({ id: 'retry-msg' });
+      EmailJob.findOneAndUpdate.mockResolvedValue({
+        _id: 'db-123',
+        email: 'test@example.com',
+        payload: { subject: 'Test' },
+      });
 
-      await jobProcessor(mockJob);
+      mockEmailSend.mockRejectedValue(new Error('Resend Down Forever'));
 
-      expect(logger.info).toHaveBeenCalledWith(
-        'Processing email job',
-        expect.objectContaining({ attempt: 3 }),
+      // Exhaust bounds
+      EmailJob.findById.mockResolvedValue({ attempts: 4, maxAttempts: 5 });
+
+      await expect(jobProcessor(failedJob)).rejects.toThrow('Resend Down Forever');
+
+      expect(EmailJob.updateOne).toHaveBeenCalledWith(
+        { _id: 'db-123' },
+        { $set: expect.objectContaining({ status: 'DEAD', attempts: 5 }) },
       );
-    });
-  });
-
-  describe('Event Handlers', () => {
-    let completedHandler;
-    let failedHandler;
-
-    beforeEach(() => {
-      startWorker();
-
-      const completedCall = mockOn.mock.calls.find((c) => c[0] === 'completed');
-      const failedCall = mockOn.mock.calls.find((c) => c[0] === 'failed');
-
-      completedHandler = completedCall ? completedCall[1] : null;
-      failedHandler = failedCall ? failedCall[1] : null;
-    });
-
-    it('should log completion event', () => {
-      const mockJob = { id: 'job-complete' };
-      completedHandler(mockJob);
-
-      expect(logger.debug).toHaveBeenCalledWith(
-        'Email delivered',
-        { jobId: 'job-complete' },
-      );
-    });
-
-    it('should log failure event after max retries', () => {
-      const mockJob = {
-        id: 'job-failed',
-        data: { to: 'user@example.com' },
-        attemptsMade: 3,
-      };
-      const mockError = new Error('Max retries exceeded');
-      failedHandler(mockJob, mockError);
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Email failed permanently',
-        expect.objectContaining({
-          jobId: 'job-failed',
-          to: 'user@example.com',
-          error: 'Max retries exceeded',
-          attempts: 3,
-        }),
-      );
-    });
-  });
-
-  describe('Graceful Shutdown', () => {
-    it('should close queue on SIGTERM', async () => {
-      startWorker();
-      process.emit('SIGTERM');
-
-      await Promise.resolve(); // allow microtasks to flush
-
-      expect(mockQueue.close).toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith('Shutting down email worker...');
-    });
-
-    it('should close queue on SIGINT', async () => {
-      startWorker();
-      process.emit('SIGINT');
-
-      await Promise.resolve(); // allow microtasks to flush
-
-      expect(mockQueue.close).toHaveBeenCalled();
     });
   });
 });
