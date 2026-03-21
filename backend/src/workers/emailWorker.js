@@ -205,7 +205,7 @@ const startWorker = () => {
 
     // Acquire ATOMIC Lock
     const claimedJob = await EmailJob.findOneAndUpdate(
-      { _id: emailJobId, status: { $in: ['QUEUED', 'FAILED'] } },
+      { _id: emailJobId, status: { $in: ['PENDING', 'QUEUED', 'FAILED'] } },
       { $set: { status: 'PROCESSING', processedAt: Date.now() } },
       { new: true },
     );
