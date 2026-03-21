@@ -1,6 +1,6 @@
 const Joi = require('joi');
 const Queue = require('bull');
-const { createRedisClient, createRedisSubscriber, createIsolatedRedisClient } = require('./redis');
+const IORedis = require('ioredis');
 const logger = require('./logger');
 
 // Validate Queue Config
@@ -26,6 +26,44 @@ const redisConfig = {
   },
 };
 
+// Multiplexed cached clients for Phase 2/3 shared optimization
+let sharedClient = null;
+let sharedSubscriber = null;
+
+const createClient = (type) => {
+  const connectionOpts = process.env.REDIS_URL || {
+    host: (env || {}).REDIS_HOST || '127.0.0.1',
+    port: (env || {}).REDIS_PORT || 6379,
+    password: (env || {}).REDIS_PASSWORD || undefined,
+  };
+
+  switch (type) {
+    case 'client':
+      if (!sharedClient) {
+        sharedClient = new IORedis(connectionOpts, { maxRetriesPerRequest: null });
+      }
+      return sharedClient;
+
+    case 'subscriber':
+      if (!sharedSubscriber) {
+        sharedSubscriber = new IORedis(connectionOpts, {
+          maxRetriesPerRequest: null,
+          enableReadyCheck: false, // REQUIRED for Bull pub/sub
+        });
+      }
+      return sharedSubscriber;
+
+    case 'bclient':
+      // MUST be isolated; one per queue for blocking commands
+      return new IORedis(connectionOpts, {
+        maxRetriesPerRequest: null, // REQUIRED for Bull blocking
+      });
+
+    default:
+      throw new Error(`Unknown Redis client type: ${type}`);
+  }
+};
+
 /**
  * Centralized Factory for Bull Queues.
  * Applies Phase 2 optimizations: safe locking, stall config, and connection multiplexing.
@@ -33,23 +71,8 @@ const redisConfig = {
 const createQueue = (name, customOptions = {}) => {
   if (process.env.NODE_ENV === 'test') { return null; }
 
-  const sharedClient = createRedisClient();
-  const sharedSubscriber = createRedisSubscriber();
-
   const options = {
-    createClient: (type) => {
-      switch (type) {
-        case 'client':
-          return sharedClient;
-        case 'subscriber':
-          return sharedSubscriber;
-        case 'bclient':
-          // MUST be isolated for blocking commands
-          return createIsolatedRedisClient();
-        default:
-          return createIsolatedRedisClient();
-      }
-    },
+    createClient,
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
