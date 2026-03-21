@@ -22,6 +22,7 @@ const statusMonitor = process.env.NODE_ENV !== 'test' ? require('express-status-
 
 // OBSERVABILITY: Structured logging
 const { correlationMiddleware } = require('./middleware/correlation');
+const systemContextMiddleware = require('./middleware/systemContext');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -29,6 +30,7 @@ const { createRedisClient } = require('./config/redis');
 const mongoSanitize = require('./middleware/mongoSanitize');
 const csrfProtection = require('./middleware/csrfProtection');
 const isTrustedOrigin = require('./utils/trustedOrigin');
+const backpressureMiddleware = require('./middleware/backpressure');
 
 // OBSERVABILITY: Sentry — loaded from instrumentation/sentry.js which was already
 // initialised in server.js before this module was required
@@ -74,6 +76,12 @@ app.set('trust proxy', 1);
 // (Sentry v10 auto-instruments incoming requests; manual requestHandler is removed)
 // OBSERVABILITY: Correlation ID middleware (must be early in stack)
 app.use(correlationMiddleware);
+
+// CONSISTENT STATE: Inject frozen system environment and degraded mode tracking
+app.use(systemContextMiddleware);
+
+// LOAD SHEDDING: Hybrid rate & concurrency limiter during degraded mode
+app.use(backpressureMiddleware);
 
 // Security middleware
 app.use(

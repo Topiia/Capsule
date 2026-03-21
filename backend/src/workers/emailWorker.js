@@ -4,8 +4,9 @@ const { Resend } = require('resend');
 const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
-// OBSERVABILITY: Sentry for worker crash monitoring
 const Sentry = require('../instrumentation/sentry');
+const { emailCircuit, safeCall } = require('../config/circuitBreaker');
+const systemState = require('../config/systemState');
 
 /**
  * Send email via Resend with 10 s timeout
@@ -20,21 +21,29 @@ const sendEmail = async (options) => {
 
   // ─── [WORKER] Phase 3 — Email Provider Timing ─────────────────────────────
   const EMAIL_API_START = Date.now();
-  console.log(`[WORKER] EMAIL_API_START  (${new Date(EMAIL_API_START).toISOString()})`);
+  const startStr = new Date(EMAIL_API_START).toISOString();
+  console.log(`[WORKER] EMAIL_API_START  (${startStr})`);
 
-  const emailPromise = resend.emails.send({
-    from: `${FROM_NAME} <${FROM_EMAIL}>`,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-    text: options.text,
-  });
-
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Resend API timeout')), 10000);
-  });
-
-  const result = await Promise.race([emailPromise, timeoutPromise]);
+  // Circuit breaker wraps Resend + 10s timeout together.
+  // safeCall fails over to explicit fallback which throws (Bull retries)
+  const result = await safeCall(
+    emailCircuit,
+    () => {
+      const sendPromise = resend.emails.send({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
+      // Timeout is handled inside emailCircuit.fire()
+      // Since circuit.fire uses timeout, we return sendPromise
+      return sendPromise;
+    },
+    () => {
+      throw new Error('Circuit OPEN — no fallback, throwing to Bull');
+    },
+  );
 
   // ─── [WORKER] Gap 3 — Enhanced EMAIL_API_DONE: providerLatency + emailId + accepted ─
   const EMAIL_API_DONE = Date.now();
@@ -246,6 +255,12 @@ const startWorker = () => {
       .update(`${to}-${subject}-${Math.floor(Date.now() / 3600000)}`)
       .digest('hex');
     const idempotencyKey = `idemp:email:${payloadHash}`;
+
+    if (!systemState.redis) {
+      console.error('[CRITICAL] Idempotency disabled');
+      // HIGH_RISK_OPERATION
+      throw new Error('System temporarily unavailable');
+    }
 
     try {
       if (emailQueue.client) {

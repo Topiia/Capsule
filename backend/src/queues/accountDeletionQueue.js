@@ -1,5 +1,7 @@
 const { createQueue } = require('../config/queue.config');
 const cloudinary = require('../config/cloudinary');
+const { cloudinaryCircuit, safeCall } = require('../config/circuitBreaker');
+const { handleFallback } = require('../config/fallbackPolicy');
 const logger = require('../config/logger');
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
 
@@ -134,9 +136,14 @@ exports.startAccountDeletionWorker = () => {
 
         try {
           // eslint-disable-next-line no-await-in-loop
-          const result = await cloudinary.api.delete_resources(batch, {
-            resource_type: 'image',
-          });
+          const result = await safeCall(
+            cloudinaryCircuit,
+            () => cloudinary.api.delete_resources(batch, { resource_type: 'image' }),
+            () => {
+              handleFallback('deletion');
+              throw new Error('Circuit OPEN - Cloudinary unavailable');
+            },
+          );
 
           const deleted = Object.values(result.deleted || {}).filter(
             (status) => status === 'deleted',

@@ -1,6 +1,8 @@
 const Groq = require('groq-sdk');
 const AIProviderInterface = require('./ai.provider.interface');
 const logger = require('../config/logger');
+const { moderationCircuit, safeCall } = require('../config/circuitBreaker');
+const { handleFallback } = require('../config/fallbackPolicy');
 
 class GroqProvider extends AIProviderInterface {
   constructor() {
@@ -33,17 +35,27 @@ Return a JSON object ONLY:
 }`;
 
     try {
-      const completion = await this.groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: text },
-        ],
-        model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', // Updated to supported model
-        temperature: 0,
-        response_format: { type: 'json_object' },
-      });
+      const responseContent = await safeCall(
+        moderationCircuit,
+        async () => {
+          const completion = await this.groq.chat.completions.create({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: text },
+            ],
+            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            temperature: 0,
+            response_format: { type: 'json_object' },
+          });
+          return completion.choices[0]?.message?.content;
+        },
+        () => {
+          // The circuit is open. Enforce Fallback Policy immediately.
+          // Since moderation policy is 'reject', handleFallback throws an Error
+          handleFallback('moderation');
+        },
+      );
 
-      const responseContent = completion.choices[0]?.message?.content;
       if (!responseContent) throw new Error('Empty response from Groq');
 
       const result = JSON.parse(responseContent);
@@ -57,7 +69,6 @@ Return a JSON object ONLY:
       };
     } catch (error) {
       logger.error('Groq Analysis Failed:', error);
-      // Fallback or rethrow for CircuitBreaker
       throw error;
     }
   }

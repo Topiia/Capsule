@@ -34,11 +34,15 @@ jest.mock('../../src/config/queue.config', () => ({
 
 const { createQueue } = require('../../src/config/queue.config');
 const logger = require('../../src/config/logger');
+const systemState = require('../../src/config/systemState');
 const { startWorker } = require('../../src/workers/emailWorker');
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
+
+  // Ensure system state reflects normal operation for worker tests
+  systemState.set({ redis: true, queue: true });
 
   // Set up mock queue returned by createQueue factory
   mockProcess = jest.fn();
@@ -195,7 +199,7 @@ describe('Email Worker', () => {
 
       mockEmailSend.mockImplementation(() => new Promise(() => {}));
 
-      await expect(jobProcessor(mockJob)).rejects.toThrow('Resend API timeout');
+      await expect(jobProcessor(mockJob)).rejects.toThrow('API timeout');
     }, 15000);
 
     it('should succeed if Resend responds within timeout', async () => {

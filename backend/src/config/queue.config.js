@@ -13,14 +13,16 @@ const envSchema = Joi.object({
 const { error, value: env } = envSchema.validate(process.env);
 
 if (error) {
-  throw new Error(`Queue Config Error: ${error.message}`);
+  // Log but do not throw — all fields have defaults, this should never fail.
+  // A throw here crashes the process at require() time before any error handler is attached.
+  console.error('[QUEUE CONFIG] Joi validation warning:', error.message);
 }
 
 const redisConfig = {
   redis: {
-    port: env.REDIS_PORT,
-    host: env.REDIS_HOST,
-    password: env.REDIS_PASSWORD || undefined,
+    port: (env || {}).REDIS_PORT || 6379,
+    host: (env || {}).REDIS_HOST || '127.0.0.1',
+    password: (env || {}).REDIS_PASSWORD || undefined,
   },
 };
 
