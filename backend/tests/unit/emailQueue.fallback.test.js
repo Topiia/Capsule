@@ -124,13 +124,15 @@ describe('Email Queue - Graceful Degradation', () => {
 
       expect(result).toEqual({ emailId: null, fallback: true, fireAndForget: true });
       expect(freshSendSync).toHaveBeenCalledWith(emailData);
-      expect(freshLogger.warn).toHaveBeenCalledWith(
-        'Email sync-fallback selected',
-        expect.objectContaining({
-          to: emailData.to,
-          subject: emailData.subject,
-        }),
-      );
+      // The new log is '[DEGRADED MODE] ...' when systemState.degraded is true.
+      // systemState defaults (redis:false, queue:false) make degraded=true in tests.
+      const warnCalls = freshLogger.warn.mock.calls;
+      const degradedCall = warnCalls.find((c) => c[0].includes('sync fallback') || c[0].includes('sync-fallback'));
+      expect(degradedCall).toBeDefined();
+      expect(degradedCall[1]).toEqual(expect.objectContaining({
+        to: emailData.to,
+        subject: emailData.subject,
+      }));
     });
 
     it('should NOT crash the application', async () => {

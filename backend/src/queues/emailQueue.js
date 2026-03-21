@@ -3,6 +3,8 @@ const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 const { sendEmailSync } = require('../utils/sendEmailSync');
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
+const systemState = require('../config/systemState');
+const metrics = require('../config/metrics');
 
 /**
  * PERFORMANCE: Email Job Queue (Producer Only)
@@ -128,11 +130,28 @@ exports.queueEmail = async (emailData, priority = 5) => {
   const selectedMode = (redisReady && workerAlive) ? 'async-queue' : 'sync-fallback';
 
   if (selectedMode === 'sync-fallback') {
-    logger.warn('Email sync-fallback selected', { to: emailData.to, subject: emailData.subject });
+    // ── DEGRADED MODE: explicit log so it's never silent ─────────────────────
+    if (systemState.degraded) {
+      logger.warn('[DEGRADED MODE] Using sync fallback — queue/Redis unavailable', {
+        to: emailData.to,
+        subject: emailData.subject,
+        redis: systemState.redis,
+        queue: systemState.queue,
+      });
+    } else {
+      // Worker not alive yet (still starting or heartbeat expired)
+      logger.warn('[EMAIL] Sync-fallback selected — worker heartbeat not found', {
+        to: emailData.to,
+        subject: emailData.subject,
+      });
+    }
+
+    metrics.increment('emailFallback');
 
     sendEmailSync(emailData)
       .catch((err) => {
-        logger.error('Background sync email send failed', { to: emailData.to, error: err.message });
+        logger.error('[EMAIL] Background sync send failed', { to: emailData.to, error: err.message });
+        metrics.increment('redisFailures');
       });
     return { emailId: null, fallback: true, fireAndForget: true };
   }
@@ -140,10 +159,11 @@ exports.queueEmail = async (emailData, priority = 5) => {
   try {
     const job = await emailQueue.add(emailData, {
       priority,
-      attempts: emailData.critical ? 5 : 3, // More retries for critical emails
+      attempts: emailData.critical ? 5 : 3,
     });
 
-    logger.info('Email queued (async)', {
+    metrics.increment('emailAsync');
+    logger.info('[EMAIL] Queued async', {
       jobId: job.id,
       to: emailData.to,
       subject: emailData.subject,
@@ -151,16 +171,16 @@ exports.queueEmail = async (emailData, priority = 5) => {
     });
     return { jobId: job.id, queued: true };
   } catch (error) {
-    logger.error('Failed to queue email - attempting synchronous fallback', {
+    logger.error('[EMAIL] queue.add() failed — sync fallback', {
       to: emailData.to,
       subject: emailData.subject,
       error: error.message,
     });
+    metrics.increment('emailFallback');
 
-    // CRITICAL FIX: Do NOT await. Fire-and-forget so HTTP response returns immediately.
     sendEmailSync(emailData)
       .catch((err) => {
-        logger.error('Background catch-fallback email send failed', { to: emailData.to, error: err.message });
+        logger.error('[EMAIL] Catch-fallback sync send failed', { to: emailData.to, error: err.message });
       });
     return { emailId: null, fallback: true, fireAndForget: true };
   }
