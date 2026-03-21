@@ -244,6 +244,63 @@ app.get('/health/db', (req, res) => {
   }
 });
 
+// Queue & Worker Health Check
+app.get('/health/queue', async (req, res) => {
+  try {
+    const isRedisAvailable = redis && typeof redis.ping === 'function';
+    if (!isRedisAvailable) {
+      return res.status(503).json({ status: 'degraded', message: 'Redis not configured or down', workerAlive: false });
+    }
+
+    const WORKER_HEARTBEAT_KEY = 'email:worker:heartbeat';
+    const ts = await redis.get(WORKER_HEARTBEAT_KEY);
+    const workerAlive = !!ts && (Date.now() - Number(ts)) < 90000;
+
+    // Fetch DB Stats
+    // eslint-disable-next-line global-require
+    const EmailJob = require('./models/EmailJob');
+    const [pendingJobs, queuedJobs, deadJobs] = await Promise.all([
+      EmailJob.countDocuments({ status: 'PENDING' }),
+      EmailJob.countDocuments({ status: 'QUEUED' }),
+      EmailJob.countDocuments({ status: 'DEAD' }),
+    ]);
+
+    // Fetch Queue Stats
+    // eslint-disable-next-line global-require
+    const { createEmailQueue } = require('./queues/emailQueue');
+    const emailQueue = createEmailQueue();
+    let queueStats = {};
+    if (emailQueue) {
+      const [waiting, active, failed, delayed] = await Promise.all([
+        emailQueue.getWaitingCount(),
+        emailQueue.getActiveCount(),
+        emailQueue.getFailedCount(),
+        emailQueue.getDelayedCount(),
+      ]);
+      queueStats = {
+        queueDepth: waiting,
+        activeJobs: active,
+        failedJobs: failed,
+        retryingJobs: delayed,
+      };
+    }
+
+    res.status(200).json({
+      status: 'ok',
+      workerAlive,
+      ...queueStats,
+      dbStats: {
+        pendingJobs,
+        queuedJobs,
+        deadJobs,
+      },
+      lastHeartbeat: ts ? new Date(Number(ts)).toISOString() : null,
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 // API routes
 const cspRoutes = require('./routes/csp');
 const cspDashboardRoutes = require('./routes/csp-dashboard');

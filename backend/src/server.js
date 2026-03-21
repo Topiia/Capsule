@@ -103,6 +103,10 @@ const PORT = process.env.PORT || 5000;
     emailQueue = createEmailQueue();
 
     // eslint-disable-next-line global-require
+    const { startOutboxDispatcher } = require('./workers/outboxDispatcher');
+    startOutboxDispatcher();
+
+    // eslint-disable-next-line global-require
     const { startAccountDeletionWorker, createAccountDeletionQueue } = require('./queues/accountDeletionQueue');
     accountDeletionQueue = createAccountDeletionQueue();
     startAccountDeletionWorker();
@@ -167,6 +171,11 @@ const PORT = process.env.PORT || 5000;
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = () => {
     console.log('[SERVER] Graceful shutdown initiated');
+    
+    // eslint-disable-next-line global-require
+    const { stopOutboxDispatcher } = require('./workers/outboxDispatcher');
+    stopOutboxDispatcher();
+
     server.close(() => {
       process.exit(0);
     });

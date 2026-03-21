@@ -3,8 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const asyncHandler = require('../middleware/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
-const { sendEmail } = require('../utils/sendEmail');
-const { queuePasswordResetEmail } = require('../queues/emailQueue');
+const { queuePasswordResetEmail, queueVerificationEmail, queueEmail } = require('../queues/emailQueue');
 const envConfig = require('../config/env');
 const logger = require('../config/logger');
 
@@ -127,41 +126,9 @@ exports.register = asyncHandler(async (req, res, next) => {
   if (process.env.NODE_ENV !== 'test' && (process.env.EMAIL_HOST || process.env.NODE_ENV === 'development')) {
     try {
       const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-
-      await sendEmail({
-        to: user.email,
-        subject: 'Welcome to Capsule - Verify Your Email',
-        text: `Hi ${user.username},
-
-Welcome to Capsule! We're excited to have you join our community of content creators.
-
-To complete your registration and activate your account, please click the link below:
-
-${verificationUrl}
-
-This verification link will expire in 24 hours.
-
-If you didn't create an account with Capsule, please ignore this email.
-
-Best regards,
-The Capsule Team`,
-        html: `
-          <h2>Welcome to Capsule!</h2>
-          <p>Hi ${user.username},</p>
-          <p>We're excited to have you join our community of content creators.</p>
-          <p>To complete your registration and activate your account, please click the button below:</p>
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${verificationUrl}" style="background-color: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-              Verify Email Address
-            </a>
-          </p>
-          <p>Or copy and paste this link into your browser:</p>
-          <p><a href="${verificationUrl}">${verificationUrl}</a></p>
-          <p><small>This verification link will expire in 24 hours.</small></p>
-          <p>If you didn't create an account with Capsule, please ignore this email.</p>
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-          <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
-        `,
+      await queueVerificationEmail(user.email, verificationUrl, {
+        traceId: req.correlationId,
+        userId: user._id,
       });
     } catch (error) {
       console.error('Email sending failed:', error.message);
@@ -243,8 +210,9 @@ exports.login = asyncHandler(async (req, res, next) => {
   // Send welcome email on first login — skip in test env
   if (isFirstLogin && process.env.NODE_ENV !== 'test' && process.env.EMAIL_HOST) {
     try {
-      await sendEmail({
+      await queueEmail({
         to: user.email,
+        type: 'welcome',
         subject: 'Welcome to Capsule! 🎉',
         text: `Hi ${user.username},
 
@@ -283,7 +251,7 @@ The Capsule Team`,
             <p style="color: #666; font-size: 12px;">Best regards,<br>The Capsule Team</p>
           </div>
         `,
-      });
+      }, 5, { traceId: req.correlationId, userId: user._id });
     } catch (error) {
       console.error('Welcome email failed:', error.message);
       // Don't block login if email fails
@@ -439,21 +407,19 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
   // Queue email (using top-level import)
   if (process.env.NODE_ENV !== 'test') {
-    queuePasswordResetEmail(user.email, resetUrl)
-      .then((queueResult) => {
-        if (queueResult && queueResult.fallback) {
-          logger.warn('Password reset email queued via synchronous fallback');
-        } else {
-          logger.info('Password reset email queued via Redis', { jobId: queueResult?.jobId });
-        }
-      })
-      .catch((err) => {
-        // SECURITY: log internally, never expose to user
-        logger.error('CRITICAL: Complete failure to queue/send password reset email', {
-          error: err.message,
-          email: user.email,
-        });
+    try {
+      await queuePasswordResetEmail(user.email, resetUrl, {
+        traceId: req.correlationId,
+        userId: user._id,
       });
+    } catch (err) {
+      // SECURITY: log internally, never expose to user
+      logger.error('CRITICAL: Complete failure to queue/send password reset email', {
+        error: err.message,
+        email: user.email,
+        traceId: req.correlationId,
+      });
+    }
   }
 
   // SECURITY: Always return same message regardless of email outcome or whether

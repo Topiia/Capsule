@@ -1,0 +1,393 @@
+﻿node.exe : FAIL UNIT tests/unit/emailQueue.test.js
+At C:\Program Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL UNIT tests/un 
+   it/emailQueue.test.js:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Email Queue Producer (Outbox Architecture)
+    queueEmail() - Success Path
+      ├ù should create an EmailJob in MongoDB and push to Bull 
+Queue (11 ms)
+    queueEmail() - Bull Failure Path (Self-Healing Enqueue)
+      ΓêÜ should catch Bull errors and leave EmailJob as 
+PENDING for the dispatcher (6 ms)
+    Convenience Wrappers
+      ΓêÜ queueVerificationEmail sets critical priority and 
+attributes (1 ms)
+      ├ù queuePasswordResetEmail sets critical priority and 
+attributes (5 ms)
+      ├ù queueWelcomeEmail creates general email (2 ms)
+    Utilities
+      ├ù returns queue stats (4 ms)
+
+  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ 
+queueEmail() - Success Path ΓÇ║ should create an EmailJob in 
+MongoDB and push to Bull Queue
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: {"emailJobId": "dbjob-123"}, {"attempts": 3, 
+"priority": 7}
+
+    Number of calls: 0
+
+    [0m [90m 72 |[39m
+     [90m 73 |[39m       [90m// Verify Queue push with 
+relation[39m
+    [31m[1m>[22m[39m[90m 74 |[39m       
+expect(mockAdd)[33m.[39mtoHaveBeenCalledWith(
+     [90m    |[39m                       [31m[1m^[22m[39m
+     [90m 75 |[39m         { emailJobId[33m:[39m 
+[32m'dbjob-123'[39m }[33m,[39m
+     [90m 76 |[39m         { priority[33m:[39m 
+[35m7[39m[33m,[39m attempts[33m:[39m [35m3[39m }
+     [90m 77 |[39m       )[33m;[39m[0m
+
+      at Object.toHaveBeenCalledWith 
+(tests/unit/emailQueue.test.js:74:23)
+
+  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ 
+Convenience Wrappers ΓÇ║ queuePasswordResetEmail sets critical 
+priority and attributes
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: ObjectContaining {"type": "password_reset"}
+    Received: {"email": "test@example.com", "maxAttempts": 5, 
+"payload": {"html": "
+          <!DOCTYPE html>
+          <html lang=\"en\">
+          <head>
+            <meta charset=\"UTF-8\">
+            <meta name=\"viewport\" 
+content=\"width=device-width, initial-scale=1.0\">
+            <title>Reset Your Password</title>
+          </head>
+          <body style=\"margin: 0; padding: 0; font-family: 
+Arial, sans-serif; background-color: #f4f4f4;\">
+            <table role=\"presentation\" style=\"width: 100%; 
+border-collapse: collapse; background-color: #f4f4f4;\">
+              <tr>
+                <td style=\"padding: 40px 0;\">
+                  <table role=\"presentation\" style=\"width: 
+600px; margin: 0 auto; background-color: #ffffff; 
+border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\">
+                    <!-- Header -->
+                    <tr>
+                      <td style=\"padding: 40px 40px 20px; 
+text-align: center; background-color: #4F46E5; border-radius: 
+8px 8px 0 0;\">
+                        <h1 style=\"margin: 0; color: #ffffff; 
+font-size: 28px; font-weight: bold;\">Capsule</h1>
+                      </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                      <td style=\"padding: 40px;\">
+                        <h2 style=\"margin: 0 0 20px; color: 
+#1f2937; font-size: 24px; font-weight: bold;\">Password Reset 
+Request</h2>
+                        <p style=\"margin: 0 0 20px; color: 
+#4b5563; font-size: 16px; line-height: 1.6;\">
+                          We received a request to reset your 
+password. Click the button below to create a new password.
+                        </p>
+                        <!-- CTA Button -->
+                        <table role=\"presentation\" 
+style=\"margin: 30px 0;\">
+                          <tr>
+                            <td style=\"border-radius: 6px; 
+background-color: #4F46E5;\">
+                              <a href=\"http://url\" 
+style=\"display: inline-block; padding: 14px 32px; color: 
+#ffffff; text-decoration: none; font-size: 16px; font-weight: 
+bold; border-radius: 6px;\">Reset Password</a>
+                            </td>
+                          </tr>
+                        </table>
+                        <!-- Security Warning -->
+                        <table role=\"presentation\" 
+style=\"margin: 20px 0; background-color: #fef3c7; border-left: 
+4px solid #f59e0b; padding: 16px; border-radius: 4px;\">
+                          <tr>
+                            <td>
+                              <p style=\"margin: 0; color: 
+#92400e; font-size: 14px; line-height: 1.6;\">
+                                <strong>ΓÜá∩╕Å Security 
+Notice:</strong> This link will expire in 10 minutes. If you 
+didn't request a password reset, please ignore this email and 
+your password will remain unchanged.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                        <p style=\"margin: 20px 0 0; color: 
+#9ca3af; font-size: 12px; line-height: 1.6;\">
+                          If the button doesn't work, copy and 
+paste this link into your browser:<br>
+                          <a href=\"http://url\" style=\"color: 
+#4F46E5; word-break: break-all;\">http://url</a>
+                        </p>
+                      </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                      <td style=\"padding: 30px 40px; 
+background-color: #f9fafb; border-radius: 0 0 8px 8px; 
+border-top: 1px solid #e5e7eb;\">
+                        <p style=\"margin: 0 0 10px; color: 
+#6b7280; font-size: 14px; text-align: center;\">
+                          <strong>Capsule</strong> - Your vlog 
+platform
+                        </p>
+                        <p style=\"margin: 0; color: #9ca3af; 
+font-size: 12px; text-align: center; line-height: 1.6;\">
+                          This is an automated security email 
+from Capsule.<br>
+                          For security reasons, we cannot 
+unsubscribe you from these notifications.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        ", "subject": "Reset Your Password - Capsule", "text": 
+"Password Reset Request┬╖
+    We received a request to reset your password for your 
+Capsule account.┬╖
+    Reset your password by visiting this link:┬╖
+    http://url┬╖
+    ΓÜá∩╕Å SECURITY NOTICE:
+    - This link will expire in 10 minutes
+    - If you didn't request this reset, please ignore this email
+    - Your password will remain unchanged if you don't click 
+the link┬╖
+    ---
+    Capsule - Your vlog platform
+    This is an automated security email."}, "status": 
+"PENDING", "traceId": null, "type": "forgot_password", 
+"userId": null}
+
+    Number of calls: 1
+
+    [0m [90m 112 |[39m     it([32m'queuePasswordResetEmail 
+sets critical priority and attributes'[39m[33m,[39m 
+[36masync[39m () [33m=>[39m {
+     [90m 113 |[39m       [36mawait[39m 
+queuePasswordResetEmail([32m'test@example.com'[39m[33m,[39m 
+[32m'http://url'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 114 |[39m       expect([33mEmail
+Job[39m[33m.[39mcreate)[33m.[39mtoHaveBeenCalledWith(expect
+[33m.[39mobjectContaining({ type[33m:[39m 
+[32m'password_reset'[39m }))[33m;[39m
+     [90m     |[39m                               
+[31m[1m^[22m[39m
+     [90m 115 |[39m     })[33m;[39m
+     [90m 116 |[39m     
+     [90m 117 |[39m     it([32m'queueWelcomeEmail creates 
+general email'[39m[33m,[39m [36masync[39m () [33m=>[39m 
+{[0m
+
+      at Object.toHaveBeenCalledWith 
+(tests/unit/emailQueue.test.js:114:31)
+
+  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ 
+Convenience Wrappers ΓÇ║ queueWelcomeEmail creates general email
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: ObjectContaining {"type": "welcome"}
+    Received: {"email": "test@example.com", "maxAttempts": 3, 
+"payload": {"html": "
+          <!DOCTYPE html>
+          <html lang=\"en\">
+          <head>
+            <meta charset=\"UTF-8\">
+            <meta name=\"viewport\" 
+content=\"width=device-width, initial-scale=1.0\">
+            <title>Welcome to Capsule</title>
+          </head>
+          <body style=\"margin: 0; padding: 0; font-family: 
+Arial, sans-serif; background-color: #f4f4f4;\">
+            <table role=\"presentation\" style=\"width: 100%; 
+border-collapse: collapse; background-color: #f4f4f4;\">
+              <tr>
+                <td style=\"padding: 40px 0;\">
+                  <table role=\"presentation\" style=\"width: 
+600px; margin: 0 auto; background-color: #ffffff; 
+border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\">
+                    <!-- Header -->
+                    <tr>
+                      <td style=\"padding: 40px 40px 20px; 
+text-align: center; background-color: #4F46E5; border-radius: 
+8px 8px 0 0;\">
+                        <h1 style=\"margin: 0; color: #ffffff; 
+font-size: 28px; font-weight: bold;\">Capsule</h1>
+                      </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                      <td style=\"padding: 40px;\">
+                        <h2 style=\"margin: 0 0 20px; color: 
+#1f2937; font-size: 24px; font-weight: bold;\">Welcome, Bob! 
+≡ƒÄë</h2>
+                        <p style=\"margin: 0 0 20px; color: 
+#4b5563; font-size: 16px; line-height: 1.6;\">
+                          Thank you for joining Capsule! We're 
+excited to have you as part of our creative community. You're 
+all set to start creating and sharing your vlogs with the world.
+                        </p>
+                        <h3 style=\"margin: 30px 0 15px; color: 
+#1f2937; font-size: 18px; font-weight: bold;\">Get Started:</h3>
+                        <table role=\"presentation\" 
+style=\"width: 100%; margin: 0 0 20px;\">
+                          <tr>
+                            <td style=\"padding: 12px 0; 
+border-bottom: 1px solid #e5e7eb;\">
+                              <p style=\"margin: 0; color: 
+#4b5563; font-size: 15px;\">
+                                <strong style=\"color: 
+#4F46E5;\">Γ£ô</strong> Complete your profile to let others 
+know who you are
+                              </p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style=\"padding: 12px 0; 
+border-bottom: 1px solid #e5e7eb;\">
+                              <p style=\"margin: 0; color: 
+#4b5563; font-size: 15px;\">
+                                <strong style=\"color: 
+#4F46E5;\">Γ£ô</strong> Create your first vlog and share your 
+story
+                              </p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style=\"padding: 12px 0;\">
+                              <p style=\"margin: 0; color: 
+#4b5563; font-size: 15px;\">
+                                <strong style=\"color: 
+#4F46E5;\">Γ£ô</strong> Follow other creators and discover 
+amazing content
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                        <!-- CTA Button -->
+                        <table role=\"presentation\" 
+style=\"margin: 30px 0;\">
+                          <tr>
+                            <td style=\"border-radius: 6px; 
+background-color: #4F46E5;\">
+                              <a href=\"http://localhost:3000\" 
+style=\"display: inline-block; padding: 14px 32px; color: 
+#ffffff; text-decoration: none; font-size: 16px; font-weight: 
+bold; border-radius: 6px;\">Start Creating</a>
+                            </td>
+                          </tr>
+                        </table>
+                        <p style=\"margin: 20px 0 0; color: 
+#6b7280; font-size: 14px; line-height: 1.6;\">
+                          If you have any questions or need 
+help getting started, feel free to reach out to our support 
+team.
+                        </p>
+                      </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                      <td style=\"padding: 30px 40px; 
+background-color: #f9fafb; border-radius: 0 0 8px 8px; 
+border-top: 1px solid #e5e7eb;\">
+                        <p style=\"margin: 0 0 10px; color: 
+#6b7280; font-size: 14px; text-align: center;\">
+                          <strong>Capsule</strong> - Your vlog 
+platform
+                        </p>
+                        <p style=\"margin: 0; color: #9ca3af; 
+font-size: 12px; text-align: center; line-height: 1.6;\">
+                          You're receiving this email because 
+you signed up for Capsule.<br>
+                          If you'd like to stop receiving these 
+emails, you can <a href=\"#\" style=\"color: #4F46E5; 
+text-decoration: none;\">unsubscribe</a>.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        ", "subject": "Welcome to Capsule!", "text": "Welcome 
+to Capsule, Bob! ≡ƒÄë┬╖
+    Thank you for joining Capsule! We're excited to have you as 
+part of our creative community.┬╖
+{"numFailedTestSuites":1,"numFailedTests":4,"numPassedTestSuites":0,"numPassedTests":2,"numPendingTestSuites":0,"numPendingTests":0,"numRuntimeErrorTestSuites":0,"numTodoTests":0,"numTotalTestSuites":1,"numTotalTests":6,"openHandles":[],"snapshot":{"added":0,"didUpdate":false,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0},"startTime":1774083983732,"success":false,"testResults":[{"assertionResults":[{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","queueEmail() - Success Path"],"duration":11,"failureDetails":[{"matcherResult":{"message":"expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: {\"emailJobId\": \"dbjob-123\"}, {\"attempts\": 3, \"priority\": 7}\n\nNumber of calls: 0","pass":false}}],"failureMessages":["Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: {\"emailJobId\": \"dbjob-123\"}, {\"attempts\": 3, \"priority\": 7}\n\nNumber of calls: 0\n    at Object.toHaveBeenCalledWith (C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js:74:23)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"],"fullName":"Email Queue Producer (Outbox Architecture) queueEmail() - Success Path should create an EmailJob in MongoDB and push to Bull Queue","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"failed","title":"should create an EmailJob in MongoDB and push to Bull Queue"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","queueEmail() - Bull Failure Path (Self-Healing Enqueue)"],"duration":6,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) queueEmail() - Bull Failure Path (Self-Healing Enqueue) should catch Bull errors and leave EmailJob as PENDING for the dispatcher","invocations":1,"location":null,"numPassingAsserts":3,"retryReasons":[],"status":"passed","title":"should catch Bull errors and leave EmailJob as PENDING for the dispatcher"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":1,"failureDetails":[],"failureMessages":[],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queueVerificationEmail sets critical priority and attributes","invocations":1,"location":null,"numPassingAsserts":1,"retryReasons":[],"status":"passed","title":"queueVerificationEmail sets critical priority and attributes"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":5,"failureDetails":[{"matcherResult":{"message":"expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"type\": \"password_reset\"}\nReceived: {\"email\": \"test@example.com\", \"maxAttempts\": 5, \"payload\": {\"html\": \"\n      <!DOCTYPE html>\n      <html lang=\\\"en\\\">\n      <head>\n        <meta charset=\\\"UTF-8\\\">\n        <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n        <title>Reset Your Password</title>\n      </head>\n      <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n        <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n          <tr>\n            <td style=\\\"padding: 40px 0;\\\">\n              <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                <!-- Header -->\n                <tr>\n                  <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                    <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                  </td>\n                </tr>\n                <!-- Content -->\n                <tr>\n                  <td style=\\\"padding: 40px;\\\">\n                    <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Password Reset Request</h2>\n                    <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                      We received a request to reset your password. Click the button below to create a new password.\n                    </p>\n                    <!-- CTA Button -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                      <tr>\n                        <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                          <a href=\\\"http://url\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Reset Password</a>\n                        </td>\n                      </tr>\n                    </table>\n                    <!-- Security Warning -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 20px 0; background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px;\\\">\n                      <tr>\n                        <td>\n                          <p style=\\\"margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;\\\">\n                            <strong>ΓÜá∩╕Å Security Notice:</strong> This link will expire in 10 minutes. If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n                          </p>\n                        </td>\n                      </tr>\n                    </table>\n                    <p style=\\\"margin: 20px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6;\\\">\n                      If the button doesn't work, copy and paste this link into your browser:<br>\n                      <a href=\\\"http://url\\\" style=\\\"color: #4F46E5; word-break: break-all;\\\">http://url</a>\n                    </p>\n                  </td>\n                </tr>\n                <!-- Footer -->\n                <tr>\n                  <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                    <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                      <strong>Capsule</strong> - Your vlog platform\n                    </p>\n                    <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                      This is an automated security email from Capsule.<br>\n                      For security reasons, we cannot unsubscribe you from these notifications.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n      </body>\n      </html>\n    \", \"subject\": \"Reset Your Password - Capsule\", \"text\": \"Password Reset Request┬╖\nWe received a request to reset your password for your Capsule account.┬╖\nReset your password by visiting this link:┬╖\nhttp://url┬╖\nΓÜá∩╕Å SECURITY NOTICE:\n- This link will expire in 10 minutes\n- If you didn't request this reset, please ignore this email\n- Your password will remain unchanged if you don't click the link┬╖\n---\nCapsule - Your vlog platform\nThis is an automated security email.\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"forgot_password\", \"userId\": null}\n\nNumber of calls: 1","pass":false}}],"failureMessages":["Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"type\": \"password_reset\"}\nReceived: {\"email\": \"test@example.com\", \"maxAttempts\": 5, \"payload\": {\"html\": \"\n      <!DOCTYPE html>\n      <html lang=\\\"en\\\">\n      <head>\n        <meta charset=\\\"UTF-8\\\">\n        <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n        <title>Reset Your Password</title>\n      </head>\n      <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n        <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n          <tr>\n            <td style=\\\"padding: 40px 0;\\\">\n              <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                <!-- Header -->\n                <tr>\n                  <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                    <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                  </td>\n                </tr>\n                <!-- Content -->\n                <tr>\n                  <td style=\\\"padding: 40px;\\\">\n                    <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Password Reset Request</h2>\n                    <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                      We received a request to reset your password. Click the button below to create a new password.\n                    </p>\n                    <!-- CTA Button -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                      <tr>\n                        <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                          <a href=\\\"http://url\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Reset Password</a>\n                        </td>\n                      </tr>\n                    </table>\n                    <!-- Security Warning -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 20px 0; background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px;\\\">\n                      <tr>\n                        <td>\n                          <p style=\\\"margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;\\\">\n                            <strong>ΓÜá∩╕Å Security Notice:</strong> This link will expire in 10 minutes. If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n                          </p>\n                        </td>\n                      </tr>\n                    </table>\n                    <p style=\\\"margin: 20px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6;\\\">\n                      If the button doesn't work, copy and paste this link into your browser:<br>\n                      <a href=\\\"http://url\\\" style=\\\"color: #4F46E5; word-break: break-all;\\\">http://url</a>\n                    </p>\n                  </td>\n                </tr>\n                <!-- Footer -->\n                <tr>\n                  <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                    <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                      <strong>Capsule</strong> - Your vlog platform\n                    </p>\n                    <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                      This is an automated security email from Capsule.<br>\n                      For security reasons, we cannot unsubscribe you from these notifications.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n      </body>\n      </html>\n    \", \"subject\": \"Reset Your Password - Capsule\", \"text\": \"Password Reset Request┬╖\nWe received a request to reset your password for your Capsule account.┬╖\nReset your password by visiting this link:┬╖\nhttp://url┬╖\nΓÜá∩╕Å SECURITY NOTICE:\n- This link will expire in 10 minutes\n- If you didn't request this reset, please ignore this email\n- Your password will remain unchanged if you don't click the link┬╖\n---\nCapsule - Your vlog platform\nThis is an automated security email.\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"forgot_password\", \"userId\": null}\n\nNumber of calls: 1\n    at Object.toHaveBeenCalledWith (C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js:114:31)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queuePasswordResetEmail sets critical priority and attributes","invocations":1,"location":null,"numPassingAsserts":0,"retryReasons":[],"status":"failed","title":"queuePasswordResetEmail sets critical priority and attributes"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Convenience Wrappers"],"duration":2,"failureDetails":[{"matcherResult":{"message":"expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"type\": \"welcome\"}\nReceived: {\"email\": \"test@example.com\", \"maxAttempts\": 3, \"payload\": {\"html\": \"\n      <!DOCTYPE html>\n      <html lang=\\\"en\\\">\n      <head>\n        <meta charset=\\\"UTF-8\\\">\n        <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n        <title>Welcome to Capsule</title>\n      </head>\n      <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n        <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n          <tr>\n            <td style=\\\"padding: 40px 0;\\\">\n              <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                <!-- Header -->\n                <tr>\n                  <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                    <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                  </td>\n                </tr>\n                <!-- Content -->\n                <tr>\n                  <td style=\\\"padding: 40px;\\\">\n                    <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Welcome, Bob! ≡ƒÄë</h2>\n                    <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                      Thank you for joining Capsule! We're excited to have you as part of our creative community. You're all set to start creating and sharing your vlogs with the world.\n                    </p>\n                    <h3 style=\\\"margin: 30px 0 15px; color: #1f2937; font-size: 18px; font-weight: bold;\\\">Get Started:</h3>\n                    <table role=\\\"presentation\\\" style=\\\"width: 100%; margin: 0 0 20px;\\\">\n                      <tr>\n                        <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Complete your profile to let others know who you are\n                          </p>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Create your first vlog and share your story\n                          </p>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\\\"padding: 12px 0;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Follow other creators and discover amazing content\n                          </p>\n                        </td>\n                      </tr>\n                    </table>\n                    <!-- CTA Button -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                      <tr>\n                        <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                          <a href=\\\"http://localhost:3000\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Start Creating</a>\n                        </td>\n                      </tr>\n                    </table>\n                    <p style=\\\"margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;\\\">\n                      If you have any questions or need help getting started, feel free to reach out to our support team.\n                    </p>\n                  </td>\n                </tr>\n                <!-- Footer -->\n                <tr>\n                  <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                    <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                      <strong>Capsule</strong> - Your vlog platform\n                    </p>\n                    <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                      You're receiving this email because you signed up for Capsule.<br>\n                      If you'd like to stop receiving these emails, you can <a href=\\\"#\\\" style=\\\"color: #4F46E5; text-decoration: none;\\\">unsubscribe</a>.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n      </body>\n      </html>\n    \", \"subject\": \"Welcome to Capsule!\", \"text\": \"Welcome to Capsule, Bob! ≡ƒÄë┬╖\nThank you for joining Capsule! We're excited to have you as part of our creative community.┬╖\nGet Started:\nΓ£ô Complete your profile to let others know who you are\nΓ£ô Create your first vlog and share your story\nΓ£ô Follow other creators and discover amazing content┬╖\nVisit Capsule: http://localhost:3000┬╖\nIf you have any questions or need help getting started, feel free to reach out to our support team.┬╖\n---\nCapsule - Your vlog platform\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"general\", \"userId\": null}\n\nNumber of calls: 1","pass":false}}],"failureMessages":["Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\nExpected: ObjectContaining {\"type\": \"welcome\"}\nReceived: {\"email\": \"test@example.com\", \"maxAttempts\": 3, \"payload\": {\"html\": \"\n      <!DOCTYPE html>\n      <html lang=\\\"en\\\">\n      <head>\n        <meta charset=\\\"UTF-8\\\">\n        <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n        <title>Welcome to Capsule</title>\n      </head>\n      <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n        <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n          <tr>\n            <td style=\\\"padding: 40px 0;\\\">\n              <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                <!-- Header -->\n                <tr>\n                  <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                    <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                  </td>\n                </tr>\n                <!-- Content -->\n                <tr>\n                  <td style=\\\"padding: 40px;\\\">\n                    <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Welcome, Bob! ≡ƒÄë</h2>\n                    <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                      Thank you for joining Capsule! We're excited to have you as part of our creative community. You're all set to start creating and sharing your vlogs with the world.\n                    </p>\n                    <h3 style=\\\"margin: 30px 0 15px; color: #1f2937; font-size: 18px; font-weight: bold;\\\">Get Started:</h3>\n                    <table role=\\\"presentation\\\" style=\\\"width: 100%; margin: 0 0 20px;\\\">\n                      <tr>\n                        <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Complete your profile to let others know who you are\n                          </p>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Create your first vlog and share your story\n                          </p>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\\\"padding: 12px 0;\\\">\n                          <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                            <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Follow other creators and discover amazing content\n                          </p>\n                        </td>\n                      </tr>\n                    </table>\n                    <!-- CTA Button -->\n                    <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                      <tr>\n                        <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                          <a href=\\\"http://localhost:3000\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Start Creating</a>\n                        </td>\n                      </tr>\n                    </table>\n                    <p style=\\\"margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;\\\">\n                      If you have any questions or need help getting started, feel free to reach out to our support team.\n                    </p>\n                  </td>\n                </tr>\n                <!-- Footer -->\n                <tr>\n                  <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                    <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                      <strong>Capsule</strong> - Your vlog platform\n                    </p>\n                    <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                      You're receiving this email because you signed up for Capsule.<br>\n                      If you'd like to stop receiving these emails, you can <a href=\\\"#\\\" style=\\\"color: #4F46E5; text-decoration: none;\\\">unsubscribe</a>.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n      </body>\n      </html>\n    \", \"subject\": \"Welcome to Capsule!\", \"text\": \"Welcome to Capsule, Bob! ≡ƒÄë┬╖\nThank you for joining Capsule! We're excited to have you as part of our creative community.┬╖\nGet Started:\nΓ£ô Complete your profile to let others know who you are\nΓ£ô Create your first vlog and share your story\nΓ£ô Follow other creators and discover amazing content┬╖\nVisit Capsule: http://localhost:3000┬╖\nIf you have any questions or need help getting started, feel free to reach out to our support team.┬╖\n---\nCapsule - Your vlog platform\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"general\", \"userId\": null}\n\nNumber of calls: 1\n    at Object.toHaveBeenCalledWith (C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js:119:31)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"],"fullName":"Email Queue Producer (Outbox Architecture) Convenience Wrappers queueWelcomeEmail creates general email","invocations":1,"location":null,"numPassingAsserts":0,"retryReasons":[],"status":"failed","title":"queueWelcomeEmail creates general email"},{"ancestorTitles":["Email Queue Producer (Outbox Architecture)","Utilities"],"duration":4,"failureDetails":[{"matcherResult":{"actual":0,"expected":1,"message":"expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 0","name":"toBe","pass":false}}],"failureMessages":["Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 0\n    at Object.toBe (C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js:126:29)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"],"fullName":"Email Queue Producer (Outbox Architecture) Utilities returns queue stats","invocations":1,"location":null,"numPassingAsserts":0,"retryReasons":[],"status":"failed","title":"returns queue stats"}],"endTime":1774083984523,"message":"  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ queueEmail() - Success Path ΓÇ║ should create an EmailJob in MongoDB and push to Bull Queue\n\n    expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\n    Expected: {\"emailJobId\": \"dbjob-123\"}, {\"attempts\": 3, \"priority\": 7}\n\n    Number of calls: 0\n\n    \u001b[0m \u001b[90m 72 |\u001b[39m\n     \u001b[90m 73 |\u001b[39m       \u001b[90m// Verify Queue push with relation\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 74 |\u001b[39m       expect(mockAdd)\u001b[33m.\u001b[39mtoHaveBeenCalledWith(\n     \u001b[90m    |\u001b[39m                       \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 75 |\u001b[39m         { emailJobId\u001b[33m:\u001b[39m \u001b[32m'dbjob-123'\u001b[39m }\u001b[33m,\u001b[39m\n     \u001b[90m 76 |\u001b[39m         { priority\u001b[33m:\u001b[39m \u001b[35m7\u001b[39m\u001b[33m,\u001b[39m attempts\u001b[33m:\u001b[39m \u001b[35m3\u001b[39m }\n     \u001b[90m 77 |\u001b[39m       )\u001b[33m;\u001b[39m\u001b[0m\n\n      at Object.toHaveBeenCalledWith (tests/unit/emailQueue.test.js:74:23)\n\n  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ Convenience Wrappers ΓÇ║ queuePasswordResetEmail sets critical priority and attributes\n\n    expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\n    Expected: ObjectContaining {\"type\": \"password_reset\"}\n    Received: {\"email\": \"test@example.com\", \"maxAttempts\": 5, \"payload\": {\"html\": \"\n          <!DOCTYPE html>\n          <html lang=\\\"en\\\">\n          <head>\n            <meta charset=\\\"UTF-8\\\">\n            <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n            <title>Reset Your Password</title>\n          </head>\n          <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n            <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n              <tr>\n                <td style=\\\"padding: 40px 0;\\\">\n                  <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                    <!-- Header -->\n                    <tr>\n                      <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                        <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                      </td>\n                    </tr>\n                    <!-- Content -->\n                    <tr>\n                      <td style=\\\"padding: 40px;\\\">\n                        <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Password Reset Request</h2>\n                        <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                          We received a request to reset your password. Click the button below to create a new password.\n                        </p>\n                        <!-- CTA Button -->\n                        <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                          <tr>\n                            <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                              <a href=\\\"http://url\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Reset Password</a>\n                            </td>\n                          </tr>\n                        </table>\n                        <!-- Security Warning -->\n                        <table role=\\\"presentation\\\" style=\\\"margin: 20px 0; background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px;\\\">\n                          <tr>\n                            <td>\n                              <p style=\\\"margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;\\\">\n                                <strong>ΓÜá∩╕Å Security Notice:</strong> This link will expire in 10 minutes. If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n                              </p>\n                            </td>\n                          </tr>\n                        </table>\n                        <p style=\\\"margin: 20px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6;\\\">\n                          If the button doesn't work, copy and paste this link into your browser:<br>\n                          <a href=\\\"http://url\\\" style=\\\"color: #4F46E5; word-break: break-all;\\\">http://url</a>\n                        </p>\n                      </td>\n                    </tr>\n                    <!-- Footer -->\n                    <tr>\n                      <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                        <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                          <strong>Capsule</strong> - Your vlog platform\n                        </p>\n                        <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                          This is an automated security email from Capsule.<br>\n                          For security reasons, we cannot unsubscribe you from these notifications.\n                        </p>\n                      </td>\n                    </tr>\n                  </table>\n                </td>\n              </tr>\n            </table>\n          </body>\n          </html>\n        \", \"subject\": \"Reset Your Password - Capsule\", \"text\": \"Password Reset Request┬╖\n    We received a request to reset your password for your Capsule account.┬╖\n    Reset your password by visiting this link:┬╖\n    http://url┬╖\n    ΓÜá∩╕Å SECURITY NOTICE:\n    - This link will expire in 10 minutes\n    - If you didn't request this reset, please ignore this email\n    - Your password will remain unchanged if you don't click the link┬╖\n    ---\n    Capsule - Your vlog platform\n    This is an automated security email.\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"forgot_password\", \"userId\": null}\n\n    Number of calls: 1\n\n    \u001b[0m \u001b[90m 112 |\u001b[39m     it(\u001b[32m'queuePasswordResetEmail sets critical priority and attributes'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n     \u001b[90m 113 |\u001b[39m       \u001b[36mawait\u001b[39m queuePasswordResetEmail(\u001b[32m'test@example.com'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'http://url'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 114 |\u001b[39m       expect(\u001b[33mEmailJob\u001b[39m\u001b[33m.\u001b[39mcreate)\u001b[33m.\u001b[39mtoHaveBeenCalledWith(expect\u001b[33m.\u001b[39mobjectContaining({ type\u001b[33m:\u001b[39m \u001b[32m'password_reset'\u001b[39m }))\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 115 |\u001b[39m     })\u001b[33m;\u001b[39m\n     \u001b[90m 116 |\u001b[39m     \n     \u001b[90m 117 |\u001b[39m     it(\u001b[32m'queueWelcomeEmail creates general email'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\u001b[0m\n\n      at Object.toHaveBeenCalledWith (tests/unit/emailQueue.test.js:114:31)\n\n  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ Convenience Wrappers ΓÇ║ queueWelcomeEmail creates general email\n\n    expect(jest.fn()).toHaveBeenCalledWith(...expected)\n\n    Expected: ObjectContaining {\"type\": \"welcome\"}\n    Received: {\"email\": \"test@example.com\", \"maxAttempts\": 3, \"payload\": {\"html\": \"\n          <!DOCTYPE html>\n          <html lang=\\\"en\\\">\n          <head>\n            <meta charset=\\\"UTF-8\\\">\n            <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1.0\\\">\n            <title>Welcome to Capsule</title>\n          </head>\n          <body style=\\\"margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;\\\">\n            <table role=\\\"presentation\\\" style=\\\"width: 100%; border-collapse: collapse; background-color: #f4f4f4;\\\">\n              <tr>\n                <td style=\\\"padding: 40px 0;\\\">\n                  <table role=\\\"presentation\\\" style=\\\"width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\\\">\n                    <!-- Header -->\n                    <tr>\n                      <td style=\\\"padding: 40px 40px 20px; text-align: center; background-color: #4F46E5; border-radius: 8px 8px 0 0;\\\">\n                        <h1 style=\\\"margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;\\\">Capsule</h1>\n                      </td>\n                    </tr>\n                    <!-- Content -->\n                    <tr>\n                      <td style=\\\"padding: 40px;\\\">\n                        <h2 style=\\\"margin: 0 0 20px; color: #1f2937; font-size: 24px; font-weight: bold;\\\">Welcome, Bob! ≡ƒÄë</h2>\n                        <p style=\\\"margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;\\\">\n                          Thank you for joining Capsule! We're excited to have you as part of our creative community. You're all set to start creating and sharing your vlogs with the world.\n                        </p>\n                        <h3 style=\\\"margin: 30px 0 15px; color: #1f2937; font-size: 18px; font-weight: bold;\\\">Get Started:</h3>\n                        <table role=\\\"presentation\\\" style=\\\"width: 100%; margin: 0 0 20px;\\\">\n                          <tr>\n                            <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                              <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                                <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Complete your profile to let others know who you are\n                              </p>\n                            </td>\n                          </tr>\n                          <tr>\n                            <td style=\\\"padding: 12px 0; border-bottom: 1px solid #e5e7eb;\\\">\n                              <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                                <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Create your first vlog and share your story\n                              </p>\n                            </td>\n                          </tr>\n                          <tr>\n                            <td style=\\\"padding: 12px 0;\\\">\n                              <p style=\\\"margin: 0; color: #4b5563; font-size: 15px;\\\">\n                                <strong style=\\\"color: #4F46E5;\\\">Γ£ô</strong> Follow other creators and discover amazing content\n                              </p>\n                            </td>\n                          </tr>\n                        </table>\n                        <!-- CTA Button -->\n                        <table role=\\\"presentation\\\" style=\\\"margin: 30px 0;\\\">\n                          <tr>\n                            <td style=\\\"border-radius: 6px; background-color: #4F46E5;\\\">\n                              <a href=\\\"http://localhost:3000\\\" style=\\\"display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;\\\">Start Creating</a>\n                            </td>\n                          </tr>\n                        </table>\n                        <p style=\\\"margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;\\\">\n                          If you have any questions or need help getting started, feel free to reach out to our support team.\n                        </p>\n                      </td>\n                    </tr>\n                    <!-- Footer -->\n                    <tr>\n                      <td style=\\\"padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;\\\">\n                        <p style=\\\"margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;\\\">\n                          <strong>Capsule</strong> - Your vlog platform\n                        </p>\n                        <p style=\\\"margin: 0; color: #9ca3af; font-size: 12px; text-align: center; line-height: 1.6;\\\">\n                          You're receiving this email because you signed up for Capsule.<br>\n                          If you'd like to stop receiving these emails, you can <a href=\\\"#\\\" style=\\\"color: #4F46E5; text-decoration: none;\\\">unsubscribe</a>.\n                        </p>\n                      </td>\n                    </tr>\n                  </table>\n                </td>\n              </tr>\n            </table>\n          </body>\n          </html>\n        \", \"subject\": \"Welcome to Capsule!\", \"text\": \"Welcome to Capsule, Bob! ≡ƒÄë┬╖\n    Thank you for joining Capsule! We're excited to have you as part of our creative community.┬╖\n    Get Started:\n    Γ£ô Complete your profile to let others know who you are\n    Γ£ô Create your first vlog and share your story\n    Γ£ô Follow other creators and discover amazing content┬╖\n    Visit Capsule: http://localhost:3000┬╖\n    If you have any questions or need help getting started, feel free to reach out to our support team.┬╖\n    ---\n    Capsule - Your vlog platform\"}, \"status\": \"PENDING\", \"traceId\": null, \"type\": \"general\", \"userId\": null}\n\n    Number of calls: 1\n\n    \u001b[0m \u001b[90m 117 |\u001b[39m     it(\u001b[32m'queueWelcomeEmail creates general email'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n     \u001b[90m 118 |\u001b[39m       \u001b[36mawait\u001b[39m queueWelcomeEmail(\u001b[32m'test@example.com'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'Bob'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 119 |\u001b[39m       expect(\u001b[33mEmailJob\u001b[39m\u001b[33m.\u001b[39mcreate)\u001b[33m.\u001b[39mtoHaveBeenCalledWith(expect\u001b[33m.\u001b[39mobjectContaining({ type\u001b[33m:\u001b[39m \u001b[32m'welcome'\u001b[39m }))\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 120 |\u001b[39m     })\u001b[33m;\u001b[39m\n     \u001b[90m 121 |\u001b[39m   })\u001b[33m;\u001b[39m\n     \u001b[90m 122 |\u001b[39m\u001b[0m\n\n      at Object.toHaveBeenCalledWith (tests/unit/emailQueue.test.js:119:31)\n\n  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ Utilities ΓÇ║ returns queue stats\n\n    expect(received).toBe(expected) // Object.is equality\n\n    Expected: 1\n    Received: 0\n\n    \u001b[0m \u001b[90m 124 |\u001b[39m     it(\u001b[32m'returns queue stats'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n     \u001b[90m 125 |\u001b[39m       \u001b[36mconst\u001b[39m stats \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m getQueueStats()\u001b[33m;\u001b[39m\n    \u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 126 |\u001b[39m       expect(stats\u001b[33m.\u001b[39mwaiting)\u001b[33m.\u001b[39mtoBe(\u001b[35m1\u001b[39m)\u001b[33m;\u001b[39m\n     \u001b[90m     |\u001b[39m                             \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n     \u001b[90m 127 |\u001b[39m     })\u001b[33m;\u001b[39m\n     \u001b[90m 128 |\u001b[39m   })\u001b[33m;\u001b[39m\n     \u001b[90m 129 |\u001b[39m })\u001b[33m;\u001b[39m\u001b[0m\n\n      at Object.toBe (tests/unit/emailQueue.test.js:126:29)\n","name":"C:\\Users\\ANKIT\\All-In-One\\saas-project\\Capsule\\backend\\tests\\unit\\emailQueue.test.js","startTime":1774083983803,"status":"failed","summary":""}],"wasInterrupted":false}
+    Get Started:
+    Γ£ô Complete your profile to let others know who you are
+    Γ£ô Create your first vlog and share your story
+    Γ£ô Follow other creators and discover amazing content┬╖
+    Visit Capsule: http://localhost:3000┬╖
+    If you have any questions or need help getting started, 
+feel free to reach out to our support team.┬╖
+    ---
+    Capsule - Your vlog platform"}, "status": "PENDING", 
+"traceId": null, "type": "general", "userId": null}
+
+    Number of calls: 1
+
+    [0m [90m 117 |[39m     it([32m'queueWelcomeEmail 
+creates general email'[39m[33m,[39m [36masync[39m () 
+[33m=>[39m {
+     [90m 118 |[39m       [36mawait[39m 
+queueWelcomeEmail([32m'test@example.com'[39m[33m,[39m 
+[32m'Bob'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 119 |[39m       expect([33mEmail
+Job[39m[33m.[39mcreate)[33m.[39mtoHaveBeenCalledWith(expect
+[33m.[39mobjectContaining({ type[33m:[39m 
+[32m'welcome'[39m }))[33m;[39m
+     [90m     |[39m                               
+[31m[1m^[22m[39m
+     [90m 120 |[39m     })[33m;[39m
+     [90m 121 |[39m   })[33m;[39m
+     [90m 122 |[39m[0m
+
+      at Object.toHaveBeenCalledWith 
+(tests/unit/emailQueue.test.js:119:31)
+
+  ΓùÅ Email Queue Producer (Outbox Architecture) ΓÇ║ Utilities 
+ΓÇ║ returns queue stats
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+    [0m [90m 124 |[39m     it([32m'returns queue 
+stats'[39m[33m,[39m [36masync[39m () [33m=>[39m {
+     [90m 125 |[39m       [36mconst[39m stats [33m=[39m 
+[36mawait[39m getQueueStats()[33m;[39m
+    [31m[1m>[22m[39m[90m 126 |[39m       expect(stats[33m
+.[39mwaiting)[33m.[39mtoBe([35m1[39m)[33m;[39m
+     [90m     |[39m                             
+[31m[1m^[22m[39m
+     [90m 127 |[39m     })[33m;[39m
+     [90m 128 |[39m   })[33m;[39m
+     [90m 129 |[39m })[33m;[39m[0m
+
+      at Object.toBe (tests/unit/emailQueue.test.js:126:29)
+
+Test Suites: 1 failed, 1 total
+Tests:       4 failed, 2 passed, 6 total
+Snapshots:   0 total
+Time:        0.952 s, estimated 2 s
+Ran all test suites matching /tests\\unit\\emailQueue.test.js/i.

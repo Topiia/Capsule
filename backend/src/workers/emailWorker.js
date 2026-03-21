@@ -1,12 +1,11 @@
 require('dotenv').config();
-const crypto = require('crypto');
 const { Resend } = require('resend');
 const { createQueue } = require('../config/queue.config');
 const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 const Sentry = require('../instrumentation/sentry');
 const { emailCircuit, safeCall } = require('../config/circuitBreaker');
-const systemState = require('../config/systemState');
+const EmailJob = require('../models/EmailJob');
 
 /**
  * Send email via Resend with 10 s timeout
@@ -35,6 +34,9 @@ const sendEmail = async (options) => {
         subject: options.subject,
         html: options.html,
         text: options.text,
+        headers: options.emailJobId ? {
+          'X-Entity-Ref-ID': options.emailJobId.toString()
+        } : undefined
       });
       // Timeout is handled inside emailCircuit.fire()
       // Since circuit.fire uses timeout, we return sendPromise
@@ -194,11 +196,29 @@ const startWorker = () => {
     console.log(`[WORKER] QUEUE_READY_ERROR  ${err.message}  (${new Date().toISOString()})`);
   });
 
-  // Process email jobs
-  emailQueue.process(async (job) => {
-    const {
-      to, subject, text, html,
-    } = job.data;
+  // Process email jobs (concurrency limit 10)
+  emailQueue.process(10, async (job) => {
+    const { emailJobId } = job.data;
+    if (!emailJobId) {
+      throw new Error('Legacy direct job without emailJobId detected. Abandoning.');
+    }
+    
+    // Acquire ATOMIC Lock
+    const claimedJob = await EmailJob.findOneAndUpdate(
+      { _id: emailJobId, status: { $in: ['QUEUED', 'FAILED'] } },
+      { $set: { status: 'PROCESSING', processedAt: Date.now() } },
+      { new: true }
+    );
+    
+    if (!claimedJob) {
+      // If it isn't QUEUED or FAILED, it's either already PROCESSING, SENT, or DEAD
+      logger.warn('[WORKER] Concurrency lock failed or job finalized externally', { emailJobId });
+      return { success: true, duplicate: true };
+    }
+    
+    const { payload, traceId, userId, type } = claimedJob;
+    const { subject, text, html } = payload;
+    const to = claimedJob.email;
 
     // ─── [WORKER] Phase 2 — Worker Pickup Timing ────────────────────────────
     const JOB_RECEIVED = Date.now();
@@ -249,65 +269,30 @@ const startWorker = () => {
       redisStatus: redisStatusAtJob,
     });
 
-    // FIX: Deterministic, retry-safe business key.
-    // Generates same key for identical payloads within a 1-hour window.
-    const payloadHash = crypto.createHash('sha256')
-      .update(`${to}-${subject}-${Math.floor(Date.now() / 3600000)}`)
-      .digest('hex');
-    const idempotencyKey = `idemp:email:${payloadHash}`;
-
-    if (!systemState.redis) {
-      console.error('[CRITICAL] Idempotency disabled');
-      // HIGH_RISK_OPERATION
-      throw new Error('System temporarily unavailable');
-    }
-
-    try {
-      if (emailQueue.client) {
-        // FIX: Atomic SET NX locks the job BEFORE the external Resend API side-effect.
-        // Tradeoff: If worker crashes after this block but before Resend receives it,
-        // it is permanently dropped for 7 days (prevents duplicate spam at cost of delivery loss).
-        const acquired = await emailQueue.client.set(idempotencyKey, 'LOCKED', 'NX', 'EX', 86400 * 7); // 7 days TTL
-        if (!acquired) {
-          logger.warn('Duplicate email job payload detected and prevented', { jobId: job.id, to, idempotencyKey });
-          return { success: true, duplicate: true };
-        }
-      }
-    } catch (idempErr) {
-      logger.warn('Failed to check/set idempotency key', { jobId: job.id, error: idempErr.message });
-    }
-
     try {
       // ─── [WORKER] Phase 2 — Email send starts ─────────────────────────────
       const EMAIL_SEND_START = Date.now();
       console.log(`[WORKER] EMAIL_SEND_START  jobId=${job.id}  (${new Date(EMAIL_SEND_START).toISOString()})`);
 
-      await sendEmail({
-        to, subject, text, html,
+      const sendResult = await sendEmail({
+        to, subject, text, html, emailJobId
       });
 
       const JOB_DONE = Date.now();
       const jobDuration = JOB_DONE - JOB_RECEIVED;
 
-      // Warn if execution safely exceeded lock tolerance.
-      // emailQueue.clients is a Bull internal array not available in test mocks;
-      // fall back to the configured lockDuration (120s) to avoid TypeError.
-      const lockDuration = emailQueue.clients?.[0]?.options?.settings?.lockDuration ?? 120000;
-      if (jobDuration > lockDuration / 2) {
-        logger.warn('Job duration exceeded 50% of lock duration', { jobId: job.id, duration: jobDuration });
-      }
-
-      // Safety Audit: LOCKED vs DONE distinction preserved for crash diagnostics.
-      // Without DONE, a LOCKED key could mean crashed-before-send or successfully sent — ambiguous.
-      try {
-        if (emailQueue.client) {
-          await emailQueue.client.set(idempotencyKey, 'DONE', 'XX', 'EX', 86400 * 7);
+      await EmailJob.updateOne(
+        { _id: emailJobId },
+        { 
+          $set: { 
+            status: 'SENT', 
+            providerMessageId: sendResult && sendResult.id 
+          } 
         }
-      } catch (idempSetErr) {
-        logger.warn('Failed to update idempotency key to DONE', { jobId: job.id, error: idempSetErr.message });
-      }
+      );
 
-      console.log(`[WORKER] JOB_COMPLETED  jobId=${job.id}  duration=${jobDuration}ms  (${new Date(JOB_DONE).toISOString()})`);
+      console.log(`[WORKER] JOB_COMPLETED  jobId=${job.id}  emailJobId=${emailJobId}  duration=${jobDuration}ms  (${new Date(JOB_DONE).toISOString()})`);
+      logger.info('Email completed successfully', { emailJobId, traceId, type });
 
       return { success: true };
     } catch (error) {
@@ -319,6 +304,31 @@ const startWorker = () => {
         error: error.message,
         attempt: job.attemptsMade + 1,
       });
+
+      // Increment attempts and update state based on threshold
+      const jobDoc = await EmailJob.findById(emailJobId);
+      if (jobDoc) {
+        const newAttempts = jobDoc.attempts + 1;
+        const isDead = newAttempts >= jobDoc.maxAttempts;
+        await EmailJob.updateOne(
+          { _id: emailJobId },
+          { 
+            $set: { 
+              status: isDead ? 'DEAD' : 'FAILED',
+              attempts: newAttempts,
+              lastError: error.message
+            }
+          }
+        );
+        logger.error('Email processing failed', { 
+          emailJobId, 
+          traceId,
+          error: error.message, 
+          status: isDead ? 'DEAD' : 'FAILED',
+          attempt: newAttempts 
+        });
+      }
+
       throw error; // Trigger Bull retry
     }
   });
