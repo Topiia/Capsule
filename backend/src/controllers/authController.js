@@ -508,3 +508,38 @@ exports.verifyEmail = asyncHandler(async (req, res, next) => {
     message: 'Email verified successfully',
   });
 });
+
+// @desc    Test direct email execution (Diagnostic tool)
+// @route   POST /api/auth/test-email
+// @access  Public
+exports.testEmail = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) {
+    return next(new ErrorResponse('Please provide an email to test', 400));
+  }
+
+  // eslint-disable-next-line global-require
+  const { sendEmail } = require('../utils/sendEmail');
+
+  try {
+    const result = await sendEmail({
+      to: email,
+      subject: 'Diagnostic Test Email (Bypassing Queue)',
+      html: '<p>If you receive this, the API server can successfully talk to Resend.</p>',
+      text: 'If you receive this, the API server can successfully talk to Resend.',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email hit Resend successfully',
+      result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Direct Resend failed',
+      error: err.message,
+      stack: err.stack,
+    });
+  }
+});

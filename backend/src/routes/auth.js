@@ -10,6 +10,7 @@ const {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  testEmail,
 } = require('../controllers/authController');
 const { protect, refreshToken, logout } = require('../middleware/auth');
 const {
@@ -82,5 +83,8 @@ router.put(
 );
 router.get('/verify/:token', authLimiter, verifyEmail);
 router.post('/logout', protect, identityLimiter, logout);
+
+// Diagnostic test endpoint (No limiting needed for temp diagnostic)
+router.post('/test-email', testEmail);
 
 module.exports = router;

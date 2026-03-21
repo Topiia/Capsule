@@ -88,11 +88,11 @@ const logger = winston.createLogger({
   silent: process.env.NODE_ENV === 'test', // Completely silence logger in tests
 });
 
-// Add console transport in development (but not in test)
-if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+// Add console transport in all environments except test
+if (process.env.NODE_ENV !== 'test') {
   logger.add(
     new winston.transports.Console({
-      format: consoleFormat,
+      format: process.env.NODE_ENV === 'production' ? logFormat : consoleFormat,
       handleExceptions: true,
       handleRejections: true,
     }),
