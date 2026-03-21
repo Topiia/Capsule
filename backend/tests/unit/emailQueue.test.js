@@ -35,7 +35,8 @@ jest.mock('../../src/config/queue.config', () => ({
 }));
 
 const {
-  createEmailQueue, queueEmail, queueVerificationEmail, queuePasswordResetEmail, queueWelcomeEmail, getQueueStats,
+  createEmailQueue, queueEmail, queueVerificationEmail,
+  queuePasswordResetEmail, queueWelcomeEmail, getQueueStats,
 } = require('../../src/queues/emailQueue');
 const { createQueue } = require('../../src/config/queue.config');
 const EmailJob = require('../../src/models/EmailJob');
@@ -93,8 +94,8 @@ describe('Email Queue Producer (Outbox Architecture)', () => {
       );
 
       expect(EmailJob.updateOne).toHaveBeenCalledWith(
-        { _id: 'dbjob-123' },
-        { $set: expect.objectContaining({ status: 'QUEUED' }) },
+        { _id: 'dbjob-123', status: 'PENDING' },
+        { $set: expect.objectContaining({ status: 'QUEUED', queuedAt: expect.any(Date) }) },
       );
 
       expect(result).toEqual({ emailJobId: 'dbjob-123', queued: true });
