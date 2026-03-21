@@ -22,8 +22,13 @@ jest.mock('../../src/config/logger', () => ({
   debug: jest.fn(),
 }));
 
-// Mock emailQueue module — the factory MUST return the same object reference
-// so that setting `mockAdd` on it is visible inside the dispatcher module.
+// Mock sendEmail utility — this is the direct-send fallback path
+const mockSendEmail = jest.fn().mockResolvedValue({ data: { id: 'resend-msg-001' } });
+jest.mock('../../src/utils/sendEmail', () => ({
+  sendEmail: mockSendEmail,
+}));
+
+// Mock emailQueue module — returns a shared object so add() can be reassigned per test
 const mockEmailQueue = { add: jest.fn() };
 jest.mock('../../src/queues/emailQueue', () => ({
   createEmailQueue: jest.fn(() => mockEmailQueue),
@@ -37,9 +42,10 @@ const EmailJob = require('../../src/models/EmailJob');
 
 describe('OutboxDispatcher — poll cycle', () => {
   beforeEach(() => {
-    // Reset per-test mocks manually (avoid jest.clearAllMocks wiping mockEmailQueue.add)
+    // Reset per-test mocks manually
     mockEmailQueue.add = jest.fn().mockResolvedValue({ id: 'bull-999' });
-    // find() must return a thenable-chainable mock with .limit() support
+    mockSendEmail.mockResolvedValue({ data: { id: 'resend-msg-001' } });
+    // find() must return a chainable mock with .limit()
     EmailJob.find.mockReturnValue({ limit: jest.fn().mockResolvedValue([]) });
     EmailJob.findOneAndUpdate.mockReset();
     EmailJob.updateMany.mockResolvedValue({ modifiedCount: 0 });
@@ -59,47 +65,96 @@ describe('OutboxDispatcher — poll cycle', () => {
       traceId: 'trace-abc',
       type: 'forgot_password',
       maxAttempts: 3,
+      attempts: 0,
+      email: 'user@example.com',
+      payload: { subject: 'Reset', html: '<p>Reset</p>', text: 'Reset' },
     };
     EmailJob.find.mockReturnValueOnce({ limit: jest.fn().mockResolvedValue([fakeJob]) });
-    EmailJob.findOneAndUpdate.mockResolvedValueOnce({ ...fakeJob, status: 'QUEUED' });
+    EmailJob.findOneAndUpdate.mockResolvedValueOnce({ ...fakeJob, status: 'PROCESSING' });
 
     await runDispatchCycle();
 
     // Core assertion: PENDING guard must be in the atomic claim
     expect(EmailJob.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'job-orphan-1', status: 'PENDING' },
-      { $set: { status: 'QUEUED', queuedAt: expect.any(Date) } },
+      expect.objectContaining({ $set: expect.objectContaining({ status: 'PROCESSING' }) }),
       { new: true },
     );
+    // Bull should receive the job
     expect(mockEmailQueue.add).toHaveBeenCalledWith(
       { emailJobId: 'job-orphan-1' },
       expect.objectContaining({ priority: 5 }),
     );
+    // Direct send should NOT be called when Bull succeeds
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it('reverts job to PENDING when Bull add() throws', async () => {
+  it('falls back to direct send when Bull is unavailable', async () => {
     const fakeJob = {
-      _id: 'job-fail-1', status: 'PENDING', maxAttempts: 3, traceId: null,
+      _id: 'job-direct-1',
+      status: 'PENDING',
+      traceId: null,
+      type: 'forgot_password',
+      maxAttempts: 3,
+      attempts: 0,
+      email: 'user@example.com',
+      payload: { subject: 'Reset Password', html: '<p>Reset</p>', text: 'Reset' },
     };
     EmailJob.find.mockReturnValueOnce({ limit: jest.fn().mockResolvedValue([fakeJob]) });
-    EmailJob.findOneAndUpdate.mockResolvedValueOnce({ ...fakeJob, status: 'QUEUED' });
+    EmailJob.findOneAndUpdate.mockResolvedValueOnce({ ...fakeJob, status: 'PROCESSING' });
+    // Bull is unavailable
+    mockEmailQueue.add.mockRejectedValueOnce(new Error('Redis ECONNREFUSED'));
+
+    await runDispatchCycle();
+
+    // Must fall back to direct send
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'user@example.com',
+      subject: 'Reset Password',
+    }));
+    // DB must be marked SENT
+    expect(EmailJob.updateOne).toHaveBeenCalledWith(
+      { _id: 'job-direct-1' },
+      { $set: { status: 'SENT', providerMessageId: 'resend-msg-001' } },
+    );
+  });
+
+  it('marks job DEAD when max attempts exceeded and direct send fails', async () => {
+    const fakeJob = {
+      _id: 'job-dead-1',
+      status: 'PENDING',
+      traceId: null,
+      type: 'forgot_password',
+      maxAttempts: 3,
+      attempts: 3, // Already at max
+      email: 'user@example.com',
+      payload: { subject: 'Reset', html: '<p>Reset</p>', text: 'Reset' },
+    };
+    EmailJob.find.mockReturnValueOnce({ limit: jest.fn().mockResolvedValue([fakeJob]) });
+    EmailJob.findOneAndUpdate.mockResolvedValueOnce({ ...fakeJob, status: 'PROCESSING' });
     mockEmailQueue.add.mockRejectedValueOnce(new Error('Redis down'));
+    mockSendEmail.mockRejectedValueOnce(new Error('Resend API key invalid'));
 
     await runDispatchCycle();
 
     expect(EmailJob.updateOne).toHaveBeenCalledWith(
-      { _id: 'job-fail-1' },
-      { $set: { status: 'PENDING' }, $unset: { queuedAt: 1 } },
+      { _id: 'job-dead-1' },
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: 'DEAD' }),
+      }),
     );
   });
 
   it('skips job when atomic claim returns null (race: already claimed)', async () => {
     const fakeJob = { _id: 'job-race-1', status: 'PENDING', maxAttempts: 3 };
     EmailJob.find.mockReturnValueOnce({ limit: jest.fn().mockResolvedValue([fakeJob]) });
+    // Another dispatcher already claimed it
     EmailJob.findOneAndUpdate.mockResolvedValueOnce(null);
 
     await runDispatchCycle();
 
+    // Neither Bull nor direct send should be called
     expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 });
