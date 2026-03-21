@@ -29,7 +29,7 @@ const sendEmail = async (options) => {
     const resend = getResendClient();
 
     // Send email via Resend API
-    const data = await resend.emails.send({
+    const response = await resend.emails.send({
       from: `${emailConfig.resend.fromName} <${emailConfig.resend.fromEmail}>`,
       to: options.to,
       subject: options.subject,
@@ -37,16 +37,20 @@ const sendEmail = async (options) => {
       text: options.text,
     });
 
+    if (response.error) {
+      throw new Error(`Resend API Error: ${response.error.message}`);
+    }
+
     // Log success in development
     if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
       console.log('\n✅ [EMAIL SENT via Resend]');
       console.log(`   To: ${options.to}`);
       console.log(`   Subject: ${options.subject}`);
-      console.log(`   Message ID: ${data.id}`);
+      console.log(`   Message ID: ${response.data?.id}`);
       console.log('');
     }
 
-    return data;
+    return response.data;
   } catch (error) {
     // Log error internally but don't expose details
     if (process.env.NODE_ENV !== 'test') {
