@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 const emailConfig = require('../config/email');
 
 const { onJobFailed, createFailureSpikeDetector } = require('../monitoring/dlqMonitor');
-const systemState = require('../config/systemState');
+
 const metrics = require('../config/metrics');
 
 /**
