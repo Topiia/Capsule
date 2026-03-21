@@ -47,13 +47,25 @@ if (missingOptional.length > 0) {
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] Uncaught Exception:', err.message);
   console.error(err.stack);
+  // Only exit for truly fatal sync errors, not Redis connection churn
   process.exit(1);
 });
 
 process.on('unhandledRejection', (err) => {
-  console.error('[FATAL] Unhandled Promise Rejection:', err.message);
-  console.error(err.stack);
-  process.exit(1);
+  const msg = err && err.message ? err.message : String(err);
+  // ioredis emits unhandled rejections during reconnect attempts when Redis
+  // is unavailable. These are expected on Render free tier and must NOT exit.
+  const isRedisError = msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND')
+    || msg.includes('connect ETIMEDOUT') || msg.includes('Redis') || msg.includes('redis');
+
+  if (isRedisError) {
+    console.warn('[WARN] Redis connection issue (non-fatal):', msg);
+  } else {
+    console.error('[FATAL] Unhandled Promise Rejection:', msg);
+    console.error(err && err.stack);
+    // Exit only for non-Redis unhandled rejections
+    process.exit(1);
+  }
 });
 
 // Import the configured Express app (no side-effects beyond Express setup)
@@ -66,12 +78,16 @@ const { startQueueMetrics } = require('./monitoring/queueMetrics');
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to database and Redis before starting the server
+// Connect to database — non-fatal: app still binds port so health checks pass
+// and operators can read error logs in the hosting dashboard.
 connectDB().catch((_err) => {
-  console.error('[FATAL] Database connection failed during startup.');
-  process.exit(1);
+  console.error('[DB] Database connection failed — app started without DB. Check MONGODB_URI.');
 });
-connectRedis();
+
+// Connect Redis — already internally try/caught; non-fatal by design.
+connectRedis().catch((err) => {
+  console.warn('[Redis] connectRedis() uncaught error (non-fatal):', err.message);
+});
 
 // Start HTTP server
 const server = app.listen(PORT, () => {

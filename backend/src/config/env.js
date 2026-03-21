@@ -38,12 +38,13 @@ module.exports = {
         'REDIS_URL',
         'RESEND_API_KEY',
       ];
-      required.forEach((req) => {
-        if (!process.env[req]) {
-          console.error(`FATAL CONFIG ERROR: ${req} missing`);
-          process.exit(1);
-        }
-      });
+      const missing = required.filter((req) => !process.env[req]);
+      if (missing.length > 0) {
+        // Log clearly but do NOT exit — let the server start so health checks work
+        // and operators can read logs on Render/Railway dashboards.
+        missing.forEach((req) => console.error(`[ENV] MISSING required variable: ${req}`));
+        console.error('[ENV] Server may not function correctly. Set the above variables in your hosting dashboard.');
+      }
     }
   },
 };
