@@ -18,8 +18,11 @@ const Like = require('../../src/models/Like');
 jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
-jest.mock('../../src/utils/sendEmailSync', () => ({
-  sendEmailSync: jest.fn().mockReturnValue({ success: true }),
+jest.mock('../../src/queues/emailQueue', () => ({
+  queueWelcomeEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queuePasswordResetEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queueVerificationEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queueEmail: jest.fn().mockResolvedValue({ queued: true })
 }));
 jest.mock('../../src/middleware/upload', () => ({
   uploadSingle: jest.fn().mockReturnValue((req, res, next) => next()),

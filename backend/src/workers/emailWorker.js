@@ -89,13 +89,13 @@ const startWorker = () => {
   // ─── [WORKER] Heartbeat — proves worker is alive every 60s ────────────────
   // On Render free tier: if HEARTBEAT stops → worker was put to sleep.
   // That proves the delivery delay = worker downtime, NOT code or Resend.
-  const heartbeatInterval = setInterval(() => {
+  const heartbeatInterval = process.env.NODE_ENV !== 'test' ? setInterval(() => {
     const uptimeSec = Math.round((Date.now() - WORKER_BOOT_TIME) / 1000);
     console.log(
       `[WORKER] HEARTBEAT  uptime=${uptimeSec}s  pid=${process.pid}`
       + `  (${new Date().toISOString()})`,
     );
-  }, 60000);
+  }, 60000) : null;
 
   const emailQueue = createQueue('email');
 
@@ -183,7 +183,7 @@ const startWorker = () => {
     // Write first heartbeat immediately, then every 30s
     // API will not use async-queue until this key exists in Redis
     await writeHeartbeat();
-    const heartbeatWriterInterval = setInterval(writeHeartbeat, 30000);
+    const heartbeatWriterInterval = process.env.NODE_ENV !== 'test' ? setInterval(writeHeartbeat, 30000) : null;
 
     // Log WORKER_READY after first heartbeat is confirmed written
     console.log(

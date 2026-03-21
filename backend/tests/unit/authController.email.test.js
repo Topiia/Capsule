@@ -26,7 +26,12 @@ const { forgotPassword } = require('../../src/controllers/authController');
 jest.mock('../../src/utils/sendEmail', () => ({
   sendEmail: jest.fn(),
 }));
-jest.mock('../../src/utils/sendEmailSync', () => jest.fn());
+jest.mock('../../src/queues/emailQueue', () => ({
+  queueWelcomeEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queuePasswordResetEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queueVerificationEmail: jest.fn().mockResolvedValue({ queued: true }),
+  queueEmail: jest.fn().mockResolvedValue({ queued: true })
+}));
 jest.mock('../../src/queues/emailQueue');
 jest.mock('../../src/models/User');
 
@@ -89,7 +94,7 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
       expect(queuePasswordResetEmail).toHaveBeenCalledTimes(1);
       expect(queuePasswordResetEmail).toHaveBeenCalledWith(
         'test@example.com',
-        expect.stringContaining('/reset-password/mock-token'),
+        expect.stringContaining('/reset-password/mock-token'), expect.any(Object),
       );
 
       expect(res.json).toHaveBeenCalledWith({
@@ -186,7 +191,7 @@ describe('Auth Controller - Forgot Password (Async Email)', () => {
       // Should queue with generated token
       expect(queuePasswordResetEmail).toHaveBeenCalledWith(
         'test@example.com',
-        expect.stringContaining('generated-token'),
+        expect.stringContaining('generated-token'), expect.any(Object),
       );
     });
   });
