@@ -102,6 +102,12 @@ const PORT = process.env.PORT || 5000;
     const { createEmailQueue } = require('./queues/emailQueue');
     emailQueue = createEmailQueue();
 
+    // Attach the worker inside the API process so single-tier deployments
+    // (like Render Free) process their own email queues.
+    // eslint-disable-next-line global-require
+    const { startEmailWorker } = require('./workers/emailWorker');
+    startEmailWorker();
+
     // eslint-disable-next-line global-require
     const { startOutboxDispatcher } = require('./workers/outboxDispatcher');
     startOutboxDispatcher();

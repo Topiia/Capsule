@@ -67,6 +67,7 @@ const createClient = (type) => {
       // MUST be isolated; one per queue for blocking commands
       return new IORedis(...mergeOpts({
         maxRetriesPerRequest: null, // REQUIRED for Bull blocking
+        enableReadyCheck: false, // REQUIRED for Bull blocking
       }));
 
     default:
