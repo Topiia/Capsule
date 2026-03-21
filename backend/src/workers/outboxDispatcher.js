@@ -6,7 +6,7 @@ let dispatcherInterval;
 
 const startOutboxDispatcher = () => {
   if (dispatcherInterval) return;
-  
+
   // Wait to require and create queue until function is called
   // to avoid circular dependencies and test environment issues
   const emailQueue = createEmailQueue();
@@ -18,38 +18,39 @@ const startOutboxDispatcher = () => {
       // This allows the initial API request to attempt direct Bull enqueue first
       const pendingJobs = await EmailJob.find({
         status: 'PENDING',
-        createdAt: { $lte: new Date(Date.now() - 5000) }
+        createdAt: { $lte: new Date(Date.now() - 5000) },
       }).limit(50);
 
+      /* eslint-disable no-restricted-syntax, no-await-in-loop */
       for (const job of pendingJobs) {
         // Atomic claim ensures multiple dispatchers don't process the same job
         const claimed = await EmailJob.findOneAndUpdate(
           { _id: job._id, status: 'PENDING' },
           { $set: { status: 'QUEUED', queuedAt: new Date() } },
-          { new: true }
+          { new: true },
         );
 
         if (claimed) {
           try {
             await emailQueue.add(
               { emailJobId: claimed._id },
-              { priority: 5, attempts: claimed.maxAttempts } // Bull attempts fallback safety
+              { priority: 5, attempts: claimed.maxAttempts }, // Bull attempts fallback safety
             );
-            logger.info('[DISPATCHER] Outbox job enqueued', { 
-              emailJobId: claimed._id, 
+            logger.info('[DISPATCHER] Outbox job enqueued', {
+              emailJobId: claimed._id,
               traceId: claimed.traceId,
               type: claimed.type,
-              status: 'QUEUED'
+              status: 'QUEUED',
             });
           } catch (bullErr) {
-            logger.error('[DISPATCHER] Bull Add Failed', { 
-              emailJobId: claimed._id, 
-              error: bullErr.message 
+            logger.error('[DISPATCHER] Bull Add Failed', {
+              emailJobId: claimed._id,
+              error: bullErr.message,
             });
             // Revert status to PENDING so it can be picked up by the next sweep
             await EmailJob.updateOne(
               { _id: claimed._id },
-              { $set: { status: 'PENDING' }, $unset: { queuedAt: 1 } }
+              { $set: { status: 'PENDING' }, $unset: { queuedAt: 1 } },
             );
           }
         }
@@ -59,17 +60,16 @@ const startOutboxDispatcher = () => {
       // (This guards against Bull dropping jobs or dispatcher crashing mid-enqueue)
       const stuckJobs = await EmailJob.updateMany(
         { status: 'QUEUED', queuedAt: { $lte: new Date(Date.now() - 300000) } },
-        { $set: { status: 'PENDING' }, $unset: { queuedAt: 1 } }
+        { $set: { status: 'PENDING' }, $unset: { queuedAt: 1 } },
       );
       if (stuckJobs.modifiedCount > 0) {
         logger.warn(`[DISPATCHER] Recovered ${stuckJobs.modifiedCount} stuck QUEUED jobs back to PENDING`);
       }
-
     } catch (err) {
       logger.error('[DISPATCHER] Error during polling', { error: err.message });
     }
   }, 10000); // Poll every 10 seconds
-  
+
   logger.info('Email Outbox Dispatcher started');
 };
 

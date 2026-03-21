@@ -171,7 +171,7 @@ const PORT = process.env.PORT || 5000;
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = () => {
     console.log('[SERVER] Graceful shutdown initiated');
-    
+
     // eslint-disable-next-line global-require
     const { stopOutboxDispatcher } = require('./workers/outboxDispatcher');
     stopOutboxDispatcher();

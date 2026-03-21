@@ -35,8 +35,8 @@ const sendEmail = async (options) => {
         html: options.html,
         text: options.text,
         headers: options.emailJobId ? {
-          'X-Entity-Ref-ID': options.emailJobId.toString()
-        } : undefined
+          'X-Entity-Ref-ID': options.emailJobId.toString(),
+        } : undefined,
       });
       // Timeout is handled inside emailCircuit.fire()
       // Since circuit.fire uses timeout, we return sendPromise
@@ -202,21 +202,23 @@ const startWorker = () => {
     if (!emailJobId) {
       throw new Error('Legacy direct job without emailJobId detected. Abandoning.');
     }
-    
+
     // Acquire ATOMIC Lock
     const claimedJob = await EmailJob.findOneAndUpdate(
       { _id: emailJobId, status: { $in: ['QUEUED', 'FAILED'] } },
       { $set: { status: 'PROCESSING', processedAt: Date.now() } },
-      { new: true }
+      { new: true },
     );
-    
+
     if (!claimedJob) {
       // If it isn't QUEUED or FAILED, it's either already PROCESSING, SENT, or DEAD
       logger.warn('[WORKER] Concurrency lock failed or job finalized externally', { emailJobId });
       return { success: true, duplicate: true };
     }
-    
-    const { payload, traceId, userId, type } = claimedJob;
+
+    const {
+      payload, traceId, type,
+    } = claimedJob;
     const { subject, text, html } = payload;
     const to = claimedJob.email;
 
@@ -275,7 +277,7 @@ const startWorker = () => {
       console.log(`[WORKER] EMAIL_SEND_START  jobId=${job.id}  (${new Date(EMAIL_SEND_START).toISOString()})`);
 
       const sendResult = await sendEmail({
-        to, subject, text, html, emailJobId
+        to, subject, text, html, emailJobId,
       });
 
       const JOB_DONE = Date.now();
@@ -283,12 +285,12 @@ const startWorker = () => {
 
       await EmailJob.updateOne(
         { _id: emailJobId },
-        { 
-          $set: { 
-            status: 'SENT', 
-            providerMessageId: sendResult && sendResult.id 
-          } 
-        }
+        {
+          $set: {
+            status: 'SENT',
+            providerMessageId: sendResult && sendResult.id,
+          },
+        },
       );
 
       console.log(`[WORKER] JOB_COMPLETED  jobId=${job.id}  emailJobId=${emailJobId}  duration=${jobDuration}ms  (${new Date(JOB_DONE).toISOString()})`);
@@ -312,20 +314,20 @@ const startWorker = () => {
         const isDead = newAttempts >= jobDoc.maxAttempts;
         await EmailJob.updateOne(
           { _id: emailJobId },
-          { 
-            $set: { 
+          {
+            $set: {
               status: isDead ? 'DEAD' : 'FAILED',
               attempts: newAttempts,
-              lastError: error.message
-            }
-          }
+              lastError: error.message,
+            },
+          },
         );
-        logger.error('Email processing failed', { 
-          emailJobId, 
+        logger.error('Email processing failed', {
+          emailJobId,
           traceId,
-          error: error.message, 
+          error: error.message,
           status: isDead ? 'DEAD' : 'FAILED',
-          attempt: newAttempts 
+          attempt: newAttempts,
         });
       }
 
