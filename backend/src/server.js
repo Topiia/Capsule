@@ -105,7 +105,7 @@ const PORT = process.env.PORT || 5000;
     // Attach the worker inside the API process so single-tier deployments
     // (like Render Free) process their own email queues.
     // eslint-disable-next-line global-require
-    const { startEmailWorker } = require('./workers/emailWorker');
+    const { startWorker: startEmailWorker } = require('./workers/emailWorker');
     startEmailWorker();
 
     // eslint-disable-next-line global-require
