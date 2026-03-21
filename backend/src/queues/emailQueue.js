@@ -148,8 +148,8 @@ exports.queueEmail = async (emailData, priority = 5, context = {}) => {
 
     // If successful, update to QUEUED
     await EmailJob.updateOne(
-      { _id: jobDoc._id },
-      { $set: { status: 'QUEUED', queuedAt: new Date() } },
+      { _id: jobDoc._id, status: 'PENDING' },
+      { $set: { status: 'QUEUED', queuedAt: new Date() } }
     );
 
     metrics.increment('emailAsyncQueued');
