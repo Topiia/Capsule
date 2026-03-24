@@ -17,6 +17,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── 0. Wake Render backend (cold start guard) ────────────────────────────
+      - name: Wake Render backend (cold start guard)
+        run: |
+          echo "Waiting for Render backend to wake up..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health")
+            echo "Attempt $i — HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Backend is awake and responding"
+              exit 0
+            fi
+            echo "Backend not ready yet, waiting 15s..."
+            sleep 15
+          done
+          echo "❌ Backend did not wake up after 3 minutes"
+          exit 1
+
       # ── 1. Backend CSP enforcement header ───────────────────────────────────
       - name: Check CSP enforcement header (backend)
         run: |
