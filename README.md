@@ -2,6 +2,7 @@
 
 [![Backend CI](https://github.com/Topiia/Capsule/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Topiia/Capsule/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/Topiia/Capsule/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Topiia/Capsule/actions/workflows/frontend-ci.yml)
+[![Security Scan](https://github.com/Topiia/Capsule/actions/workflows/security-scan.yml/badge.svg)](https://github.com/Topiia/Capsule/actions/workflows/security-scan.yml)
 ![Node](https://img.shields.io/badge/node-20.x-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -92,7 +93,9 @@ capsule/
 │   │   ├── middleware/     # Custom middleware
 │   │   ├── utils/          # Utility functions
 │   │   ├── config/         # Configuration files
-│   │   └── services/       # Business logic
+│   │   ├── services/       # Business logic
+│   │   ├── queues/         # Bull job queues
+│   │   └── workers/        # Background workers (email worker)
 │   ├── uploads/            # Local upload directory
 │   └── package.json
 │
@@ -117,7 +120,8 @@ capsule/
 
 ## 🔐 Security Features
 
-- JWT-based authentication
+- JWT-based authentication with 15-minute access token expiry
+- Refresh token rotation with token family tracking (30-day session)
 - Password hashing with bcrypt
 - Input validation and sanitization
 - CORS protection
@@ -170,31 +174,65 @@ capsule/
    Edit `backend/.env` with your credentials:
 
    ```env
+   # Server
+   PORT=5000
+   NODE_ENV=development
+
    # Database
    MONGODB_URI=mongodb://localhost:27017/capsule
-   # OR for MongoDB Atlas:
-   # MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/capsule
 
-   # JWT Secrets (generate strong random strings)
+   # Frontend
+   FRONTEND_URL=http://localhost:3000
+   CORS_ORIGINS=http://localhost:3000
+
+   # JWT
    JWT_SECRET=your-super-secret-jwt-key-here
    JWT_REFRESH_SECRET=your-super-secret-refresh-key
+   JWT_EXPIRE=15m
+   JWT_REFRESH_EXPIRE=30d
 
-   # Resend Email API
+   # Cloudinary
+   CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
+   CLOUDINARY_CLOUD_NAME=your-cloud-name
+   CLOUDINARY_API_KEY=your-api-key
+   CLOUDINARY_API_SECRET=your-api-secret
+
+   # Redis (local dev)
+   REDIS_HOST=127.0.0.1
+   REDIS_PORT=6379
+
+   # Email (Resend)
    RESEND_API_KEY=re_your_resend_api_key
    FROM_EMAIL=onboarding@resend.dev
    FROM_NAME=Capsule
 
-   # Cloudinary
-   CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
+   # Rate Limiting
+   RATE_LIMIT_WINDOW_MS=900000
+   RATE_LIMIT_MAX_REQUESTS=100
 
-   # Frontend URL
-   FRONTEND_URL=http://localhost:3000
+   # Upload
+   MAX_FILE_SIZE=10485760
+   UPLOAD_PATH=uploads/
+
+   # AI
+   AI_TAGGING_ENABLED=true
+   MIN_DESCRIPTION_LENGTH=10
    ```
 
    **Frontend** (`frontend/.env` - Optional):
 
    ```bash
    cp frontend/.env.example frontend/.env
+   ```
+
+   Edit `frontend/.env` with your credentials:
+
+   ```env
+   VITE_API_URL=http://localhost:5000/api
+   VITE_APP_URL=http://localhost:3000
+   VITE_AI_TAGGING_ENABLED=true
+   VITE_MAX_FILE_SIZE=10485760
+   VITE_DEFAULT_THEME=noir-velvet
    ```
 
 5. **Start MongoDB** (if using local installation)
@@ -260,6 +298,10 @@ cd backend
 npm run lint       # zero warnings enforced
 npm test           # Jest 19 test suites + coverage report
 npm run test:watch # watch mode for local dev
+npm run test:unit      # unit tests only
+npm run test:integration  # integration tests only
+npm run worker:email   # start email background worker
+npm run seed           # seed the database with sample data
 
 # Frontend — lint + build + vitest + coverage (≥ 40% lines required)
 cd frontend
@@ -271,9 +313,16 @@ npm run test:coverage  # explicit coverage report
 ```
 
 > **CI Pipeline:** Both test pipelines run automatically on every pull request via GitHub Actions.
+> **Security Scan:** Weekly Monday 9AM UTC — wakes Render backend, audits CSP and security headers, checks SSL expiry, runs npm audit on both frontend and backend. Uploads markdown report as artifact.
 > See [`docs/internal/ci.md`](docs/internal/ci.md) for full pipeline documentation.
 
 ## 🚀 Deployment
+
+## 🌐 Live URLs
+| Service  | URL |
+|----------|-----|
+| Frontend | https://vlogspherefrontend.vercel.app |
+| Backend  | https://capsule-backend.onrender.com |
 
 ### Frontend Deployment (Vercel)
 

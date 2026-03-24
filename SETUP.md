@@ -17,6 +17,9 @@ Before you begin, ensure you have the following installed:
 
 - **Docker** & **Docker Compose** (for containerized deployment)
 - **PM2** (for process management in production)
+- **Redis** 
+  - Local dev: requires Redis running on 127.0.0.1:6379
+  - Production: uses Upstash (set REDIS_URL in Render env vars)
 
 ## 🔧 Installation
 
@@ -45,12 +48,53 @@ nano .env  # or use your preferred editor
 
 **Required Environment Variables:**
 
-- `MONGODB_URI` - Your MongoDB connection string
-- `JWT_SECRET` - A secure random string for JWT signing
-- `JWT_REFRESH_SECRET` - Another secure random string for refresh tokens
-- `CLOUDINARY_CLOUD_NAME` - Your Cloudinary cloud name
-- `CLOUDINARY_API_KEY` - Your Cloudinary API key
-- `CLOUDINARY_API_SECRET` - Your Cloudinary API secret
+Create a `.env` file in the `backend` directory with the following variables:
+
+```env
+# Server
+PORT=5000
+NODE_ENV=development
+
+# Database
+MONGODB_URI=mongodb://localhost:27017/capsule
+
+# Frontend
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGINS=http://localhost:3000
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-here
+JWT_REFRESH_SECRET=your-super-secret-refresh-key
+JWT_EXPIRE=15m
+JWT_REFRESH_EXPIRE=30d
+
+# Cloudinary
+CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# Redis (local dev)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+# Email (Resend)
+RESEND_API_KEY=re_your_resend_api_key
+FROM_EMAIL=onboarding@resend.dev
+FROM_NAME=Capsule
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Upload
+MAX_FILE_SIZE=10485760
+UPLOAD_PATH=uploads/
+
+# AI
+AI_TAGGING_ENABLED=true
+MIN_DESCRIPTION_LENGTH=10
+```
 
 ### 3. Frontend Setup
 
@@ -70,7 +114,15 @@ nano .env  # or use your preferred editor
 
 **Required Environment Variables:**
 
-- `VITE_API_URL` - Your backend API URL (e.g., http://localhost:5000/api)
+Create a `.env` file in the `frontend` directory with the following variables:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_APP_URL=http://localhost:3000
+VITE_AI_TAGGING_ENABLED=true
+VITE_MAX_FILE_SIZE=10485760
+VITE_DEFAULT_THEME=noir-velvet
+```
 
 ### 4. Database Setup
 
@@ -124,6 +176,16 @@ The application will be available at:
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
+
+## Background Workers
+The email queue runs as a separate process using Bull + Redis.
+Start the email worker in a separate terminal:
+```bash
+cd backend
+npm run worker:email
+```
+Requires Redis running locally on port 6379.
+In production (Render), deploy as a separate worker service.
 
 ### Production Mode
 
