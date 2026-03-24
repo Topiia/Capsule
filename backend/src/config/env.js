@@ -26,7 +26,7 @@ module.exports = {
     }
     return process.env.JWT_REFRESH_SECRET;
   },
-  get JWT_EXPIRE() { return process.env.JWT_EXPIRE || '7d'; },
+  get JWT_EXPIRE() { return process.env.JWT_EXPIRE || '15m'; },
   get JWT_REFRESH_EXPIRE() { return process.env.JWT_REFRESH_EXPIRE || '30d'; },
   get EMAIL_ENABLED() { return this.NODE_ENV !== 'test'; },
   get REDIS_ENABLED() { return this.NODE_ENV !== 'test'; },

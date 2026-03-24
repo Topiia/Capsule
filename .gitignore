@@ -113,3 +113,10 @@ simulate_*.js
 docs/csp-maintenance.md
 docs/security-runbook.md
 docs/security_architecture.md
+
+# --- Audit Reports ---
+audit-report/
+audit-reports/
+audit-report
+audit-reports
+architecture-audit/
